@@ -47,11 +47,23 @@ let package = Package(
             path: "Sources/Persistence"
         ),
 
+        // MARK: - libghostty-vt (C library for VT parsing/state)
+        // NOTE: CGhosttyVT headers + static lib are in Sources/CGhosttyVT/ and Frameworks/.
+        // Currently not linked due to missing Highway (hwy) SIMD dependency.
+        // The GhosttyVTTerminal.swift wrapper is ready — needs linker flags resolved.
+        // To enable: add "CGhosttyVT" to Terminal dependencies and uncomment linkerSettings.
+        .target(
+            name: "CGhosttyVT",
+            path: "Sources/CGhosttyVT",
+            publicHeadersPath: "include"
+        ),
+
         // MARK: - Terminal Provider Protocol + PTY
         .target(
             name: "Terminal",
             dependencies: ["Models"],
-            path: "Sources/Terminal"
+            path: "Sources/Terminal",
+            sources: ["TerminalProvider.swift", "PTYProcess.swift", "NativePTYProvider.swift"]
         ),
 
         // MARK: - Terminal SwiftUI View (NSViewRepresentable)
