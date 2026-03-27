@@ -12,6 +12,7 @@ public struct NewSessionDialog: View {
     @State private var tool: Tool = .claude
     @State private var useWorktree: Bool = true
     @State private var branchName: String = ""
+    @State private var branchManuallyEdited: Bool = false
     @State private var validationError: String?
 
     let projects: [Project]
@@ -32,7 +33,7 @@ public struct NewSessionDialog: View {
                 // Title
                 field("Session Name", text: $title, placeholder: "feature-name")
                     .onChange(of: title) {
-                        if useWorktree && (branchName.isEmpty || branchName == autobranchName(from: "")) {
+                        if useWorktree && !branchManuallyEdited {
                             branchName = autobranchName(from: title)
                         }
                     }
@@ -69,7 +70,14 @@ public struct NewSessionDialog: View {
 
                 // Branch name (visible when worktree enabled)
                 if useWorktree {
-                    field("Branch Name", text: $branchName, placeholder: "feature/my-feature")
+                    field("Branch Name", text: Binding(
+                        get: { branchName },
+                        set: { newValue in
+                            branchName = newValue
+                            // If user edits branch to differ from auto, mark as manually edited
+                            branchManuallyEdited = (newValue != autobranchName(from: title))
+                        }
+                    ), placeholder: "feature/my-feature")
                 }
             }
 

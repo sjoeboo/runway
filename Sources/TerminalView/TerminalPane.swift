@@ -22,7 +22,9 @@ public struct TerminalPane: View {
     public var body: some View {
         Group {
             if let state = terminalState {
-                TerminalSurfaceView(context: state)
+                TerminalFocusWrapper {
+                    TerminalSurfaceView(context: state)
+                }
             } else {
                 Color.black
             }
