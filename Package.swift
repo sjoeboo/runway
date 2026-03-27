@@ -12,6 +12,7 @@ let package = Package(
     dependencies: [
         .package(url: "https://github.com/groue/GRDB.swift.git", from: "7.4.0"),
         .package(url: "https://github.com/migueldeicaza/SwiftTerm.git", from: "1.2.0"),
+        .package(url: "https://github.com/Lakr233/libghostty-spm.git", from: "1.0.0"),
     ],
     targets: [
         // MARK: - App Entry Point
@@ -74,6 +75,7 @@ let package = Package(
                 "Terminal",
                 "Theme",
                 .product(name: "SwiftTerm", package: "SwiftTerm"),
+                .product(name: "GhosttyTerminal", package: "libghostty-spm"),
             ],
             path: "Sources/TerminalView"
         ),
