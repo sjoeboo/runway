@@ -5,10 +5,9 @@ import SwiftUI
 /// directly to the Ghostty AppTerminalView, bypassing SwiftUI's event
 /// interception layer.
 ///
-/// SwiftUI's NavigationSplitView and command system intercept key events
-/// before they reach NSViewRepresentable views. This monitor catches
-/// keyDown/keyUp/flagsChanged events and sends them to the terminal
-/// when it's the intended first responder.
+/// SwiftUI's NavigationSplitView intercepts key events before they reach
+/// NSViewRepresentable views. This monitor catches events and forwards
+/// them to the terminal when it's the first responder.
 @MainActor
 public final class TerminalKeyEventMonitor {
     public static let shared = TerminalKeyEventMonitor()
@@ -22,20 +21,24 @@ public final class TerminalKeyEventMonitor {
     public func start() {
         guard keyDownMonitor == nil else { return }
 
-        // Monitor key events to ensure the terminal stays focused.
-        // We DON'T consume events — we just ensure the first responder
-        // is restored to the terminal if something stole it.
-        // AppKit delivers key events to the first responder naturally.
         keyDownMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
-            self?.ensureTerminalFocus(for: event)
-            return event // pass through — let AppKit deliver normally
-        }
-
-        keyUpMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyUp) { event in
+            if self?.forwardToTerminal(event) == true {
+                return nil // consumed — we delivered it directly
+            }
             return event
         }
 
-        flagsMonitor = NSEvent.addLocalMonitorForEvents(matching: .flagsChanged) { event in
+        keyUpMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyUp) { [weak self] event in
+            if self?.forwardToTerminal(event) == true {
+                return nil
+            }
+            return event
+        }
+
+        flagsMonitor = NSEvent.addLocalMonitorForEvents(matching: .flagsChanged) { [weak self] event in
+            if self?.forwardToTerminal(event) == true {
+                return nil
+            }
             return event
         }
     }
@@ -49,43 +52,41 @@ public final class TerminalKeyEventMonitor {
         flagsMonitor = nil
     }
 
-    /// Ensure the terminal has focus when a key event arrives.
-    /// If something stole focus (e.g., SwiftUI sidebar), restore it.
-    private func ensureTerminalFocus(for event: NSEvent) {
-        guard let window = NSApplication.shared.keyWindow else { return }
+    private func forwardToTerminal(_ event: NSEvent) -> Bool {
+        guard let window = NSApplication.shared.keyWindow else { return false }
+        guard let firstResponder = window.firstResponder as? NSView else { return false }
 
-        let fr = window.firstResponder
-        let frClass = fr.map { String(describing: type(of: $0)) } ?? "nil"
+        let className = String(describing: type(of: firstResponder))
 
-        // Already focused on terminal — nothing to do
-        if frClass.contains("AppTerminalView") {
-            return
-        }
+        // Only forward when the terminal is the first responder
+        guard className.contains("AppTerminalView") else { return false }
 
-        // If focus is on a text field (dialog input), don't steal it
-        if frClass.contains("TextField") || frClass.contains("FieldEditor") {
-            return
-        }
-
-        // Focus was lost to something else — try to restore to terminal
-        if let contentView = window.contentView {
-            if let terminal = findTerminalView(in: contentView) {
-                print("[KeyMonitor] Restoring focus from \(frClass) to terminal")
-                window.makeFirstResponder(terminal)
+        // Let Cmd+key shortcuts through to the menu system
+        // EXCEPT Cmd+C (SIGINT) which the terminal needs
+        if event.modifierFlags.contains(.command) && event.type == .keyDown {
+            let key = event.charactersIgnoringModifiers ?? ""
+            if key != "c" && !key.isEmpty {
+                return false
             }
         }
-    }
 
-    private func findTerminalView(in view: NSView) -> NSView? {
-        for subview in view.subviews {
-            let name = String(describing: type(of: subview))
-            if name.contains("AppTerminalView") && subview.acceptsFirstResponder {
-                return subview
-            }
-            if let found = findTerminalView(in: subview) {
-                return found
-            }
+        // Forward the event directly to the terminal view.
+        // Call keyDown which triggers Ghostty's handleKeyDown → interpretKeyEvents chain.
+        switch event.type {
+        case .keyDown:
+            firstResponder.keyDown(with: event)
+            // Also trigger interpretKeyEvents for special keys (Enter, arrows, etc.)
+            // This ensures the NSTextInputClient chain processes them correctly.
+            firstResponder.interpretKeyEvents([event])
+            return true
+        case .keyUp:
+            firstResponder.keyUp(with: event)
+            return true
+        case .flagsChanged:
+            firstResponder.flagsChanged(with: event)
+            return true
+        default:
+            return false
         }
-        return nil
     }
 }
