@@ -144,11 +144,161 @@ extension AppTheme {
         )
     )
 
+    /// Everforest Light — nature-inspired light theme.
+    public static let everforestLight = AppTheme(
+        id: "everforest-light",
+        name: "Everforest Light",
+        appearance: .light,
+        chrome: ChromePalette(
+            background: Color(hex: 0xFDF6E3),
+            surface: Color(hex: 0xF4F0D9),
+            surfaceHover: Color(hex: 0xEAE6C7),
+            border: Color(hex: 0xD5CDB4),
+            text: Color(hex: 0x5C6A72),
+            textDim: Color(hex: 0x829181),
+            accent: Color(hex: 0x8DA101),
+            green: Color(hex: 0x8DA101),
+            yellow: Color(hex: 0xDFA000),
+            red: Color(hex: 0xF85552),
+            orange: Color(hex: 0xF57D26),
+            purple: Color(hex: 0xDF69BA),
+            cyan: Color(hex: 0x35A77C),
+            comment: Color(hex: 0x939F91)
+        ),
+        terminal: TerminalPalette(
+            foreground: Color(hex: 0x5C6A72),
+            background: Color(hex: 0xFDF6E3),
+            cursor: Color(hex: 0x5C6A72),
+            selection: Color(hex: 0xE6E2CC),
+            ansi: [
+                Color(hex: 0x5C6A72), // black
+                Color(hex: 0xF85552), // red
+                Color(hex: 0x8DA101), // green
+                Color(hex: 0xDFA000), // yellow
+                Color(hex: 0x3A94C5), // blue
+                Color(hex: 0xDF69BA), // magenta
+                Color(hex: 0x35A77C), // cyan
+                Color(hex: 0xE0DCC7), // white
+                Color(hex: 0x829181), // bright black
+                Color(hex: 0xF85552), // bright red
+                Color(hex: 0x8DA101), // bright green
+                Color(hex: 0xDFA000), // bright yellow
+                Color(hex: 0x3A94C5), // bright blue
+                Color(hex: 0xDF69BA), // bright magenta
+                Color(hex: 0x35A77C), // bright cyan
+                Color(hex: 0x5C6A72), // bright white
+            ]
+        )
+    )
+
+    /// Oasis Lagoon Dark — deep navy/blue dark theme. Ported from Hangar.
+    public static let oasisLagoonDark = AppTheme(
+        id: "oasis-lagoon-dark",
+        name: "Oasis Lagoon Dark",
+        appearance: .dark,
+        chrome: ChromePalette(
+            background: Color(hex: 0x101825),
+            surface: Color(hex: 0x22385C),
+            surfaceHover: Color(hex: 0x2A4570),
+            border: Color(hex: 0x264870),
+            text: Color(hex: 0xD9E6FA),
+            textDim: Color(hex: 0x8FB0D0),
+            accent: Color(hex: 0x58B8FD),
+            green: Color(hex: 0x53D390),
+            yellow: Color(hex: 0xF0E68C),
+            red: Color(hex: 0xFF7979),
+            orange: Color(hex: 0xF8B471),
+            purple: Color(hex: 0xC695FF),
+            cyan: Color(hex: 0x68C0B6),
+            comment: Color(hex: 0x8FB0D0)
+        ),
+        terminal: TerminalPalette(
+            foreground: Color(hex: 0xD9E6FA),
+            background: Color(hex: 0x101825),
+            cursor: Color(hex: 0x58B8FD),
+            selection: Color(hex: 0x264870),
+            ansi: [
+                Color(hex: 0x101825), // black
+                Color(hex: 0xFF7979), // red
+                Color(hex: 0x53D390), // green
+                Color(hex: 0xF0E68C), // yellow
+                Color(hex: 0x58B8FD), // blue
+                Color(hex: 0xC695FF), // magenta
+                Color(hex: 0x68C0B6), // cyan
+                Color(hex: 0xD9E6FA), // white
+                Color(hex: 0x8FB0D0), // bright black
+                Color(hex: 0xFF7979), // bright red
+                Color(hex: 0x53D390), // bright green
+                Color(hex: 0xF0E68C), // bright yellow
+                Color(hex: 0x58B8FD), // bright blue
+                Color(hex: 0xC695FF), // bright magenta
+                Color(hex: 0x68C0B6), // bright cyan
+                Color(hex: 0xD9E6FA), // bright white
+            ]
+        )
+    )
+
+    /// Oasis Lagoon Light — airy blue light theme. Ported from Hangar.
+    public static let oasisLagoonLight = AppTheme(
+        id: "oasis-lagoon-light",
+        name: "Oasis Lagoon Light",
+        appearance: .light,
+        chrome: ChromePalette(
+            background: Color(hex: 0xEEF4FF),
+            surface: Color(hex: 0xD0E8FE),
+            surfaceHover: Color(hex: 0xC0DEFE),
+            border: Color(hex: 0xB2DCFE),
+            text: Color(hex: 0x10426D),
+            textDim: Color(hex: 0x1F3F71),
+            accent: Color(hex: 0x1670AD),
+            green: Color(hex: 0x1B491D),
+            yellow: Color(hex: 0x6B2E00),
+            red: Color(hex: 0x663021),
+            orange: Color(hex: 0x533C00),
+            purple: Color(hex: 0x46259F),
+            cyan: Color(hex: 0x064658),
+            comment: Color(hex: 0x1F3F71)
+        ),
+        terminal: TerminalPalette(
+            foreground: Color(hex: 0x10426D),
+            background: Color(hex: 0xEEF4FF),
+            cursor: Color(hex: 0x1670AD),
+            selection: Color(hex: 0xB2DCFE),
+            ansi: [
+                Color(hex: 0x10426D), // black
+                Color(hex: 0x663021), // red
+                Color(hex: 0x1B491D), // green
+                Color(hex: 0x6B2E00), // yellow
+                Color(hex: 0x1670AD), // blue
+                Color(hex: 0x46259F), // magenta
+                Color(hex: 0x064658), // cyan
+                Color(hex: 0xD0E8FE), // white
+                Color(hex: 0x1F3F71), // bright black
+                Color(hex: 0x663021), // bright red
+                Color(hex: 0x1B491D), // bright green
+                Color(hex: 0x6B2E00), // bright yellow
+                Color(hex: 0x1670AD), // bright blue
+                Color(hex: 0x46259F), // bright magenta
+                Color(hex: 0x064658), // bright cyan
+                Color(hex: 0x10426D), // bright white
+            ]
+        )
+    )
+
     /// All built-in themes.
     public static let builtIn: [AppTheme] = [
         .tokyoNightStorm,
         .ayuMirage,
         .everforestDark,
+        .everforestLight,
+        .oasisLagoonDark,
+        .oasisLagoonLight,
+    ]
+
+    /// Paired themes for auto light/dark switching.
+    public static let pairedThemes: [(dark: String, light: String)] = [
+        ("everforest-dark", "everforest-light"),
+        ("oasis-lagoon-dark", "oasis-lagoon-light"),
     ]
 }
 

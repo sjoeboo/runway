@@ -19,9 +19,20 @@ struct RunwayApp: App {
         }
         .windowStyle(.titleBar)
         .defaultSize(width: 1200, height: 800)
+        .commands {
+            CommandGroup(after: .sidebar) {
+                Button("Sessions") { store.currentView = .sessions }
+                    .keyboardShortcut("1", modifiers: .command)
+                Button("Pull Requests") { store.currentView = .prs }
+                    .keyboardShortcut("2", modifiers: .command)
+                Button("Todos") { store.currentView = .todos }
+                    .keyboardShortcut("3", modifiers: .command)
+            }
+        }
 
         Settings {
             SettingsView()
+                .environment(store.themeManager)
         }
     }
 }
@@ -30,6 +41,7 @@ struct RunwayApp: App {
 struct ContentView: View {
     @Environment(RunwayStore.self) private var store
     @Environment(\.theme) private var theme
+    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
         NavigationSplitView {
@@ -57,6 +69,10 @@ struct ContentView: View {
             NewProjectDialog { name, path, branch in
                 store.createProject(name: name, path: path, defaultBranch: branch)
             }
+        }
+        // Auto-switch theme with system appearance
+        .onChange(of: colorScheme) { _, newScheme in
+            store.themeManager.updateForColorScheme(newScheme)
         }
     }
 
