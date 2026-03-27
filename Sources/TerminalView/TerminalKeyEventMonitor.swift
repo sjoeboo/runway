@@ -22,24 +22,20 @@ public final class TerminalKeyEventMonitor {
     public func start() {
         guard keyDownMonitor == nil else { return }
 
+        // Monitor key events to ensure the terminal stays focused.
+        // We DON'T consume events — we just ensure the first responder
+        // is restored to the terminal if something stole it.
+        // AppKit delivers key events to the first responder naturally.
         keyDownMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
-            if self?.forwardToTerminal(event) == true {
-                return nil // consumed
-            }
+            self?.ensureTerminalFocus(for: event)
+            return event // pass through — let AppKit deliver normally
+        }
+
+        keyUpMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyUp) { event in
             return event
         }
 
-        keyUpMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyUp) { [weak self] event in
-            if self?.forwardToTerminal(event) == true {
-                return nil
-            }
-            return event
-        }
-
-        flagsMonitor = NSEvent.addLocalMonitorForEvents(matching: .flagsChanged) { [weak self] event in
-            if self?.forwardToTerminal(event) == true {
-                return nil
-            }
+        flagsMonitor = NSEvent.addLocalMonitorForEvents(matching: .flagsChanged) { event in
             return event
         }
     }
@@ -53,42 +49,43 @@ public final class TerminalKeyEventMonitor {
         flagsMonitor = nil
     }
 
-    /// Forward the event to the terminal if it's the first responder.
-    /// Returns true if the event was consumed.
-    private func forwardToTerminal(_ event: NSEvent) -> Bool {
-        guard let window = NSApplication.shared.keyWindow,
-              let firstResponder = window.firstResponder as? NSView else {
-            return false
+    /// Ensure the terminal has focus when a key event arrives.
+    /// If something stole focus (e.g., SwiftUI sidebar), restore it.
+    private func ensureTerminalFocus(for event: NSEvent) {
+        guard let window = NSApplication.shared.keyWindow else { return }
+
+        let fr = window.firstResponder
+        let frClass = fr.map { String(describing: type(of: $0)) } ?? "nil"
+
+        // Already focused on terminal — nothing to do
+        if frClass.contains("AppTerminalView") {
+            return
         }
 
-        let className = String(describing: type(of: firstResponder))
-        guard className.contains("AppTerminalView") else {
-            return false
+        // If focus is on a text field (dialog input), don't steal it
+        if frClass.contains("TextField") || frClass.contains("FieldEditor") {
+            return
         }
 
-        // Don't intercept Cmd+key combos that should go to the menu system
-        // (except Cmd+C which terminal apps need for interrupt)
-        if event.modifierFlags.contains(.command) {
-            let key = event.charactersIgnoringModifiers ?? ""
-            // Let these through to SwiftUI menu commands
-            if ["n", "p", "1", "2", "3", "q", ",", "w"].contains(key) {
-                return false
+        // Focus was lost to something else — try to restore to terminal
+        if let contentView = window.contentView {
+            if let terminal = findTerminalView(in: contentView) {
+                print("[KeyMonitor] Restoring focus from \(frClass) to terminal")
+                window.makeFirstResponder(terminal)
             }
         }
+    }
 
-        // Forward directly to the terminal view
-        switch event.type {
-        case .keyDown:
-            firstResponder.keyDown(with: event)
-            return true
-        case .keyUp:
-            firstResponder.keyUp(with: event)
-            return true
-        case .flagsChanged:
-            firstResponder.flagsChanged(with: event)
-            return true
-        default:
-            return false
+    private func findTerminalView(in view: NSView) -> NSView? {
+        for subview in view.subviews {
+            let name = String(describing: type(of: subview))
+            if name.contains("AppTerminalView") && subview.acceptsFirstResponder {
+                return subview
+            }
+            if let found = findTerminalView(in: subview) {
+                return found
+            }
         }
+        return nil
     }
 }
