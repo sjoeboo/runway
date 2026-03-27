@@ -5,6 +5,7 @@ import Theme
 import Views
 import Terminal
 import StatusDetection
+import TerminalView
 
 @main
 struct RunwayApp: App {
@@ -16,6 +17,10 @@ struct RunwayApp: App {
         // the window, dock icon, and menu bar all appear.
         NSApplication.shared.setActivationPolicy(.regular)
         NSApplication.shared.activate(ignoringOtherApps: true)
+
+        // Start the keyboard event monitor — forwards key events directly
+        // to the Ghostty terminal, bypassing SwiftUI's event interception.
+        TerminalKeyEventMonitor.shared.start()
     }
 
     var body: some Scene {

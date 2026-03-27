@@ -23,12 +23,50 @@ public struct TerminalPane: View {
         VStack(spacing: 0) {
             if let state = terminalState {
                 TerminalSurfaceView(context: state)
-                    .background(TerminalFocusView())
             } else {
                 Color.black
             }
         }
         .onAppear { setupTerminal() }
+        .onAppear { requestTerminalFocus() }
+    }
+
+    /// Walk the key window's view tree to find the Ghostty terminal and give it focus.
+    private func requestTerminalFocus() {
+        for delay in [0.2, 0.5, 1.0, 2.0] {
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+                guard let window = NSApplication.shared.keyWindow else {
+                    print("[Focus] No key window at \(delay)s")
+                    return
+                }
+                if let terminal = Self.findTerminalView(in: window.contentView) {
+                    let result = window.makeFirstResponder(terminal)
+                    let actual = String(describing: type(of: window.firstResponder as Any))
+                    print("[Focus] makeFirstResponder at \(delay)s → \(result), actual=\(actual)")
+                }
+            }
+        }
+    }
+
+    /// Recursively find the Ghostty AppTerminalView in a view hierarchy.
+    private static func findTerminalView(in view: NSView?, depth: Int = 0) -> NSView? {
+        guard let view else { return nil }
+        for subview in view.subviews {
+            let className = String(describing: type(of: subview))
+            let accepts = subview.acceptsFirstResponder
+            if depth < 8 {
+                print("[Focus] \(String(repeating: "  ", count: depth))\(className) acceptsFirstResponder=\(accepts)")
+            }
+            // AppTerminalView from libghostty-spm
+            if className.contains("Terminal") && accepts && !(subview is NSTextField) {
+                print("[Focus] ✓ Found terminal: \(className)")
+                return subview
+            }
+            if let found = findTerminalView(in: subview, depth: depth + 1) {
+                return found
+            }
+        }
+        return nil
     }
 
     private func setupTerminal() {
