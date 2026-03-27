@@ -46,6 +46,11 @@ public struct TerminalPane: View {
             builder.withFontSize(13)
             builder.withCursorStyle(.bar)
             builder.withCursorStyleBlink(true)
+
+            // Set the command to run (e.g., "claude" instead of default shell)
+            if config.command != "/bin/zsh" && config.command != "/bin/bash" {
+                builder.withCustom("command", config.command)
+            }
         })
 
         let state = TerminalViewState(

@@ -21,9 +21,16 @@ public actor WorktreeManager {
         let sanitized = sanitizeBranchName(branchName)
         let worktreePath = "\(repoPath)/.worktrees/\(sanitized)"
 
-        // Update base branch first
-        try await runGit(in: repoPath, args: ["fetch", "origin", baseBranch])
-        try await runGit(in: repoPath, args: ["worktree", "add", "-b", sanitized, worktreePath, "origin/\(baseBranch)"])
+        // Try to update base branch from remote (non-fatal if no remote)
+        let hasRemote = (try? await runGit(in: repoPath, args: ["remote"])).map { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty } ?? false
+
+        if hasRemote {
+            try? await runGit(in: repoPath, args: ["fetch", "origin", baseBranch])
+            try await runGit(in: repoPath, args: ["worktree", "add", "-b", sanitized, worktreePath, "origin/\(baseBranch)"])
+        } else {
+            // No remote — branch from local base branch
+            try await runGit(in: repoPath, args: ["worktree", "add", "-b", sanitized, worktreePath, baseBranch])
+        }
 
         return worktreePath
     }
