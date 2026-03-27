@@ -14,27 +14,39 @@ public struct PRDashboardView: View {
     }
 
     public var body: some View {
-        VStack(spacing: 0) {
-            // Tab bar
-            HStack(spacing: 0) {
-                ForEach(PRTab.allCases, id: \.self) { tab in
-                    tabButton(tab)
+        HSplitView {
+            // Left: PR list
+            VStack(spacing: 0) {
+                // Tab bar
+                HStack(spacing: 0) {
+                    ForEach(PRTab.allCases, id: \.self) { tab in
+                        tabButton(tab)
+                    }
+                    Spacer()
                 }
-                Spacer()
+                .padding(.horizontal)
+                .padding(.vertical, 8)
+                .background(theme.chrome.surface)
+
+                Divider()
+
+                // PR list
+                List(filteredPRs, selection: Binding(
+                    get: { selectedPR?.id },
+                    set: { id in selectedPR = pullRequests.first(where: { $0.id == id }) }
+                )) { pr in
+                    PRRowView(pr: pr)
+                        .tag(pr.id)
+                }
             }
-            .padding(.horizontal)
-            .padding(.vertical, 8)
-            .background(theme.chrome.surface)
 
-            Divider()
-
-            // PR list
-            List(filteredPRs, selection: Binding(
-                get: { selectedPR?.id },
-                set: { id in selectedPR = pullRequests.first(where: { $0.id == id }) }
-            )) { pr in
-                PRRowView(pr: pr)
-                    .tag(pr.id)
+            // Right: PR detail drawer
+            if let pr = selectedPR {
+                PRDetailDrawer(
+                    pr: pr,
+                    onClose: { selectedPR = nil }
+                )
+                .frame(minWidth: 400)
             }
         }
     }

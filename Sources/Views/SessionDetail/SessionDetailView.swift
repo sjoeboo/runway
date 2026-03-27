@@ -1,7 +1,6 @@
 import SwiftUI
 import Models
 import Theme
-import TerminalView
 
 /// Main content area showing the selected session's terminal and status.
 public struct SessionDetailView: View {
@@ -14,26 +13,14 @@ public struct SessionDetailView: View {
 
     public var body: some View {
         VStack(spacing: 0) {
-            // Terminal area
-            TerminalPane(config: terminalConfig)
+            // Terminal tabs area
+            TerminalTabView(session: session)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
 
             // Status bar
             statusBar
         }
         .background(theme.chrome.background)
-    }
-
-    private var terminalConfig: TerminalConfig {
-        TerminalConfig(
-            command: session.tool.command,
-            arguments: [],
-            workingDirectory: session.path,
-            environment: [
-                "RUNWAY_SESSION_ID": session.id,
-                "RUNWAY_TITLE": session.title,
-            ]
-        )
     }
 
     private var statusBar: some View {
