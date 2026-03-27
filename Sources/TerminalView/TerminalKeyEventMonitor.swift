@@ -6,11 +6,15 @@ import SwiftUI
 /// interception layer.
 ///
 /// SwiftUI's NavigationSplitView intercepts key events before they reach
-/// NSViewRepresentable views. This monitor catches events and forwards
-/// them to the terminal when it's the first responder.
+/// NSViewRepresentable views. This monitor catches ALL key events and
+/// routes them to the terminal when appropriate — regardless of what
+/// SwiftUI thinks the first responder is.
 @MainActor
 public final class TerminalKeyEventMonitor {
     public static let shared = TerminalKeyEventMonitor()
+
+    /// Set to true when the sessions view is showing a terminal
+    public var terminalIsVisible: Bool = false
 
     private var keyDownMonitor: Any?
     private var keyUpMonitor: Any?
@@ -22,21 +26,21 @@ public final class TerminalKeyEventMonitor {
         guard keyDownMonitor == nil else { return }
 
         keyDownMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
-            if self?.forwardToTerminal(event) == true {
-                return nil // consumed — we delivered it directly
+            if self?.handleEvent(event) == true {
+                return nil
             }
             return event
         }
 
         keyUpMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyUp) { [weak self] event in
-            if self?.forwardToTerminal(event) == true {
+            if self?.handleEvent(event) == true {
                 return nil
             }
             return event
         }
 
         flagsMonitor = NSEvent.addLocalMonitorForEvents(matching: .flagsChanged) { [weak self] event in
-            if self?.forwardToTerminal(event) == true {
+            if self?.handleEvent(event) == true {
                 return nil
             }
             return event
@@ -52,14 +56,18 @@ public final class TerminalKeyEventMonitor {
         flagsMonitor = nil
     }
 
-    private func forwardToTerminal(_ event: NSEvent) -> Bool {
+    private func handleEvent(_ event: NSEvent) -> Bool {
+        guard terminalIsVisible else { return false }
         guard let window = NSApplication.shared.keyWindow else { return false }
-        guard let firstResponder = window.firstResponder as? NSView else { return false }
 
-        let className = String(describing: type(of: firstResponder))
+        // Check what currently has focus
+        let fr = window.firstResponder
+        let frClass = fr.map { String(describing: type(of: $0)) } ?? "nil"
 
-        // Only forward when the terminal is the first responder
-        guard className.contains("AppTerminalView") else { return false }
+        // Don't steal from text fields (dialog inputs)
+        if frClass.contains("TextField") || frClass.contains("FieldEditor") {
+            return false
+        }
 
         // Let Cmd+key shortcuts through to the menu system
         // EXCEPT Cmd+C (SIGINT) which the terminal needs
@@ -70,23 +78,47 @@ public final class TerminalKeyEventMonitor {
             }
         }
 
-        // Forward the event directly to the terminal view.
-        // Call keyDown which triggers Ghostty's handleKeyDown → interpretKeyEvents chain.
+        // Find the terminal view and forward the event directly
+        guard let terminal = findTerminalView(in: window.contentView) else {
+            return false
+        }
+
+        // Ensure the terminal is first responder (may have been stolen by SwiftUI List)
+        if !(fr === terminal) {
+            window.makeFirstResponder(terminal)
+        }
+
+        if event.type == .keyDown {
+            print("[KeyMonitor] → terminal '\(event.characters ?? "?")' keyCode=\(event.keyCode) (was: \(frClass))")
+        }
+
+        // Forward directly to the terminal
         switch event.type {
         case .keyDown:
-            firstResponder.keyDown(with: event)
-            // Also trigger interpretKeyEvents for special keys (Enter, arrows, etc.)
-            // This ensures the NSTextInputClient chain processes them correctly.
-            firstResponder.interpretKeyEvents([event])
+            terminal.keyDown(with: event)
             return true
         case .keyUp:
-            firstResponder.keyUp(with: event)
+            terminal.keyUp(with: event)
             return true
         case .flagsChanged:
-            firstResponder.flagsChanged(with: event)
+            terminal.flagsChanged(with: event)
             return true
         default:
             return false
         }
+    }
+
+    private func findTerminalView(in view: NSView?) -> NSView? {
+        guard let view else { return nil }
+        for subview in view.subviews {
+            let name = String(describing: type(of: subview))
+            if name.contains("AppTerminalView") && subview.acceptsFirstResponder {
+                return subview
+            }
+            if let found = findTerminalView(in: subview) {
+                return found
+            }
+        }
+        return nil
     }
 }

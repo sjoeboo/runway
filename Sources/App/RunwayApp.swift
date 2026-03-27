@@ -160,11 +160,14 @@ struct ContentView: View {
             if let sessionID = store.selectedSessionID,
                let session = store.sessions.first(where: { $0.id == sessionID }) {
                 SessionDetailView(session: session)
+                    .onAppear { TerminalKeyEventMonitor.shared.terminalIsVisible = true }
+                    .onDisappear { TerminalKeyEventMonitor.shared.terminalIsVisible = false }
             } else {
                 EmptyStateView(
                     title: "No Session Selected",
                     subtitle: "Select a session from the sidebar or press ⌘N to create one"
                 )
+                    .onAppear { TerminalKeyEventMonitor.shared.terminalIsVisible = false }
             }
         case .prs:
             PRDashboardView(pullRequests: store.pullRequests)
