@@ -10,6 +10,14 @@ import StatusDetection
 struct RunwayApp: App {
     @State private var store = RunwayStore()
 
+    init() {
+        // SPM executables don't get a proper .app bundle, so macOS doesn't
+        // activate them as GUI apps. Force regular activation policy so
+        // the window, dock icon, and menu bar all appear.
+        NSApplication.shared.setActivationPolicy(.regular)
+        NSApplication.shared.activate(ignoringOtherApps: true)
+    }
+
     var body: some Scene {
         WindowGroup {
             ContentView()
