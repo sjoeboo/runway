@@ -20,3 +20,4 @@ Frameworks/GhosttyKit.xcframework/
 
 # Hangar config
 .hangar/
+.worktrees/
