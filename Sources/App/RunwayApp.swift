@@ -24,6 +24,7 @@ struct RunwayApp: App {
                 .environment(store)
                 .environment(store.themeManager)
                 .theme(store.themeManager.currentTheme)
+                .preferredColorScheme(store.themeManager.currentTheme.appearance == .dark ? .dark : .light)
         }
         .windowStyle(.titleBar)
         .defaultSize(width: 1200, height: 800)
@@ -52,36 +53,65 @@ struct ContentView: View {
     @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
-        NavigationSplitView {
-            sidebar
-        } detail: {
-            detail
+        ZStack(alignment: .bottom) {
+            NavigationSplitView {
+                sidebar
+                    .background(theme.chrome.surface)
+            } detail: {
+                detail
+            }
+            .navigationSplitViewStyle(.balanced)
+            .toolbar {
+                toolbarContent
+            }
+            .sheet(isPresented: Binding(
+                get: { store.showNewSessionDialog },
+                set: { store.showNewSessionDialog = $0 }
+            )) {
+                NewSessionDialog(projects: store.projects) { request in
+                    Task { await store.handleNewSessionRequest(request) }
+                }
+                .theme(theme)
+            }
+            .sheet(isPresented: Binding(
+                get: { store.showNewProjectDialog },
+                set: { store.showNewProjectDialog = $0 }
+            )) {
+                NewProjectDialog { name, path, branch in
+                    store.createProject(name: name, path: path, defaultBranch: branch)
+                }
+                .theme(theme)
+            }
+
+            // Status message toast
+            if let message = store.statusMessage {
+                statusToast(message)
+                    .onAppear {
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
+                            store.statusMessage = nil
+                        }
+                    }
+            }
         }
-        .navigationSplitViewStyle(.balanced)
         .background(theme.chrome.background)
-        .toolbar {
-            toolbarContent
-        }
-        .sheet(isPresented: Binding(
-            get: { store.showNewSessionDialog },
-            set: { store.showNewSessionDialog = $0 }
-        )) {
-            NewSessionDialog(projects: store.projects) { request in
-                Task { await store.handleNewSessionRequest(request) }
-            }
-        }
-        .sheet(isPresented: Binding(
-            get: { store.showNewProjectDialog },
-            set: { store.showNewProjectDialog = $0 }
-        )) {
-            NewProjectDialog { name, path, branch in
-                store.createProject(name: name, path: path, defaultBranch: branch)
-            }
-        }
-        // Auto-switch theme with system appearance
         .onChange(of: colorScheme) { _, newScheme in
             store.themeManager.updateForColorScheme(newScheme)
         }
+    }
+
+    // MARK: - Status Toast
+
+    private func statusToast(_ message: String) -> some View {
+        Text(message)
+            .font(.caption)
+            .foregroundColor(.white)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 6)
+            .background(theme.chrome.red.opacity(0.9))
+            .cornerRadius(6)
+            .padding(.bottom, 8)
+            .transition(.move(edge: .bottom).combined(with: .opacity))
+            .animation(.easeInOut(duration: 0.3), value: message)
     }
 
     // MARK: - Sidebar
@@ -89,6 +119,7 @@ struct ContentView: View {
     private var sidebar: some View {
         VStack(spacing: 0) {
             viewPicker
+            Divider()
             ProjectTreeView(
                 projects: store.projects,
                 sessions: store.sessions,
@@ -98,18 +129,21 @@ struct ContentView: View {
                 )
             )
         }
-        .frame(minWidth: 220)
+        .frame(minWidth: 240)
     }
 
     private var viewPicker: some View {
         @Bindable var store = store
-        return Picker("View", selection: $store.currentView) {
+        return Picker(selection: $store.currentView) {
             Text("Sessions").tag(AppView.sessions)
             Text("PRs").tag(AppView.prs)
             Text("Todos").tag(AppView.todos)
+        } label: {
+            EmptyView()
         }
         .pickerStyle(.segmented)
-        .padding(8)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
     }
 
     // MARK: - Detail

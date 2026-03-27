@@ -32,7 +32,7 @@ public struct NewSessionDialog: View {
                 // Title
                 field("Session Name", text: $title, placeholder: "feature-name")
                     .onChange(of: title) {
-                        if useWorktree && branchName.isEmpty || branchName == autobranchName(from: "") {
+                        if useWorktree && (branchName.isEmpty || branchName == autobranchName(from: "")) {
                             branchName = autobranchName(from: title)
                         }
                     }

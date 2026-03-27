@@ -28,7 +28,6 @@ public final class RunwayStore {
     let database: Database?
     let hookServer: HookServer
     let statusDetector: StatusDetector
-    let terminalProvider: NativePTYProvider
     let worktreeManager: WorktreeManager
     let hookInjector: HookInjector
 
@@ -38,7 +37,6 @@ public final class RunwayStore {
         self.themeManager = ThemeManager()
         self.hookServer = HookServer()
         self.statusDetector = StatusDetector()
-        self.terminalProvider = NativePTYProvider()
         self.worktreeManager = WorktreeManager()
         self.hookInjector = HookInjector()
 
@@ -46,7 +44,7 @@ public final class RunwayStore {
         do {
             self.database = try Database()
         } catch {
-            print("[RunwayStore] Failed to open database: \(error)")
+            print("[Runway] Failed to open database: \(error)")
             self.database = nil
         }
 
@@ -66,78 +64,8 @@ public final class RunwayStore {
             projects = try db.allProjects()
             sessions = try db.allSessions()
         } catch {
-            print("[RunwayStore] Failed to load state: \(error)")
+            print("[Runway] Failed to load state: \(error)")
         }
-    }
-
-    // MARK: - Session Lifecycle
-
-    func createSession(
-        title: String,
-        projectID: String?,
-        path: String,
-        tool: Tool = .claude,
-        worktreeBranch: String? = nil
-    ) async {
-        let session = Session(
-            title: title,
-            groupID: projectID,
-            path: path,
-            tool: tool,
-            worktreeBranch: worktreeBranch
-        )
-
-        sessions.append(session)
-        try? database?.saveSession(session)
-        selectedSessionID = session.id
-
-        // Start the terminal process
-        await startSession(session)
-    }
-
-    func startSession(_ session: Session) async {
-        let command = session.command ?? session.tool.command
-        let env: [String: String] = [
-            "RUNWAY_SESSION_ID": session.id,
-            "RUNWAY_TITLE": session.title,
-            "RUNWAY_TOOL": session.tool.displayName,
-        ]
-
-        do {
-            let handle = try await terminalProvider.createTerminal(
-                id: session.id,
-                command: command,
-                arguments: [],
-                cwd: URL(fileURLWithPath: session.path),
-                env: env,
-                size: TerminalSize(cols: 120, rows: 40)
-            )
-            updateSessionStatus(id: session.id, status: .running)
-            _ = handle // Will be used by terminal view
-        } catch {
-            updateSessionStatus(id: session.id, status: .error)
-            print("[RunwayStore] Failed to start session: \(error)")
-        }
-    }
-
-    func stopSession(id: String) async {
-        await terminalProvider.terminate(terminal: TerminalHandle(id: id, pid: 0))
-        updateSessionStatus(id: id, status: .stopped)
-    }
-
-    func deleteSession(id: String) {
-        sessions.removeAll { $0.id == id }
-        try? database?.deleteSession(id: id)
-        if selectedSessionID == id {
-            selectedSessionID = sessions.first?.id
-        }
-    }
-
-    private func updateSessionStatus(id: String, status: SessionStatus) {
-        if let idx = sessions.firstIndex(where: { $0.id == id }) {
-            sessions[idx].status = status
-        }
-        try? database?.updateSessionStatus(id: id, status: status)
     }
 
     // MARK: - New Session Request (from dialog)
@@ -146,7 +74,7 @@ public final class RunwayStore {
         var sessionPath = request.path
         var worktreeBranch: String? = nil
 
-        // Create worktree if requested
+        // Try to create worktree if requested (non-fatal — session still created on failure)
         if request.useWorktree, let branchName = request.branchName, !branchName.isEmpty {
             let project = projects.first(where: { $0.id == request.projectID })
             let baseBranch = project?.defaultBranch ?? "main"
@@ -159,18 +87,45 @@ public final class RunwayStore {
                 )
                 worktreeBranch = branchName
             } catch {
-                statusMessage = "Failed to create worktree: \(error.localizedDescription)"
-                return
+                // Worktree failed — create session at project path instead
+                print("[Runway] Worktree creation failed, using project path: \(error)")
+                statusMessage = "Worktree failed: \(error.localizedDescription)"
+                // Don't return — still create the session
             }
         }
 
-        await createSession(
+        let session = Session(
             title: request.title,
-            projectID: request.projectID,
+            groupID: request.projectID,
             path: sessionPath,
             tool: request.tool,
+            status: .idle,
             worktreeBranch: worktreeBranch
         )
+
+        sessions.append(session)
+        try? database?.saveSession(session)
+        selectedSessionID = session.id
+
+        // Note: The terminal is managed by Ghostty's TerminalSurfaceView in the UI.
+        // We don't need to start a PTY here — the view handles it when displayed.
+    }
+
+    // MARK: - Session Lifecycle
+
+    func updateSessionStatus(id: String, status: SessionStatus) {
+        if let idx = sessions.firstIndex(where: { $0.id == id }) {
+            sessions[idx].status = status
+        }
+        try? database?.updateSessionStatus(id: id, status: status)
+    }
+
+    func deleteSession(id: String) {
+        sessions.removeAll { $0.id == id }
+        try? database?.deleteSession(id: id)
+        if selectedSessionID == id {
+            selectedSessionID = sessions.first?.id
+        }
     }
 
     // MARK: - Project Management
@@ -198,7 +153,7 @@ public final class RunwayStore {
         do {
             try await hookServer.start()
         } catch {
-            print("[RunwayStore] Failed to start hook server: \(error)")
+            print("[Runway] Failed to start hook server: \(error)")
         }
     }
 
