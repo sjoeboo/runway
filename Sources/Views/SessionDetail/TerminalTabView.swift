@@ -38,7 +38,7 @@ public struct TerminalTabView: View {
 
             // Terminal for selected tab
             if let tab = selectedTab {
-                TerminalPane(config: tab.config)
+                TerminalWindowView(config: tab.config)
                     .id(tab.id) // Force new view per tab
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             }

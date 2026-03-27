@@ -88,10 +88,6 @@ public final class TerminalKeyEventMonitor {
             window.makeFirstResponder(terminal)
         }
 
-        if event.type == .keyDown {
-            print("[KeyMonitor] → terminal '\(event.characters ?? "?")' keyCode=\(event.keyCode) (was: \(frClass))")
-        }
-
         // Forward directly to the terminal
         switch event.type {
         case .keyDown:
