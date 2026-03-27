@@ -88,10 +88,17 @@ public final class TerminalKeyEventMonitor {
             window.makeFirstResponder(terminal)
         }
 
-        // Forward directly to the terminal
+        // Forward directly to the terminal.
+        // Create a fresh event targeted at the terminal's window to ensure
+        // interpretKeyEvents works correctly in the AppKit event loop.
         switch event.type {
         case .keyDown:
             terminal.keyDown(with: event)
+            // For special keys (Enter, Escape, arrows, Tab), also send the
+            // raw character data directly via insertText as a fallback
+            if let fallback = Self.specialKeyFallback(event) {
+                terminal.insertText(fallback as NSString)
+            }
             return true
         case .keyUp:
             terminal.keyUp(with: event)
@@ -101,6 +108,23 @@ public final class TerminalKeyEventMonitor {
             return true
         default:
             return false
+        }
+    }
+
+    /// Map special keys to their terminal escape sequences / characters.
+    /// Used as fallback when interpretKeyEvents doesn't deliver them.
+    private static func specialKeyFallback(_ event: NSEvent) -> String? {
+        switch event.keyCode {
+        case 36: return "\r"          // Return/Enter
+        case 76: return "\r"          // Numpad Enter
+        case 53: return "\u{1B}"      // Escape
+        case 48: return "\t"          // Tab
+        case 51: return "\u{7F}"      // Backspace (DEL)
+        case 123: return "\u{1B}[D"   // Left arrow
+        case 124: return "\u{1B}[C"   // Right arrow
+        case 125: return "\u{1B}[B"   // Down arrow
+        case 126: return "\u{1B}[A"   // Up arrow
+        default: return nil
         }
     }
 
