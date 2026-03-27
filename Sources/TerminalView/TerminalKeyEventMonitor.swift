@@ -92,14 +92,7 @@ public final class TerminalKeyEventMonitor {
         // Forward to the terminal
         switch event.type {
         case .keyDown:
-            // Try normal keyDown first (works for character keys)
             terminal.keyDown(with: event)
-            // For special keys, also write directly to the Ghostty surface PTY.
-            // This bypasses interpretKeyEvents which doesn't work outside
-            // AppKit's normal event dispatch chain.
-            if let text = Self.specialKeySequence(event) {
-                Self.sendDirectText(text, to: terminal)
-            }
             return true
         case .keyUp:
             terminal.keyUp(with: event)
