@@ -11,6 +11,7 @@ let package = Package(
     ],
     dependencies: [
         .package(url: "https://github.com/groue/GRDB.swift.git", from: "7.4.0"),
+        .package(url: "https://github.com/migueldeicaza/SwiftTerm.git", from: "1.2.0"),
     ],
     targets: [
         // MARK: - App Entry Point
@@ -56,7 +57,11 @@ let package = Package(
         // MARK: - Terminal SwiftUI View (NSViewRepresentable)
         .target(
             name: "TerminalView",
-            dependencies: ["Terminal"],
+            dependencies: [
+                "Terminal",
+                "Theme",
+                .product(name: "SwiftTerm", package: "SwiftTerm"),
+            ],
             path: "Sources/TerminalView"
         ),
 
