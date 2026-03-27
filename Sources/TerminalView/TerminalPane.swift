@@ -20,11 +20,10 @@ public struct TerminalPane: View {
     }
 
     public var body: some View {
-        Group {
+        VStack(spacing: 0) {
             if let state = terminalState {
-                TerminalFocusWrapper {
-                    TerminalSurfaceView(context: state)
-                }
+                TerminalSurfaceView(context: state)
+                    .background(TerminalFocusView())
             } else {
                 Color.black
             }

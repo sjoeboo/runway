@@ -1,67 +1,62 @@
 import AppKit
 import SwiftUI
 
-/// Wraps a SwiftUI view and ensures the first NSView descendant that accepts
-/// first responder gets keyboard focus when the view appears or is clicked.
+/// An invisible NSView overlay that, when clicked or when the view appears,
+/// finds the Ghostty AppTerminalView in the window and makes it first responder.
 ///
-/// This fixes the issue where Ghostty's AppTerminalView (which is an NSView
-/// wrapped in NSViewRepresentable) doesn't automatically become first responder
-/// when embedded in SwiftUI's NavigationSplitView.
-struct TerminalFocusWrapper<Content: View>: NSViewRepresentable {
-    let content: Content
-
-    init(@ViewBuilder content: () -> Content) {
-        self.content = content()
-    }
-
-    func makeNSView(context: Context) -> FocusableHostingView<Content> {
-        let view = FocusableHostingView(rootView: content)
-        // Delay focus request to after the view hierarchy is set up
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-            view.focusTerminalView()
-        }
+/// This fixes keyboard input not working when Ghostty's terminal is embedded
+/// in SwiftUI's NavigationSplitView, which doesn't automatically grant
+/// first responder to NSView-backed views.
+struct TerminalFocusView: NSViewRepresentable {
+    func makeNSView(context: Context) -> FocusHelperView {
+        let view = FocusHelperView()
         return view
     }
 
-    func updateNSView(_ nsView: FocusableHostingView<Content>, context: Context) {
-        nsView.rootView = content
-    }
+    func updateNSView(_ nsView: FocusHelperView, context: Context) {}
 }
 
-/// An NSHostingView that finds and focuses the terminal NSView on click and appearance.
-final class FocusableHostingView<Content: View>: NSHostingView<Content> {
-    override func mouseDown(with event: NSEvent) {
-        super.mouseDown(with: event)
-        focusTerminalView()
-    }
+final class FocusHelperView: NSView {
+    private var didInitialFocus = false
 
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
-        if window != nil {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
-                self?.focusTerminalView()
-            }
+        guard window != nil else { return }
+        // Delay to allow the Ghostty view to fully initialize
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
+            self?.focusTerminal()
         }
     }
 
-    /// Walk the view hierarchy to find the Ghostty terminal view and make it first responder.
-    func focusTerminalView() {
+    override func mouseDown(with event: NSEvent) {
+        super.mouseDown(with: event)
+        focusTerminal()
+    }
+
+    func focusTerminal() {
         guard let window else { return }
-        if let terminalView = findFirstResponderCandidate(in: self) {
-            window.makeFirstResponder(terminalView)
+        // Walk the entire window's view tree to find the Ghostty terminal
+        if let terminal = findTerminalView(in: window.contentView) {
+            window.makeFirstResponder(terminal)
+            didInitialFocus = true
         }
     }
 
-    /// Recursively search for the first NSView that accepts first responder
-    /// and isn't this hosting view itself (we want the terminal, not the wrapper).
-    private func findFirstResponderCandidate(in view: NSView) -> NSView? {
+    /// Find the Ghostty AppTerminalView by looking for an NSView that:
+    /// 1. Accepts first responder
+    /// 2. Has a class name containing "Terminal" (from AppTerminalView)
+    /// 3. Is not a text field or other standard control
+    private func findTerminalView(in view: NSView?) -> NSView? {
+        guard let view else { return nil }
         for subview in view.subviews {
-            // Look for the Ghostty AppTerminalView by checking if it accepts first responder
-            // and has a Metal layer (CAMetalLayer)
-            if subview !== self && subview.acceptsFirstResponder && subview.layer is CAMetalLayer {
+            let className = String(describing: type(of: subview))
+            if subview.acceptsFirstResponder
+                && className.contains("Terminal")
+                && !(subview is NSTextField)
+                && !(subview is NSButton) {
                 return subview
             }
-            if let found = findFirstResponderCandidate(in: subview) {
+            if let found = findTerminalView(in: subview) {
                 return found
             }
         }
