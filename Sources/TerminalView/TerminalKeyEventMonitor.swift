@@ -88,16 +88,16 @@ public final class TerminalKeyEventMonitor {
             window.makeFirstResponder(terminal)
         }
 
-        // Forward directly to the terminal.
-        // Create a fresh event targeted at the terminal's window to ensure
-        // interpretKeyEvents works correctly in the AppKit event loop.
+        // Forward to the terminal
         switch event.type {
         case .keyDown:
+            // Try normal keyDown first (works for character keys)
             terminal.keyDown(with: event)
-            // For special keys (Enter, Escape, arrows, Tab), also send the
-            // raw character data directly via insertText as a fallback
-            if let fallback = Self.specialKeyFallback(event) {
-                terminal.insertText(fallback as NSString)
+            // For special keys, also write directly to the Ghostty surface PTY.
+            // This bypasses interpretKeyEvents which doesn't work outside
+            // AppKit's normal event dispatch chain.
+            if let text = Self.specialKeySequence(event) {
+                Self.sendDirectText(text, to: terminal)
             }
             return true
         case .keyUp:
@@ -111,9 +111,21 @@ public final class TerminalKeyEventMonitor {
         }
     }
 
-    /// Map special keys to their terminal escape sequences / characters.
-    /// Used as fallback when interpretKeyEvents doesn't deliver them.
-    private static func specialKeyFallback(_ event: NSEvent) -> String? {
+    /// Send text directly to the Ghostty surface PTY via ghostty_surface_text.
+    /// Uses KVC to access the internal `surface` property on AppTerminalView.
+    private static func sendDirectText(_ text: String, to terminal: NSView) {
+        // Access core → surface via KVC
+        guard let core = terminal.value(forKey: "core") as? NSObject,
+              let surface = core.value(forKey: "surface") as? NSObject else {
+            return
+        }
+
+        // Call sendText on the TerminalSurface
+        surface.perform(NSSelectorFromString("sendText:"), with: text)
+    }
+
+    /// Map special keys to their terminal escape sequences.
+    private static func specialKeySequence(_ event: NSEvent) -> String? {
         switch event.keyCode {
         case 36: return "\r"          // Return/Enter
         case 76: return "\r"          // Numpad Enter
