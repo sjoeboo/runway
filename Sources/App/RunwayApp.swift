@@ -42,6 +42,22 @@ struct ContentView: View {
         .toolbar {
             toolbarContent
         }
+        .sheet(isPresented: Binding(
+            get: { store.showNewSessionDialog },
+            set: { store.showNewSessionDialog = $0 }
+        )) {
+            NewSessionDialog(projects: store.projects) { request in
+                Task { await store.handleNewSessionRequest(request) }
+            }
+        }
+        .sheet(isPresented: Binding(
+            get: { store.showNewProjectDialog },
+            set: { store.showNewProjectDialog = $0 }
+        )) {
+            NewProjectDialog { name, path, branch in
+                store.createProject(name: name, path: path, defaultBranch: branch)
+            }
+        }
     }
 
     // MARK: - Sidebar
@@ -99,10 +115,17 @@ struct ContentView: View {
     @ToolbarContentBuilder
     private var toolbarContent: some ToolbarContent {
         ToolbarItem(placement: .primaryAction) {
-            Button(action: { store.showNewSessionDialog = true }) {
-                Label("New Session", systemImage: "plus")
+            HStack(spacing: 8) {
+                Button(action: { store.showNewProjectDialog = true }) {
+                    Label("New Project", systemImage: "folder.badge.plus")
+                }
+                .keyboardShortcut("p", modifiers: [.command, .shift])
+
+                Button(action: { store.showNewSessionDialog = true }) {
+                    Label("New Session", systemImage: "plus")
+                }
+                .keyboardShortcut("n", modifiers: .command)
             }
-            .keyboardShortcut("n", modifiers: .command)
         }
     }
 }

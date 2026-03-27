@@ -4,6 +4,7 @@ import Models
 import Persistence
 import Theme
 import Terminal
+import GitOperations
 import StatusDetection
 
 /// Root application state — the single source of truth for the Runway app.
@@ -19,6 +20,8 @@ public final class RunwayStore {
     var selectedSessionID: String?
     var currentView: AppView = .sessions
     var showNewSessionDialog: Bool = false
+    var showNewProjectDialog: Bool = false
+    var statusMessage: String?
 
     // MARK: - Managers
     let themeManager: ThemeManager
@@ -26,6 +29,8 @@ public final class RunwayStore {
     let hookServer: HookServer
     let statusDetector: StatusDetector
     let terminalProvider: NativePTYProvider
+    let worktreeManager: WorktreeManager
+    let hookInjector: HookInjector
 
     // MARK: - Init
 
@@ -34,6 +39,8 @@ public final class RunwayStore {
         self.hookServer = HookServer()
         self.statusDetector = StatusDetector()
         self.terminalProvider = NativePTYProvider()
+        self.worktreeManager = WorktreeManager()
+        self.hookInjector = HookInjector()
 
         // Open database
         do {
@@ -46,8 +53,9 @@ public final class RunwayStore {
         // Load initial state
         Task { await loadState() }
 
-        // Start hook server
+        // Start hook server + inject Claude hooks
         Task { await startHookServer() }
+        Task { try? hookInjector.inject() }
     }
 
     // MARK: - State Loading
@@ -130,6 +138,39 @@ public final class RunwayStore {
             sessions[idx].status = status
         }
         try? database?.updateSessionStatus(id: id, status: status)
+    }
+
+    // MARK: - New Session Request (from dialog)
+
+    func handleNewSessionRequest(_ request: NewSessionRequest) async {
+        var sessionPath = request.path
+        var worktreeBranch: String? = nil
+
+        // Create worktree if requested
+        if request.useWorktree, let branchName = request.branchName, !branchName.isEmpty {
+            let project = projects.first(where: { $0.id == request.projectID })
+            let baseBranch = project?.defaultBranch ?? "main"
+
+            do {
+                sessionPath = try await worktreeManager.createWorktree(
+                    repoPath: request.path,
+                    branchName: branchName,
+                    baseBranch: baseBranch
+                )
+                worktreeBranch = branchName
+            } catch {
+                statusMessage = "Failed to create worktree: \(error.localizedDescription)"
+                return
+            }
+        }
+
+        await createSession(
+            title: request.title,
+            projectID: request.projectID,
+            path: sessionPath,
+            tool: request.tool,
+            worktreeBranch: worktreeBranch
+        )
     }
 
     // MARK: - Project Management
