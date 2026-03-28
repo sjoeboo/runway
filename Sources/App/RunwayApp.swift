@@ -5,7 +5,6 @@ import Theme
 import Views
 import Terminal
 import StatusDetection
-import TerminalView
 
 @main
 struct RunwayApp: App {
@@ -17,10 +16,6 @@ struct RunwayApp: App {
         // the window, dock icon, and menu bar all appear.
         NSApplication.shared.setActivationPolicy(.regular)
         NSApplication.shared.activate(ignoringOtherApps: true)
-
-        // Start the keyboard event monitor — forwards key events directly
-        // to the Ghostty terminal, bypassing SwiftUI's event interception.
-        TerminalKeyEventMonitor.shared.start()
     }
 
     var body: some Scene {
@@ -160,14 +155,11 @@ struct ContentView: View {
             if let sessionID = store.selectedSessionID,
                let session = store.sessions.first(where: { $0.id == sessionID }) {
                 SessionDetailView(session: session)
-                    .onAppear { TerminalKeyEventMonitor.shared.terminalIsVisible = true }
-                    .onDisappear { TerminalKeyEventMonitor.shared.terminalIsVisible = false }
             } else {
                 EmptyStateView(
                     title: "No Session Selected",
                     subtitle: "Select a session from the sidebar or press ⌘N to create one"
                 )
-                    .onAppear { TerminalKeyEventMonitor.shared.terminalIsVisible = false }
             }
         case .prs:
             PRDashboardView(pullRequests: store.pullRequests)
