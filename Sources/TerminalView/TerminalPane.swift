@@ -25,8 +25,11 @@ public struct TerminalPane: NSViewRepresentable {
         let terminal = LocalProcessTerminalView(frame: .zero)
         context.coordinator.terminal = terminal
 
-        // Font
-        terminal.font = NSFont.monospacedSystemFont(ofSize: 13, weight: .regular)
+        // Font — prefer Nerd Font, fall back to system monospace
+        let fontSize = CGFloat(config.fontSize ?? 13)
+        let fontName = config.fontFamily ?? "MesloLGS Nerd Font"
+        terminal.font = NSFont(name: fontName, size: fontSize)
+            ?? NSFont.monospacedSystemFont(ofSize: fontSize, weight: .regular)
 
         // Colors from theme
         applyTheme(terminal)
@@ -121,16 +124,22 @@ public struct TerminalConfig: Sendable {
     public let arguments: [String]
     public let workingDirectory: String?
     public let environment: [String: String]
+    public let fontFamily: String?
+    public let fontSize: Float?
 
     public init(
         command: String = "/bin/zsh",
         arguments: [String] = [],
         workingDirectory: String? = nil,
-        environment: [String: String] = [:]
+        environment: [String: String] = [:],
+        fontFamily: String? = nil,
+        fontSize: Float? = nil
     ) {
         self.command = command
         self.arguments = arguments
         self.workingDirectory = workingDirectory
         self.environment = environment
+        self.fontFamily = fontFamily
+        self.fontSize = fontSize
     }
 }

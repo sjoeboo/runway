@@ -24,6 +24,8 @@ public struct TerminalTabView: View {
     @State private var tabs: [TerminalTab] = []
     @State private var selectedTabID: String?
     @Environment(\.theme) private var theme
+    @AppStorage("terminalFontFamily") private var fontFamily: String = "MesloLGS Nerd Font"
+    @AppStorage("terminalFontSize") private var fontSize: Double = 13
 
     public init(session: Session) {
         self.session = session
@@ -118,7 +120,9 @@ public struct TerminalTabView: View {
                 environment: [
                     "RUNWAY_SESSION_ID": session.id,
                     "RUNWAY_TITLE": session.title,
-                ]
+                ],
+                fontFamily: fontFamily,
+                fontSize: Float(fontSize)
             ),
             isMain: true
         )
@@ -136,7 +140,9 @@ public struct TerminalTabView: View {
                 workingDirectory: session.path,
                 environment: [
                     "RUNWAY_SESSION_ID": session.id,
-                ]
+                ],
+                fontFamily: fontFamily,
+                fontSize: Float(fontSize)
             )
         )
 
