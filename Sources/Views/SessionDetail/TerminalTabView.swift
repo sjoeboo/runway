@@ -40,9 +40,13 @@ public struct TerminalTabView: View {
 
             // Terminal for selected tab
             if let tab = selectedTab {
-                TerminalPane(config: tab.config)
-                    .id(tab.id) // Force new view per tab
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                TerminalPane(
+                    config: tab.config,
+                    sessionID: session.id,
+                    tabID: tab.id
+                )
+                .id("\(session.id)_\(tab.id)")
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
         .onAppear { initializeTabs() }

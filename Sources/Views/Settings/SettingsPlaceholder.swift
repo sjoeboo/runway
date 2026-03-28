@@ -92,7 +92,7 @@ public struct SettingsView: View {
         Form {
             Section("Terminal Font") {
                 Picker("Font Family", selection: $fontFamily) {
-                    ForEach(availableMonoFonts(), id: \.self) { name in
+                    ForEach(availableFonts(), id: \.self) { name in
                         Text(name)
                             .font(.system(size: 12, design: .monospaced))
                             .tag(name)
@@ -125,22 +125,30 @@ public struct SettingsView: View {
         .padding()
     }
 
-    /// List monospaced fonts available on the system, prioritizing Nerd Fonts.
-    private func availableMonoFonts() -> [String] {
+    /// List fonts available on the system, grouped: Nerd Fonts → Monospaced → All others.
+    private func availableFonts() -> [String] {
         let allFamilies = NSFontManager.shared.availableFontFamilies
 
         var nerdFonts: [String] = []
-        var otherMono: [String] = []
+        var monoFonts: [String] = []
+        var otherFonts: [String] = []
 
         for family in allFamilies.sorted() {
             if family.contains("Nerd Font") {
                 nerdFonts.append(family)
             } else if isMonospaced(family) {
-                otherMono.append(family)
+                monoFonts.append(family)
+            } else {
+                otherFonts.append(family)
             }
         }
 
-        return nerdFonts + ["---"] + otherMono
+        var result = nerdFonts
+        if !nerdFonts.isEmpty && !monoFonts.isEmpty { result.append("── Monospaced ──") }
+        result += monoFonts
+        if !otherFonts.isEmpty { result.append("── All Fonts ──") }
+        result += otherFonts
+        return result
     }
 
     private func isMonospaced(_ family: String) -> Bool {

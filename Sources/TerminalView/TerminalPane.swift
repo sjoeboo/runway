@@ -6,84 +6,89 @@ import Theme
 
 /// A SwiftUI view wrapping SwiftTerm's LocalProcessTerminalView.
 ///
-/// SwiftTerm is a mature terminal emulator designed for embedding in macOS apps.
-/// It handles its own PTY, keyboard input, and focus management as a self-contained
-/// NSView — no event monitor hacks needed.
+/// Uses TerminalSessionCache to persist terminal sessions across view lifecycle —
+/// switching tabs or navigating away doesn't kill the PTY process.
 public struct TerminalPane: NSViewRepresentable {
     public let config: TerminalConfig
+    public let sessionID: String
+    public let tabID: String
     @Environment(\.theme) private var theme
 
-    public init(config: TerminalConfig = TerminalConfig()) {
+    public init(config: TerminalConfig, sessionID: String = "", tabID: String = "") {
         self.config = config
+        self.sessionID = sessionID
+        self.tabID = tabID
     }
 
     public func makeCoordinator() -> Coordinator {
         Coordinator()
     }
 
-    public func makeNSView(context: Context) -> LocalProcessTerminalView {
-        let terminal = LocalProcessTerminalView(frame: .zero)
+    public func makeNSView(context: Context) -> NSView {
+        // Use a container view so we can swap the terminal in/out
+        let container = TerminalContainerView()
+
+        let terminal = TerminalSessionCache.shared.terminalView(
+            forSessionID: sessionID,
+            tabID: tabID
+        ) {
+            createTerminal()
+        }
+
+        container.embed(terminal)
         context.coordinator.terminal = terminal
 
-        // Font — prefer Nerd Font, fall back to system monospace
+        // Request focus
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+            terminal.window?.makeFirstResponder(terminal)
+        }
+
+        return container
+    }
+
+    public func updateNSView(_ nsView: NSView, context: Context) {
+        if let terminal = context.coordinator.terminal {
+            applyTheme(terminal)
+        }
+    }
+
+    private func createTerminal() -> LocalProcessTerminalView {
+        // Start the Shift+Enter monitor (idempotent)
+        ShiftEnterMonitor.shared.start()
+
+        let terminal = LocalProcessTerminalView(frame: .zero)
+
+        // Font
         let fontSize = CGFloat(config.fontSize ?? 13)
         let fontName = config.fontFamily ?? "MesloLGS Nerd Font"
         terminal.font = NSFont(name: fontName, size: fontSize)
             ?? NSFont.monospacedSystemFont(ofSize: fontSize, weight: .regular)
 
-        // Colors from theme
+        // Colors
         applyTheme(terminal)
 
-        // Start the process
+        // Start process
         let shell = ProcessInfo.processInfo.environment["SHELL"] ?? "/bin/zsh"
         let env = buildEnvironment()
 
-        if config.command == "claude" || config.command == "/bin/zsh" || config.command == "/bin/bash" {
-            // For claude or shells, start the shell and optionally send commands
-            terminal.startProcess(
-                executable: shell,
-                args: [],
-                environment: env,
-                execName: nil
-            )
+        terminal.startProcess(
+            executable: shell,
+            args: [],
+            environment: env,
+            execName: nil
+        )
 
-            // If the tool is claude, send the command after shell starts
-            if config.command == "claude" {
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                    terminal.send(txt: "claude\r")
-                }
-            }
-
-            // cd to working directory
-            if let cwd = config.workingDirectory {
-                terminal.send(txt: "cd \(shellEscape(cwd)) && clear\r")
-            }
-        } else {
-            // Custom command — start the shell and run it
-            terminal.startProcess(
-                executable: shell,
-                args: [],
-                environment: env,
-                execName: nil
-            )
-            if let cwd = config.workingDirectory {
+        // cd + optionally run command
+        if let cwd = config.workingDirectory {
+            if config.command != "/bin/zsh" && config.command != "/bin/bash"
+                && config.command != shell {
                 terminal.send(txt: "cd \(shellEscape(cwd)) && \(config.command)\r")
             } else {
-                terminal.send(txt: "\(config.command)\r")
+                terminal.send(txt: "cd \(shellEscape(cwd)) && clear\r")
             }
-        }
-
-        // Request focus after a short delay
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-            terminal.window?.makeFirstResponder(terminal)
         }
 
         return terminal
-    }
-
-    public func updateNSView(_ terminal: LocalProcessTerminalView, context: Context) {
-        // Re-apply theme colors if changed
-        applyTheme(terminal)
     }
 
     private func applyTheme(_ terminal: LocalProcessTerminalView) {
@@ -110,10 +115,53 @@ public struct TerminalPane: NSViewRepresentable {
         "'" + path.replacingOccurrences(of: "'", with: "'\\''") + "'"
     }
 
-    // MARK: - Coordinator
-
     public class Coordinator {
         var terminal: LocalProcessTerminalView?
+    }
+}
+
+// MARK: - Container View
+
+/// Simple NSView container that holds the terminal view.
+/// Ensures proper autoresizing when embedded in SwiftUI.
+class TerminalContainerView: NSView {
+    func embed(_ terminal: NSView) {
+        // Remove previous
+        subviews.forEach { $0.removeFromSuperview() }
+
+        terminal.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(terminal)
+        NSLayoutConstraint.activate([
+            terminal.topAnchor.constraint(equalTo: topAnchor),
+            terminal.bottomAnchor.constraint(equalTo: bottomAnchor),
+            terminal.leadingAnchor.constraint(equalTo: leadingAnchor),
+            terminal.trailingAnchor.constraint(equalTo: trailingAnchor),
+        ])
+    }
+}
+
+// MARK: - Shift+Enter Support
+
+/// Installs a local event monitor that intercepts Shift+Enter and sends
+/// the CSI u escape sequence (\e[13;2u) that Claude Code recognizes as
+/// "insert newline" instead of "submit".
+@MainActor
+class ShiftEnterMonitor {
+    static let shared = ShiftEnterMonitor()
+    private var monitor: Any?
+
+    func start() {
+        guard monitor == nil else { return }
+        monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
+            // Shift+Enter (keyCode 36 with shift)
+            if event.keyCode == 36 && event.modifierFlags.contains(.shift) {
+                if let terminal = NSApplication.shared.keyWindow?.firstResponder as? LocalProcessTerminalView {
+                    terminal.send(txt: "\u{1B}[13;2u")
+                    return nil // consumed
+                }
+            }
+            return event
+        }
     }
 }
 
