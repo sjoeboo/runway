@@ -10,7 +10,7 @@ struct TerminalTab: Identifiable {
     let config: TerminalConfig
     let isMain: Bool
 
-    init(id: String = UUID().uuidString, title: String, config: TerminalConfig, isMain: Bool = false) {
+    init(id: String, title: String, config: TerminalConfig, isMain: Bool = false) {
         self.id = id
         self.title = title
         self.config = config
@@ -115,7 +115,9 @@ public struct TerminalTabView: View {
     private func initializeTabs() {
         guard tabs.isEmpty else { return }
 
+        let mainTabID = "\(session.id)_main"
         let mainTab = TerminalTab(
+            id: mainTabID,
             title: session.tool.displayName,
             config: TerminalConfig(
                 command: session.tool.command,
@@ -137,7 +139,9 @@ public struct TerminalTabView: View {
 
     private func addShellTab() {
         let shellCount = tabs.filter { !$0.isMain }.count + 1
+        let tabID = "\(session.id)_shell\(shellCount)"
         let tab = TerminalTab(
+            id: tabID,
             title: "Shell \(shellCount)",
             config: TerminalConfig(
                 command: ProcessInfo.processInfo.environment["SHELL"] ?? "/bin/zsh",
