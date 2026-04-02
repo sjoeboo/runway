@@ -99,7 +99,8 @@ public struct HookInjector: Sendable {
         let settingsPath = "\(dir)/settings.json"
 
         guard let rawSettings = try? readSettings(at: settingsPath),
-              let hooks = rawSettings["hooks"] as? [String: Any] else {
+            let hooks = rawSettings["hooks"] as? [String: Any]
+        else {
             return false
         }
 
@@ -157,8 +158,8 @@ public struct HookInjector: Sendable {
 
         for block in blocks {
             if let hookList = block["hooks"] as? [[String: Any]] {
-                for hook in hookList {
-                    if isRunwayHook(hook) { return true }
+                for hook in hookList where isRunwayHook(hook) {
+                    return true
                 }
             }
         }

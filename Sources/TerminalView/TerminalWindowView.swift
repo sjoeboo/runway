@@ -1,6 +1,6 @@
 import AppKit
-import SwiftUI
 import GhosttyTerminal
+import SwiftUI
 import Theme
 
 /// Embeds the Ghostty terminal in a child NSPanel that overlays the SwiftUI detail area.
@@ -30,11 +30,11 @@ public struct TerminalWindowView: NSViewRepresentable {
 /// AppTerminalView (NSView) directly and add it as a subview. This keeps it in
 /// the same window but gives us direct control over the view hierarchy.
 public final class TerminalHostView: NSView {
-    private var terminalView: NSView? // AppTerminalView
+    private var terminalView: NSView?  // AppTerminalView
     private var controller: TerminalController?
     private var state: TerminalViewState?
 
-    public override var acceptsFirstResponder: Bool { true }
+    override public var acceptsFirstResponder: Bool { true }
 
     func setup(config: TerminalConfig, theme: AppTheme) {
         // Create the Ghostty state
@@ -83,7 +83,7 @@ public final class TerminalHostView: NSView {
         }
     }
 
-    public override func viewDidMoveToWindow() {
+    override public func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
         if window != nil {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
@@ -92,7 +92,7 @@ public final class TerminalHostView: NSView {
         }
     }
 
-    public override func mouseDown(with event: NSEvent) {
+    override public func mouseDown(with event: NSEvent) {
         super.mouseDown(with: event)
         focusTerminal()
     }

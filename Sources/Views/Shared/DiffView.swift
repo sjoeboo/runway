@@ -1,5 +1,5 @@
-import SwiftUI
 import Models
+import SwiftUI
 import Theme
 
 /// Renders a unified diff with syntax-highlighted additions/deletions.
@@ -11,9 +11,10 @@ public struct DiffView: View {
     public init(files: [DiffFile]) {
         self.files = files
         // Auto-expand if single file
-        self._expandedFiles = State(initialValue: files.count == 1
-            ? Set(files.map(\.path))
-            : Set()
+        self._expandedFiles = State(
+            initialValue: files.count == 1
+                ? Set(files.map(\.path))
+                : Set()
         )
     }
 
@@ -57,10 +58,12 @@ public struct DiffView: View {
             // File header (clickable to expand/collapse)
             Button(action: { toggleFile(file.path) }) {
                 HStack(spacing: 6) {
-                    Image(systemName: expandedFiles.contains(file.path)
-                        ? "chevron.down" : "chevron.right")
-                        .font(.caption2)
-                        .foregroundColor(theme.chrome.textDim)
+                    Image(
+                        systemName: expandedFiles.contains(file.path)
+                            ? "chevron.down" : "chevron.right"
+                    )
+                    .font(.caption2)
+                    .foregroundColor(theme.chrome.textDim)
 
                     Text(file.path)
                         .font(.system(.caption, design: .monospaced))
@@ -181,15 +184,15 @@ public struct DiffFile: Identifiable, Sendable {
             } else if rawLine.hasPrefix("+++ b/") {
                 currentPath = String(rawLine.dropFirst("+++ b/".count))
             } else if rawLine.hasPrefix("--- ") {
-                continue // skip old file header
+                continue  // skip old file header
             } else if rawLine.hasPrefix("@@") {
                 // Parse hunk header: @@ -oldStart,count +newStart,count @@
                 let parts = rawLine.components(separatedBy: " ")
                 if parts.count >= 3 {
-                    let newPart = parts[2] // "+newStart,count" or "+newStart"
+                    let newPart = parts[2]  // "+newStart,count" or "+newStart"
                     let nums = newPart.dropFirst().components(separatedBy: ",")
                     newLine = Int(nums[0]) ?? 0
-                    let oldPart = parts[1] // "-oldStart,count"
+                    let oldPart = parts[1]  // "-oldStart,count"
                     let oldNums = oldPart.dropFirst().components(separatedBy: ",")
                     oldLine = Int(oldNums[0]) ?? 0
                 }

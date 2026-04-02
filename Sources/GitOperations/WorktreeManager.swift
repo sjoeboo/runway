@@ -22,7 +22,8 @@ public actor WorktreeManager {
         let worktreePath = "\(repoPath)/.worktrees/\(sanitized)"
 
         // Try to update base branch from remote (non-fatal if no remote)
-        let hasRemote = (try? await runGit(in: repoPath, args: ["remote"])).map { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty } ?? false
+        let hasRemote =
+            (try? await runGit(in: repoPath, args: ["remote"])).map { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty } ?? false
 
         if hasRemote {
             try? await runGit(in: repoPath, args: ["fetch", "origin", baseBranch])
@@ -85,10 +86,9 @@ public actor WorktreeManager {
         }
 
         // Fallback: check if common default branch names exist locally
-        for candidate in ["main", "master"] {
-            if let _ = try? await runGit(in: repoPath, args: ["rev-parse", "--verify", candidate]) {
-                return candidate
-            }
+        for candidate in ["main", "master"]
+        where (try? await runGit(in: repoPath, args: ["rev-parse", "--verify", candidate])) != nil {
+            return candidate
         }
 
         return "main"
@@ -140,11 +140,12 @@ public actor WorktreeManager {
         for line in output.components(separatedBy: "\n") {
             if line.hasPrefix("worktree ") {
                 if let path = current.path {
-                    worktrees.append(WorktreeInfo(
-                        path: path,
-                        branch: current.branch ?? "",
-                        isBare: current.isBare
-                    ))
+                    worktrees.append(
+                        WorktreeInfo(
+                            path: path,
+                            branch: current.branch ?? "",
+                            isBare: current.isBare
+                        ))
                 }
                 current = (String(line.dropFirst("worktree ".count)), nil, false)
             } else if line.hasPrefix("branch ") {
@@ -156,11 +157,12 @@ public actor WorktreeManager {
         }
 
         if let path = current.path {
-            worktrees.append(WorktreeInfo(
-                path: path,
-                branch: current.branch ?? "",
-                isBare: current.isBare
-            ))
+            worktrees.append(
+                WorktreeInfo(
+                    path: path,
+                    branch: current.branch ?? "",
+                    isBare: current.isBare
+                ))
         }
 
         return worktrees

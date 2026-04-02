@@ -53,7 +53,8 @@ final class FocusHelperView: NSView {
             if subview.acceptsFirstResponder
                 && className.contains("Terminal")
                 && !(subview is NSTextField)
-                && !(subview is NSButton) {
+                && !(subview is NSButton)
+            {
                 return subview
             }
             if let found = findTerminalView(in: subview) {

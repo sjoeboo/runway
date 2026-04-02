@@ -1,5 +1,6 @@
-import Testing
 import Foundation
+import Testing
+
 @testable import GitOperations
 
 // MARK: - WorktreeInfo
@@ -83,8 +84,8 @@ private func withTempGitRepo(_ body: (String) async throws -> Void) async throws
         let manager = WorktreeManager()
         let branch = await manager.currentBranch(path: repoPath)
         // Default branch in `git init` (depends on git config, usually main or master)
-        #expect(branch != nil)
-        #expect(!branch!.isEmpty)
+        let branchName = try #require(branch)
+        #expect(!branchName.isEmpty)
     }
 }
 
@@ -153,7 +154,7 @@ private func withTempGitRepo(_ body: (String) async throws -> Void) async throws
         #expect(!FileManager.default.fileExists(atPath: worktreePath))
 
         let worktrees = try await manager.listWorktrees(repoPath: repoPath)
-        #expect(worktrees.count == 1) // Back to just the main worktree
+        #expect(worktrees.count == 1)  // Back to just the main worktree
     }
 }
 

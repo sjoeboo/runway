@@ -28,10 +28,13 @@ public struct SettingsView: View {
     private var appearanceSettings: some View {
         Form {
             Section("Theme Mode") {
-                Picker("Mode", selection: Binding(
-                    get: { themeManager.themeMode },
-                    set: { themeManager.themeMode = $0 }
-                )) {
+                Picker(
+                    "Mode",
+                    selection: Binding(
+                        get: { themeManager.themeMode },
+                        set: { themeManager.themeMode = $0 }
+                    )
+                ) {
                     ForEach(ThemeMode.allCases, id: \.self) { mode in
                         Text(mode.rawValue).tag(mode)
                     }
@@ -109,7 +112,8 @@ public struct SettingsView: View {
             }
 
             Section("Preview") {
-                let previewFont = NSFont(name: fontFamily, size: CGFloat(fontSize))
+                let previewFont =
+                    NSFont(name: fontFamily, size: CGFloat(fontSize))
                     ?? NSFont.monospacedSystemFont(ofSize: CGFloat(fontSize), weight: .regular)
 
                 Text("$ claude --help\n  ~/code/runway on  master [!3]\n❯ ls -la  total 42")

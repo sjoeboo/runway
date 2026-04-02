@@ -1,7 +1,8 @@
-import Testing
 import Foundation
-@testable import StatusDetection
 import Models
+import Testing
+
+@testable import StatusDetection
 
 // MARK: - Additional Claude Detection Patterns
 
@@ -154,14 +155,14 @@ import Models
     let detector = StatusDetector()
     // Old content at top (idle), new content at bottom (busy)
     let content = """
-    ❯ help me
+        ❯ help me
 
-    I'll help you with that.
+        I'll help you with that.
 
-    Working...
-    ⠙ Reading files
-    ctrl+c to interrupt
-    """
+        Working...
+        ⠙ Reading files
+        ctrl+c to interrupt
+        """
     let result = detector.detect(content: content, tool: .claude)
     #expect(result == .running)
 }

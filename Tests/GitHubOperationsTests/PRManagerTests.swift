@@ -1,7 +1,8 @@
-import Testing
 import Foundation
-@testable import GitHubOperations
 import Models
+import Testing
+
+@testable import GitHubOperations
 
 // MARK: - GHError
 
@@ -24,7 +25,7 @@ import Models
 
 @Test func prDetailDefaults() {
     let detail = PRDetail()
-    #expect(detail.body == "")
+    #expect(detail.body.isEmpty)
     #expect(detail.reviews.isEmpty)
     #expect(detail.comments.isEmpty)
     #expect(detail.files.isEmpty)

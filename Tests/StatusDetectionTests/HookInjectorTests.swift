@@ -1,5 +1,6 @@
-import Testing
 import Foundation
+import Testing
+
 @testable import StatusDetection
 
 // MARK: - HookInjector Filesystem Tests
@@ -18,8 +19,8 @@ import Foundation
 
     // Verify JSON structure
     let data = try Data(contentsOf: URL(fileURLWithPath: settingsPath))
-    let json = try JSONSerialization.jsonObject(with: data) as! [String: Any]
-    let hooks = json["hooks"] as! [String: Any]
+    let json = try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
+    let hooks = try #require(json["hooks"] as? [String: Any])
 
     // Check that all expected events are present
     #expect(hooks["SessionStart"] != nil)
@@ -39,7 +40,7 @@ import Foundation
     #expect(first == true)
 
     let second = try injector.inject(port: 47437, configDir: tmpDir)
-    #expect(second == false) // Already installed, no change
+    #expect(second == false)  // Already installed, no change
 }
 
 @Test func hookInjectorIsInstalled() throws {
@@ -83,7 +84,7 @@ import Foundation
 
     // Verify existing settings are preserved
     let updated = try Data(contentsOf: URL(fileURLWithPath: "\(tmpDir)/settings.json"))
-    let json = try JSONSerialization.jsonObject(with: updated) as! [String: Any]
+    let json = try #require(JSONSerialization.jsonObject(with: updated) as? [String: Any])
     #expect(json["apiKey"] as? String == "test-key")
     #expect(json["model"] as? String == "claude-4")
     #expect(json["hooks"] != nil)

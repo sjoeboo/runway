@@ -27,10 +27,12 @@ public actor PRManager {
 
     /// Fetch PR for a specific worktree directory (by current branch).
     public func fetchPRForWorktree(path: String) async throws -> PullRequest? {
-        let output = try? await runGH(args: [
-            "pr", "view",
-            "--json", "number,title,state,headRefName,baseRefName,author,url,isDraft,additions,deletions,changedFiles,createdAt,updatedAt,reviewDecision,statusCheckRollup",
-        ], cwd: path)
+        let output = try? await runGH(
+            args: [
+                "pr", "view",
+                "--json",
+                "number,title,state,headRefName,baseRefName,author,url,isDraft,additions,deletions,changedFiles,createdAt,updatedAt,reviewDecision,statusCheckRollup",
+            ], cwd: path)
 
         guard let output, !output.isEmpty else { return nil }
         return try parseSinglePR(output)
@@ -91,8 +93,10 @@ public actor PRManager {
     }
 
     private func buildListArgs(repo: String?, filter: PRFilter) -> [String] {
-        var args = ["pr", "list", "--json",
-                    "number,title,state,headRefName,baseRefName,author,url,isDraft,additions,deletions,changedFiles,createdAt,updatedAt,reviewDecision"]
+        var args = [
+            "pr", "list", "--json",
+            "number,title,state,headRefName,baseRefName,author,url,isDraft,additions,deletions,changedFiles,createdAt,updatedAt,reviewDecision",
+        ]
 
         if let repo {
             args += ["--repo", repo]

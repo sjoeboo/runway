@@ -1,6 +1,7 @@
-import Testing
-@testable import StatusDetection
 import Models
+import Testing
+
+@testable import StatusDetection
 
 @Test func detectClaudeBusy() {
     let detector = StatusDetector()

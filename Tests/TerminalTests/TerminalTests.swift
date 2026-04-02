@@ -1,5 +1,6 @@
-import Testing
 import Foundation
+import Testing
+
 @testable import Terminal
 
 // MARK: - TerminalSize
@@ -45,7 +46,7 @@ import Foundation
     let buffer = RingBuffer(capacity: 10)
     buffer.append(Data("12345".utf8))
     buffer.append(Data("67890".utf8))
-    buffer.append(Data("ABCDE".utf8)) // This should push out the oldest data
+    buffer.append(Data("ABCDE".utf8))  // This should push out the oldest data
 
     let tail = buffer.tail(maxBytes: 100)
     #expect(tail.count <= 10)

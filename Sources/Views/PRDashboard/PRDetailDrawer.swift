@@ -1,5 +1,5 @@
-import SwiftUI
 import Models
+import SwiftUI
 import Theme
 
 /// Sliding drawer showing detailed PR information with tabbed content.

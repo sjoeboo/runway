@@ -1,11 +1,11 @@
-import SwiftUI
+import GitHubOperations
 import Models
 import Persistence
+import StatusDetection
+import SwiftUI
+import Terminal
 import Theme
 import Views
-import Terminal
-import GitHubOperations
-import StatusDetection
 
 @main
 struct RunwayApp: App {
@@ -63,19 +63,23 @@ struct ContentView: View {
             .toolbar {
                 toolbarContent
             }
-            .sheet(isPresented: Binding(
-                get: { store.showNewSessionDialog },
-                set: { store.showNewSessionDialog = $0 }
-            )) {
+            .sheet(
+                isPresented: Binding(
+                    get: { store.showNewSessionDialog },
+                    set: { store.showNewSessionDialog = $0 }
+                )
+            ) {
                 NewSessionDialog(projects: store.projects) { request in
                     Task { await store.handleNewSessionRequest(request) }
                 }
                 .theme(theme)
             }
-            .sheet(isPresented: Binding(
-                get: { store.showNewProjectDialog },
-                set: { store.showNewProjectDialog = $0 }
-            )) {
+            .sheet(
+                isPresented: Binding(
+                    get: { store.showNewProjectDialog },
+                    set: { store.showNewProjectDialog = $0 }
+                )
+            ) {
                 NewProjectDialog { name, path, branch in
                     store.createProject(name: name, path: path, defaultBranch: branch)
                 }
@@ -151,7 +155,8 @@ struct ContentView: View {
         switch store.currentView {
         case .sessions:
             if let sessionID = store.selectedSessionID,
-               let session = store.sessions.first(where: { $0.id == sessionID }) {
+                let session = store.sessions.first(where: { $0.id == sessionID })
+            {
                 SessionDetailView(session: session)
             } else {
                 EmptyStateView(
@@ -167,11 +172,12 @@ struct ContentView: View {
                 isLoading: store.isLoadingPRs,
                 onSelectPR: { pr in Task { await store.selectPR(pr) } },
                 onFilterChange: { tab in
-                    let filter: PRFilter = switch tab {
-                    case .all: .all
-                    case .mine: .mine
-                    case .reviewRequested: .reviewRequested
-                    }
+                    let filter: PRFilter =
+                        switch tab {
+                        case .all: .all
+                        case .mine: .mine
+                        case .reviewRequested: .reviewRequested
+                        }
                     Task { await store.fetchPRs(filter: filter) }
                 },
                 onRefresh: { Task { await store.fetchPRs() } },

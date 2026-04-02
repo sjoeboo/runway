@@ -1,7 +1,7 @@
-import SwiftUI
 import Models
-import Theme
+import SwiftUI
 import TerminalView
+import Theme
 
 /// A tab model for terminal instances within a session.
 struct TerminalTab: Identifiable {
@@ -159,7 +159,7 @@ public struct TerminalTabView: View {
                 command: ProcessInfo.processInfo.environment["SHELL"] ?? "/bin/zsh",
                 workingDirectory: session.path,
                 environment: [
-                    "RUNWAY_SESSION_ID": session.id,
+                    "RUNWAY_SESSION_ID": session.id
                 ],
                 fontFamily: fontFamily,
                 fontSize: Float(fontSize)

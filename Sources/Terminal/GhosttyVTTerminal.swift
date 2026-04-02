@@ -1,5 +1,5 @@
-import Foundation
 import CGhosttyVT
+import Foundation
 
 /// Swift wrapper around libghostty-vt's terminal state machine.
 ///

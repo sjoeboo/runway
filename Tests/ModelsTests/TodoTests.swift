@@ -1,5 +1,6 @@
-import Testing
 import Foundation
+import Testing
+
 @testable import Models
 
 // MARK: - Todo
@@ -14,7 +15,7 @@ import Foundation
 
 @Test func todoDefaults() {
     let todo = Todo(title: "Write tests")
-    #expect(todo.description == "")
+    #expect(todo.description.isEmpty)
     #expect(todo.prompt == nil)
     #expect(todo.projectID == nil)
     #expect(todo.sessionID == nil)

@@ -1,6 +1,7 @@
-import Testing
-@testable import Persistence
 import Models
+import Testing
+
+@testable import Persistence
 
 @Test func createAndFetchSession() throws {
     let db = try Database(inMemory: true)

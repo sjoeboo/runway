@@ -1,11 +1,13 @@
-import Testing
 import Foundation
+import Testing
+
 @testable import Models
 
 // MARK: - PullRequest
 
 @Test func pullRequestIDFormat() {
-    let pr = PullRequest(number: 42, title: "Fix bug", state: .open, headBranch: "fix/bug", baseBranch: "main", author: "alice", repo: "owner/repo")
+    let pr = PullRequest(
+        number: 42, title: "Fix bug", state: .open, headBranch: "fix/bug", baseBranch: "main", author: "alice", repo: "owner/repo")
     #expect(pr.id == "owner/repo#42")
 }
 
@@ -15,7 +17,7 @@ import Foundation
     #expect(pr.additions == 0)
     #expect(pr.deletions == 0)
     #expect(pr.changedFiles == 0)
-    #expect(pr.url == "")
+    #expect(pr.url.isEmpty)
     #expect(pr.reviewDecision == .pending)
 }
 
@@ -34,7 +36,7 @@ import Foundation
     #expect(ReviewDecision.approved.rawValue == "APPROVED")
     #expect(ReviewDecision.changesRequested.rawValue == "CHANGES_REQUESTED")
     #expect(ReviewDecision.pending.rawValue == "REVIEW_REQUIRED")
-    #expect(ReviewDecision.none.rawValue == "")
+    #expect(ReviewDecision.none.rawValue.isEmpty)
 }
 
 // MARK: - CheckSummary

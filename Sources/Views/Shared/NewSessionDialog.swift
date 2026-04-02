@@ -1,5 +1,5 @@
-import SwiftUI
 import Models
+import SwiftUI
 import Theme
 
 /// Modal dialog for creating a new AI coding session.
@@ -93,14 +93,16 @@ public struct NewSessionDialog: View {
 
                 // Branch name (visible when worktree enabled)
                 if useWorktree {
-                    field("Branch Name", text: Binding(
-                        get: { branchName },
-                        set: { newValue in
-                            branchName = newValue
-                            // If user edits branch to differ from auto, mark as manually edited
-                            branchManuallyEdited = (newValue != autobranchName(from: title))
-                        }
-                    ), placeholder: "feature/my-feature")
+                    field(
+                        "Branch Name",
+                        text: Binding(
+                            get: { branchName },
+                            set: { newValue in
+                                branchName = newValue
+                                // If user edits branch to differ from auto, mark as manually edited
+                                branchManuallyEdited = (newValue != autobranchName(from: title))
+                            }
+                        ), placeholder: "feature/my-feature")
                 }
             }
 
@@ -163,4 +165,3 @@ public struct NewSessionDialog: View {
         dismiss()
     }
 }
-
