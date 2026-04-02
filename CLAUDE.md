@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-**Runway** is a native macOS app for managing AI coding agent sessions. Built with SwiftUI and Swift Package Manager, it provides terminal management (via libghostty), git worktree operations, and GitHub PR management — all in a single-window native interface.
+**Runway** is a native macOS app for managing AI coding agent sessions. Built with SwiftUI and Swift Package Manager, it provides terminal management (via SwiftTerm), git worktree operations, and GitHub PR management — all in a single-window native interface.
 
 ## Build & Test
 
@@ -23,7 +23,8 @@ Pure SwiftUI app with modular SPM targets:
 | `Models` | Session, Project, Group, PullRequest, HookEvent |
 | `Persistence` | GRDB/SQLite with migrations |
 | `Terminal` | TerminalProvider protocol, PTY management |
-| `TerminalView` | NSViewRepresentable terminal wrapper |
+| `CGhosttyVT` | libghostty C wrapper (excluded from build, awaiting SIMD support) |
+| `TerminalView` | NSViewRepresentable wrapping SwiftTerm |
 | `GitOperations` | git CLI worktree operations |
 | `GitHubOperations` | gh CLI PR operations |
 | `StatusDetection` | Hook server + buffer-based status detector |
@@ -34,7 +35,7 @@ Pure SwiftUI app with modular SPM targets:
 
 - **@Observable** store (`RunwayStore`) as single source of truth
 - **Actor-based** managers for thread safety (WorktreeManager, PRManager, NativePTYProvider)
-- **TerminalProvider protocol** abstracts terminal backend (currently NativePTYProvider, will be libghostty)
+- **TerminalProvider protocol** abstracts terminal backend (currently SwiftTerm, libghostty on standby)
 - **GRDB** for SQLite persistence with typed records
 - **Theme environment** — `@Environment(\.theme)` provides current AppTheme to all views
 
