@@ -62,5 +62,3 @@ nesting:
 
 large_tuple:
   warning: 4
-
-reporter: default
