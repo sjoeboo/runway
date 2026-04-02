@@ -11,6 +11,7 @@ public struct Session: Identifiable, Codable, Sendable {
     public var worktreeBranch: String?
     public var parentID: String?
     public var command: String?
+    public var permissionMode: PermissionMode
     public var createdAt: Date
     public var lastAccessedAt: Date
 
@@ -24,6 +25,7 @@ public struct Session: Identifiable, Codable, Sendable {
         worktreeBranch: String? = nil,
         parentID: String? = nil,
         command: String? = nil,
+        permissionMode: PermissionMode = .default,
         createdAt: Date = Date(),
         lastAccessedAt: Date = Date()
     ) {
@@ -36,6 +38,7 @@ public struct Session: Identifiable, Codable, Sendable {
         self.worktreeBranch = worktreeBranch
         self.parentID = parentID
         self.command = command
+        self.permissionMode = permissionMode
         self.createdAt = createdAt
         self.lastAccessedAt = lastAccessedAt
     }
@@ -47,6 +50,30 @@ public struct Session: Identifiable, Codable, Sendable {
         }.joined()
         let ts = Int(Date().timeIntervalSince1970)
         return "id-\(hex)-\(ts)"
+    }
+}
+
+// MARK: - Permission Mode
+
+public enum PermissionMode: String, Codable, Sendable, CaseIterable {
+    case `default` = "default"
+    case acceptEdits = "accept_edits"
+    case bypassAll = "bypass_all"
+
+    public var displayName: String {
+        switch self {
+        case .default: "Default"
+        case .acceptEdits: "Accept Edits"
+        case .bypassAll: "Bypass All"
+        }
+    }
+
+    public var cliFlags: [String] {
+        switch self {
+        case .default: []
+        case .acceptEdits: ["--accept-edits"]
+        case .bypassAll: ["--dangerously-skip-permissions"]
+        }
     }
 }
 

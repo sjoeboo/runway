@@ -70,6 +70,30 @@ public actor WorktreeManager {
         return parseDiffStat(output)
     }
 
+    /// Detect the default branch for a repository.
+    ///
+    /// Uses `git symbolic-ref refs/remotes/origin/HEAD` (local, no network).
+    /// Falls back to checking if common branch names exist locally, then "main".
+    public func detectDefaultBranch(repoPath: String) async -> String {
+        // Try symbolic-ref first (instant, local-only)
+        if let ref = try? await runGit(in: repoPath, args: ["symbolic-ref", "refs/remotes/origin/HEAD"]) {
+            let trimmed = ref.trimmingCharacters(in: .whitespacesAndNewlines)
+            // refs/remotes/origin/main → main
+            if let last = trimmed.split(separator: "/").last {
+                return String(last)
+            }
+        }
+
+        // Fallback: check if common default branch names exist locally
+        for candidate in ["main", "master"] {
+            if let _ = try? await runGit(in: repoPath, args: ["rev-parse", "--verify", candidate]) {
+                return candidate
+            }
+        }
+
+        return "main"
+    }
+
     // MARK: - Private
 
     @discardableResult

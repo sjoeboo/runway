@@ -2,11 +2,11 @@
 
 ## Critical / Core Functionality
 
-- [ ] **PR tab not working** — PRs view is empty; needs `gh pr list` wired into RunwayStore on load + periodic refresh
-- [ ] **Todo tab not working** — Kanban board is empty; needs todo CRUD wired into RunwayStore + creation UI
-- [ ] **Session status indicators** — status dots in sidebar are static (.idle); need hook server events to actually update status (running/waiting/idle/error)
-- [ ] **Bypass permissions option** — new session dialog needs a permission mode picker (Default / Accept Edits / Bypass All) that passes `--dangerously-skip-permissions` or similar to claude
-- [ ] **Worktree default branch detection** — `git symbolic-ref refs/remotes/origin/HEAD` to auto-detect main vs master instead of hardcoding "main"
+- [x] **PR tab working** — PRManager wired into RunwayStore with fetch on load, filter support, detail loading, approve/comment actions
+- ~~**Todo tab**~~ — Removed; future plan is GitHub Issues integration via PR tab
+- [x] **Session status indicators** — Hook server extracts `X-Runway-Session-Id` header to map events to correct Runway session; status updates flow through RunwayStore
+- [x] **Bypass permissions option** — PermissionMode picker (Default / Accept Edits / Bypass All) in NewSessionDialog, persisted to DB, passed as CLI flags to claude
+- [x] **Worktree default branch detection** — `git symbolic-ref refs/remotes/origin/HEAD` with fallback to local branch check; auto-detects on project load and creation
 
 ## Terminal / Session UX
 

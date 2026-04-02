@@ -72,7 +72,11 @@ public actor HookServer {
     private func processRequest(data: Data, connection: NWConnection) {
         // Parse HTTP request body (skip headers, find blank line)
         if let bodyRange = findHTTPBody(in: data),
-           let event = try? JSONDecoder().decode(HookEvent.self, from: data[bodyRange]) {
+           var event = try? JSONDecoder().decode(HookEvent.self, from: data[bodyRange]) {
+            // Use X-Runway-Session-Id header if present (bridges Claude's session ID to Runway's)
+            if let runwayID = extractHeader(named: "X-Runway-Session-Id", from: data), !runwayID.isEmpty {
+                event.sessionID = runwayID
+            }
             for handler in handlers {
                 handler(event)
             }
@@ -83,6 +87,18 @@ public actor HookServer {
         connection.send(content: response.data(using: .utf8), completion: .contentProcessed { _ in
             connection.cancel()
         })
+    }
+
+    private func extractHeader(named name: String, from data: Data) -> String? {
+        guard let headerEnd = data.range(of: Data("\r\n\r\n".utf8)) else { return nil }
+        guard let headerStr = String(data: data[data.startIndex..<headerEnd.lowerBound], encoding: .utf8) else { return nil }
+        let needle = name.lowercased() + ":"
+        for line in headerStr.components(separatedBy: "\r\n") {
+            if line.lowercased().hasPrefix(needle) {
+                return String(line.dropFirst(needle.count)).trimmingCharacters(in: .whitespaces)
+            }
+        }
+        return nil
     }
 
     private func findHTTPBody(in data: Data) -> Range<Data.Index>? {

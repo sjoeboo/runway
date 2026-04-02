@@ -16,6 +16,7 @@ struct SessionRecord: Codable, FetchableRecord, MutablePersistableRecord {
     var worktreeBranch: String?
     var parentID: String?
     var command: String?
+    var permissionMode: String
     var createdAt: Date
     var lastAccessedAt: Date
 
@@ -29,6 +30,7 @@ struct SessionRecord: Codable, FetchableRecord, MutablePersistableRecord {
         self.worktreeBranch = session.worktreeBranch
         self.parentID = session.parentID
         self.command = session.command
+        self.permissionMode = session.permissionMode.rawValue
         self.createdAt = session.createdAt
         self.lastAccessedAt = session.lastAccessedAt
     }
@@ -44,6 +46,7 @@ struct SessionRecord: Codable, FetchableRecord, MutablePersistableRecord {
             worktreeBranch: worktreeBranch,
             parentID: parentID,
             command: command,
+            permissionMode: PermissionMode(rawValue: permissionMode) ?? .default,
             createdAt: createdAt,
             lastAccessedAt: lastAccessedAt
         )

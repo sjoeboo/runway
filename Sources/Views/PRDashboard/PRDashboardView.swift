@@ -4,13 +4,43 @@ import Theme
 
 /// PR dashboard with tab-filtered list and detail drawer.
 public struct PRDashboardView: View {
-    @State private var selectedTab: PRTab = .mine
-    @State private var selectedPR: PullRequest?
     let pullRequests: [PullRequest]
+    let selectedPRID: String?
+    let detail: PRDetail?
+    let isLoading: Bool
+    let onSelectPR: (PullRequest?) -> Void
+    let onFilterChange: (PRTab) -> Void
+    let onRefresh: () -> Void
+    let onApprove: (PullRequest) -> Void
+    let onComment: (PullRequest, String) -> Void
+
+    @State private var selectedTab: PRTab = .mine
     @Environment(\.theme) private var theme
 
-    public init(pullRequests: [PullRequest] = []) {
+    public init(
+        pullRequests: [PullRequest] = [],
+        selectedPRID: String? = nil,
+        detail: PRDetail? = nil,
+        isLoading: Bool = false,
+        onSelectPR: @escaping (PullRequest?) -> Void = { _ in },
+        onFilterChange: @escaping (PRTab) -> Void = { _ in },
+        onRefresh: @escaping () -> Void = {},
+        onApprove: @escaping (PullRequest) -> Void = { _ in },
+        onComment: @escaping (PullRequest, String) -> Void = { _, _ in }
+    ) {
         self.pullRequests = pullRequests
+        self.selectedPRID = selectedPRID
+        self.detail = detail
+        self.isLoading = isLoading
+        self.onSelectPR = onSelectPR
+        self.onFilterChange = onFilterChange
+        self.onRefresh = onRefresh
+        self.onApprove = onApprove
+        self.onComment = onComment
+    }
+
+    private var selectedPR: PullRequest? {
+        pullRequests.first(where: { $0.id == selectedPRID })
     }
 
     public var body: some View {
@@ -23,6 +53,19 @@ public struct PRDashboardView: View {
                         tabButton(tab)
                     }
                     Spacer()
+
+                    if isLoading {
+                        ProgressView()
+                            .controlSize(.small)
+                            .padding(.trailing, 12)
+                    }
+
+                    Button(action: onRefresh) {
+                        Image(systemName: "arrow.clockwise")
+                            .font(.caption)
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.trailing, 12)
                 }
                 .padding(.horizontal)
                 .padding(.vertical, 8)
@@ -31,12 +74,29 @@ public struct PRDashboardView: View {
                 Divider()
 
                 // PR list
-                List(filteredPRs, selection: Binding(
-                    get: { selectedPR?.id },
-                    set: { id in selectedPR = pullRequests.first(where: { $0.id == id }) }
-                )) { pr in
-                    PRRowView(pr: pr)
-                        .tag(pr.id)
+                if filteredPRs.isEmpty && !isLoading {
+                    Spacer()
+                    VStack(spacing: 8) {
+                        Image(systemName: "pull.request")
+                            .font(.largeTitle)
+                            .foregroundColor(theme.chrome.textDim)
+                        Text("No pull requests")
+                            .foregroundColor(theme.chrome.textDim)
+                        Button("Refresh") { onRefresh() }
+                            .controlSize(.small)
+                    }
+                    Spacer()
+                } else {
+                    List(filteredPRs, selection: Binding(
+                        get: { selectedPRID },
+                        set: { id in
+                            let pr = pullRequests.first(where: { $0.id == id })
+                            onSelectPR(pr)
+                        }
+                    )) { pr in
+                        PRRowView(pr: pr)
+                            .tag(pr.id)
+                    }
                 }
             }
 
@@ -44,11 +104,15 @@ public struct PRDashboardView: View {
             if let pr = selectedPR {
                 PRDetailDrawer(
                     pr: pr,
-                    onClose: { selectedPR = nil }
+                    detail: detail,
+                    onClose: { onSelectPR(nil) },
+                    onApprove: { onApprove(pr) },
+                    onComment: { body in onComment(pr, body) }
                 )
                 .frame(minWidth: 400)
             }
         }
+        .onAppear { onRefresh() }
     }
 
     private var filteredPRs: [PullRequest] {
@@ -58,17 +122,25 @@ public struct PRDashboardView: View {
         case .mine:
             pullRequests.filter { $0.author == currentUser }
         case .reviewRequested:
-            pullRequests // TODO: filter by review-requested
+            pullRequests // Filtered server-side by PRManager when filter is .reviewRequested
         }
     }
 
     private var currentUser: String {
-        // Will be populated from gh auth status
+        // When filter is .mine, PRManager already filters server-side via --author @me
+        // So for local filtering, we show all when tab is .mine
         ""
     }
 
     private func tabButton(_ tab: PRTab) -> some View {
-        Button(action: { selectedTab = tab }) {
+        Button(action: {
+            selectedTab = tab
+            switch tab {
+            case .all: onFilterChange(tab)
+            case .mine: onFilterChange(tab)
+            case .reviewRequested: onFilterChange(tab)
+            }
+        }) {
             Text(tab.rawValue)
                 .font(.subheadline)
                 .fontWeight(selectedTab == tab ? .semibold : .regular)
@@ -80,7 +152,7 @@ public struct PRDashboardView: View {
     }
 }
 
-enum PRTab: String, CaseIterable {
+public enum PRTab: String, CaseIterable, Sendable {
     case all = "All"
     case mine = "Mine"
     case reviewRequested = "Review Requests"

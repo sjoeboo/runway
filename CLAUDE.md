@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-**Runway** is a native macOS app for managing AI coding agent sessions. Built with SwiftUI and Swift Package Manager, it provides terminal management (via libghostty), git worktree operations, GitHub PR management, and todo tracking — all in a single-window native interface.
+**Runway** is a native macOS app for managing AI coding agent sessions. Built with SwiftUI and Swift Package Manager, it provides terminal management (via libghostty), git worktree operations, and GitHub PR management — all in a single-window native interface.
 
 ## Build & Test
 
@@ -20,7 +20,7 @@ Pure SwiftUI app with modular SPM targets:
 | Target | Purpose |
 |--------|---------|
 | `App` | SwiftUI entry point, window management, RunwayStore |
-| `Models` | Session, Project, Group, Todo, PullRequest, HookEvent |
+| `Models` | Session, Project, Group, PullRequest, HookEvent |
 | `Persistence` | GRDB/SQLite with migrations |
 | `Terminal` | TerminalProvider protocol, PTY management |
 | `TerminalView` | NSViewRepresentable terminal wrapper |
@@ -28,7 +28,7 @@ Pure SwiftUI app with modular SPM targets:
 | `GitHubOperations` | gh CLI PR operations |
 | `StatusDetection` | Hook server + buffer-based status detector |
 | `Theme` | AppTheme, ChromePalette, TerminalPalette |
-| `Views` | All SwiftUI views (sidebar, session detail, PR dashboard, todos) |
+| `Views` | All SwiftUI views (sidebar, session detail, PR dashboard) |
 
 ## Key Patterns
 

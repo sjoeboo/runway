@@ -4,6 +4,7 @@ import Persistence
 import Theme
 import Views
 import Terminal
+import GitHubOperations
 import StatusDetection
 
 @main
@@ -34,8 +35,6 @@ struct RunwayApp: App {
                     .keyboardShortcut("1", modifiers: .command)
                 Button("Pull Requests") { store.currentView = .prs }
                     .keyboardShortcut("2", modifiers: .command)
-                Button("Todos") { store.currentView = .todos }
-                    .keyboardShortcut("3", modifiers: .command)
             }
         }
 
@@ -137,7 +136,6 @@ struct ContentView: View {
         return Picker(selection: $store.currentView) {
             Text("Sessions").tag(AppView.sessions)
             Text("PRs").tag(AppView.prs)
-            Text("Todos").tag(AppView.todos)
         } label: {
             EmptyView()
         }
@@ -162,9 +160,24 @@ struct ContentView: View {
                 )
             }
         case .prs:
-            PRDashboardView(pullRequests: store.pullRequests)
-        case .todos:
-            TodoBoardView(todos: store.todos)
+            PRDashboardView(
+                pullRequests: store.pullRequests,
+                selectedPRID: store.selectedPRID,
+                detail: store.prDetail,
+                isLoading: store.isLoadingPRs,
+                onSelectPR: { pr in Task { await store.selectPR(pr) } },
+                onFilterChange: { tab in
+                    let filter: PRFilter = switch tab {
+                    case .all: .all
+                    case .mine: .mine
+                    case .reviewRequested: .reviewRequested
+                    }
+                    Task { await store.fetchPRs(filter: filter) }
+                },
+                onRefresh: { Task { await store.fetchPRs() } },
+                onApprove: { pr in Task { await store.approvePR(pr) } },
+                onComment: { pr, body in Task { await store.commentOnPR(pr, body: body) } }
+            )
         }
     }
 
@@ -193,5 +206,4 @@ struct ContentView: View {
 enum AppView: String, CaseIterable {
     case sessions
     case prs
-    case todos
 }

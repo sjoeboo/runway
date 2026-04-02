@@ -100,6 +100,12 @@ public final class Database: Sendable {
             try db.execute(sql: "INSERT INTO metadata (key, value) VALUES ('schema_version', '1')")
         }
 
+        migrator.registerMigration("v2_permission_mode") { db in
+            try db.alter(table: "sessions") { t in
+                t.add(column: "permissionMode", .text).notNull().defaults(to: "default")
+            }
+        }
+
         try migrator.migrate(dbQueue)
     }
 
