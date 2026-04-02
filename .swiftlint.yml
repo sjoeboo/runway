@@ -17,6 +17,7 @@ opt_in_rules:
   - empty_string
   - fatal_error_message
   - first_where
+  - force_unwrapping
   - last_where
   - modifier_order
   - overridden_super_call
@@ -62,4 +63,4 @@ nesting:
 large_tuple:
   warning: 4
 
-reporter: xcode
+reporter: default

@@ -43,7 +43,7 @@ jobs:
         run: brew install swiftlint
 
       - name: Lint
-        run: swiftlint lint --strict --reporter github-actions
+        run: swiftlint lint --strict
 
       - name: Install swift-format
         run: brew install swift-format
