@@ -132,10 +132,7 @@ public struct HookInjector: Sendable {
             options: [.prettyPrinted, .sortedKeys]
         )
 
-        // Atomic write: tmpfile + rename
-        let tmpPath = path + ".tmp"
-        try data.write(to: URL(fileURLWithPath: tmpPath), options: .atomic)
-        try FileManager.default.moveItem(atPath: tmpPath, toPath: path)
+        try data.write(to: URL(fileURLWithPath: path), options: .atomic)
     }
 
     private func httpHooksInstalled(in hooks: [String: Any], url: String?) -> Bool {
