@@ -17,7 +17,7 @@ Runway is a single-window command center for developers who work with AI coding 
 - **Git worktree isolation** — every session gets its own branch and working copy
 - **GitHub PR dashboard** — review, approve, and comment without leaving the app
 - **Project organization** — group sessions by project, track what's active
-- **Theme system** — 6 built-in themes (Tokyo Night, Dracula, Everforest, and more) applied to both UI and terminal
+- **Theme system** — 6 built-in themes (Tokyo Night, Ayu Mirage, Everforest, Oasis Lagoon) applied to both UI and terminal
 
 ## Quick Start
 
@@ -31,7 +31,7 @@ Runway is a single-window command center for developers who work with AI coding 
 ### Build & Run
 
 ```bash
-git clone https://github.com/your-org/runway.git
+git clone https://github.com/sjoeboo/runway.git
 cd runway
 swift build
 swift run Runway
@@ -51,6 +51,8 @@ Create named sessions tied to projects. Each session launches a terminal running
 
 - **Auto-branch naming** — session name automatically suggests a branch (e.g., "fix auth flow" → `fix-auth-flow`)
 - **Worktree isolation** — each session works in `.worktrees/{branch}`, keeping `main` clean
+- **Default branch detection** — auto-detects `main` vs `master` via `git symbolic-ref`
+- **Permission modes** — choose Default, Accept Edits, or Bypass All per session
 - **Multiple terminal tabs** — add shell tabs alongside your main agent session
 - **Session persistence** — sessions survive app restarts via SQLite
 
@@ -101,7 +103,6 @@ Themes apply to both the app chrome (sidebar, toolbar, status bar) and the termi
 | `Cmd+Shift+P` | New project |
 | `Cmd+1` | Sessions view |
 | `Cmd+2` | PRs view |
-| `Cmd+3` | Todos view |
 | `Shift+Enter` | Newline in terminal (instead of submit) |
 
 ## Architecture
@@ -111,7 +112,7 @@ Runway is a pure SwiftUI app built with Swift Package Manager. The codebase is s
 ```
 Sources/
 ├── App/                # @main entry, RunwayStore, window setup
-├── Models/             # Session, Project, Group, Todo, PullRequest, HookEvent
+├── Models/             # Session, Project, Group, PullRequest, HookEvent
 ├── Persistence/        # GRDB/SQLite database (WAL mode, ~/.runway/state.db)
 ├── Terminal/           # TerminalProvider protocol, PTY process management
 ├── TerminalView/       # NSViewRepresentable wrapping SwiftTerm
@@ -119,7 +120,7 @@ Sources/
 ├── GitHubOperations/   # Actor-based gh CLI wrapper for PR management
 ├── StatusDetection/    # Hook server (port 47437) + terminal buffer scanner
 ├── Theme/              # AppTheme, ChromePalette, TerminalPalette
-├── Views/              # All SwiftUI views (sidebar, session detail, PRs, todos)
+├── Views/              # All SwiftUI views (sidebar, session detail, PRs)
 └── CGhosttyVT/         # libghostty wrapper (standby — awaiting SIMD support)
 ```
 
@@ -147,7 +148,7 @@ Runway stores its state in `~/.runway/`:
 
 ```
 ~/.runway/
-├── state.db        # SQLite database (sessions, projects, todos)
+├── state.db        # SQLite database (sessions, projects)
 ├── themes/         # Custom theme files (planned)
 └── logs/           # Application logs (planned)
 ```
@@ -175,6 +176,9 @@ Runway is in **active early development**. Core session and terminal management 
 - Multi-tab terminals per session
 - Session persistence across app restarts
 - Live status detection (hook server + buffer scanning)
+- GitHub PR dashboard (fetch, filter, detail view, approve, comment)
+- Permission mode picker (Default / Accept Edits / Bypass All)
+- Default branch auto-detection (`main` vs `master`)
 - Theme system with 6 built-in themes
 - Font customization (family + size, Nerd Font default)
 - Claude Code hook injection
@@ -182,10 +186,10 @@ Runway is in **active early development**. Core session and terminal management 
 
 ### What's In Progress
 
-- PR dashboard wiring (`gh` integration is built, needs RunwayStore connection)
-- Todo kanban board (UI exists, needs CRUD wiring)
 - Session context menus (restart, delete, rename)
+- Split-pane terminal layouts
 - Proper `.app` bundle with icon and entitlements
+- GitHub Issues integration (replacing removed Todo feature)
 
 ## License
 
