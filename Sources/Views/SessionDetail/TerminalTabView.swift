@@ -116,12 +116,24 @@ public struct TerminalTabView: View {
         guard tabs.isEmpty else { return }
 
         let mainTabID = "\(session.id)_main"
+
+        // For Claude sessions, build the command with permission flags
+        let command: String
+        let arguments: [String]
+        if session.tool == .claude {
+            command = session.tool.command
+            arguments = session.permissionMode.cliFlags
+        } else {
+            command = session.tool.command
+            arguments = []
+        }
+
         let mainTab = TerminalTab(
             id: mainTabID,
             title: session.tool.displayName,
             config: TerminalConfig(
-                command: session.tool.command,
-                arguments: [],
+                command: command,
+                arguments: arguments,
                 workingDirectory: session.path,
                 environment: [
                     "RUNWAY_SESSION_ID": session.id,

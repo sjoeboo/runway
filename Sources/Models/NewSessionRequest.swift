@@ -8,6 +8,7 @@ public struct NewSessionRequest: Sendable {
     public let tool: Tool
     public let useWorktree: Bool
     public let branchName: String?
+    public let permissionMode: PermissionMode
 
     public init(
         title: String,
@@ -15,7 +16,8 @@ public struct NewSessionRequest: Sendable {
         path: String,
         tool: Tool,
         useWorktree: Bool,
-        branchName: String?
+        branchName: String?,
+        permissionMode: PermissionMode = .default
     ) {
         self.title = title
         self.projectID = projectID
@@ -23,5 +25,6 @@ public struct NewSessionRequest: Sendable {
         self.tool = tool
         self.useWorktree = useWorktree
         self.branchName = branchName
+        self.permissionMode = permissionMode
     }
 }

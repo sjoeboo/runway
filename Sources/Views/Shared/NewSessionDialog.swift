@@ -13,6 +13,7 @@ public struct NewSessionDialog: View {
     @State private var useWorktree: Bool = true
     @State private var branchName: String = ""
     @State private var branchManuallyEdited: Bool = false
+    @State private var permissionMode: PermissionMode = .default
     @State private var validationError: String?
 
     let projects: [Project]
@@ -63,6 +64,28 @@ public struct NewSessionDialog: View {
                     }
                     .pickerStyle(.segmented)
                     .labelsHidden()
+                }
+
+                // Permission mode (only for Claude sessions)
+                if tool == .claude {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Permissions")
+                            .font(.caption)
+                            .foregroundColor(theme.chrome.textDim)
+                        Picker("Permissions", selection: $permissionMode) {
+                            ForEach(PermissionMode.allCases, id: \.self) { mode in
+                                Text(mode.displayName).tag(mode)
+                            }
+                        }
+                        .pickerStyle(.segmented)
+                        .labelsHidden()
+
+                        if permissionMode == .bypassAll {
+                            Text("Skips all permission prompts — use with caution")
+                                .font(.caption2)
+                                .foregroundColor(theme.chrome.orange)
+                        }
+                    }
                 }
 
                 // Worktree toggle
@@ -132,7 +155,8 @@ public struct NewSessionDialog: View {
             path: path,
             tool: tool,
             useWorktree: useWorktree,
-            branchName: useWorktree ? branchName : nil
+            branchName: useWorktree ? branchName : nil,
+            permissionMode: tool == .claude ? permissionMode : .default
         )
 
         onCreate(request)

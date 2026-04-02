@@ -82,7 +82,9 @@ public struct TerminalPane: NSViewRepresentable {
         if let cwd = config.workingDirectory {
             if config.command != "/bin/zsh" && config.command != "/bin/bash"
                 && config.command != shell {
-                terminal.send(txt: "cd \(shellEscape(cwd)) && \(config.command)\r")
+                // Build full command with arguments (e.g. "claude --dangerously-skip-permissions")
+                let fullCommand = ([config.command] + config.arguments).joined(separator: " ")
+                terminal.send(txt: "cd \(shellEscape(cwd)) && \(fullCommand)\r")
             } else {
                 terminal.send(txt: "cd \(shellEscape(cwd)) && clear\r")
             }
