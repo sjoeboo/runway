@@ -37,11 +37,26 @@ swift build
 swift run Runway
 ```
 
-### Run Tests
+### Development Setup
+
+Install the linting and formatting tools:
 
 ```bash
-swift test
+make setup   # installs swiftlint and swift-format via Homebrew
 ```
+
+### Common Commands
+
+```bash
+make check      # build + test + lint + format-check (mirrors CI)
+make test       # run all tests
+make fix        # auto-fix lint and format issues
+make precommit  # fix, then verify everything passes
+make lint       # SwiftLint only
+make help       # show all available targets
+```
+
+All PRs must pass the CI pipeline (build, test, SwiftLint, swift-format) before merging.
 
 ## Features
 
@@ -168,6 +183,14 @@ Hook events are sent to `http://127.0.0.1:47437/hooks` with the session ID in a 
 ## Development Status
 
 Runway is in **active early development**. Core session and terminal management works. See [TODO.md](TODO.md) for the full roadmap.
+
+### CI & Testing
+
+- **118 tests** across 7 test targets (Models, Persistence, StatusDetection, Theme, Terminal, GitOperations, GitHubOperations)
+- **GitHub Actions CI** runs on every PR: build, test, SwiftLint, swift-format
+- **Branch protection** on `master` — CI must pass before merging
+- **SwiftLint** enforces safety (no force casts/unwraps/try) and style
+- **swift-format** enforces consistent formatting
 
 ### What Works
 
