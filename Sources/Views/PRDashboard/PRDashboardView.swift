@@ -1,5 +1,5 @@
-import SwiftUI
 import Models
+import SwiftUI
 import Theme
 
 /// PR dashboard with tab-filtered list and detail drawer.
@@ -87,13 +87,16 @@ public struct PRDashboardView: View {
                     }
                     Spacer()
                 } else {
-                    List(filteredPRs, selection: Binding(
-                        get: { selectedPRID },
-                        set: { id in
-                            let pr = pullRequests.first(where: { $0.id == id })
-                            onSelectPR(pr)
-                        }
-                    )) { pr in
+                    List(
+                        filteredPRs,
+                        selection: Binding(
+                            get: { selectedPRID },
+                            set: { id in
+                                let pr = pullRequests.first(where: { $0.id == id })
+                                onSelectPR(pr)
+                            }
+                        )
+                    ) { pr in
                         PRRowView(pr: pr)
                             .tag(pr.id)
                     }
@@ -122,7 +125,7 @@ public struct PRDashboardView: View {
         case .mine:
             pullRequests.filter { $0.author == currentUser }
         case .reviewRequested:
-            pullRequests // Filtered server-side by PRManager when filter is .reviewRequested
+            pullRequests  // Filtered server-side by PRManager when filter is .reviewRequested
         }
     }
 

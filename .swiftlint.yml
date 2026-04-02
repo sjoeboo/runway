@@ -1,0 +1,72 @@
+# SwiftLint Configuration for Runway
+# Errors block PRs, warnings are informational
+
+# Paths to lint
+included:
+  - Sources
+  - Tests
+
+# Paths to exclude
+excluded:
+  - Sources/CGhosttyVT
+  - Sources/Terminal/GhosttyVTTerminal.swift  # Standby file, not compiled
+  - .build
+
+# Rules that produce errors (block PRs)
+opt_in_rules:
+  - empty_count
+  - empty_string
+  - fatal_error_message
+  - first_where
+  - force_unwrapping
+  - last_where
+  - modifier_order
+  - overridden_super_call
+  - private_action
+  - redundant_nil_coalescing
+  - toggle_bool
+  - unowned_variable_capture
+  - yoda_condition
+
+# Rules to disable (don't match this codebase's style)
+disabled_rules:
+  - trailing_comma                            # We use trailing commas consistently
+  - opening_brace                             # Conflicts with some multi-line patterns
+  - line_length                               # Too noisy for SwiftUI view builders
+  - type_body_length                          # Large themes/views are expected
+  - file_length                               # Same reason
+  - function_body_length                      # Actor methods can be long
+  - cyclomatic_complexity                     # Parser functions are inherently complex
+  - multiple_closures_with_trailing_closure   # Standard SwiftUI pattern (.sheet, .alert, etc.)
+  - todo                                      # TODOs are expected during development
+  - inclusive_language                         # masterFD is POSIX PTY API terminology
+  - implicit_optional_initialization          # Swift convention — `var x: T? = nil` is explicit
+  - function_parameter_count                  # TerminalProvider protocol requires 6 params
+
+# Promote critical safety rules to errors
+force_cast: error
+force_try: error
+force_unwrapping:
+  severity: error
+
+# Configure specific rules
+identifier_name:
+  min_length:
+    warning: 2
+  excluded:
+    - id
+    - db
+    - fd
+    - r
+    - g
+    - b
+    - i
+    - t   # GRDB table builder convention
+    - m   # NSEvent monitor convention
+
+nesting:
+  type_level: 2
+  function_level: 3
+
+large_tuple:
+  warning: 4

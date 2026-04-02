@@ -1,6 +1,7 @@
 import Foundation
+
 #if canImport(Darwin)
-import Darwin
+    import Darwin
 #endif
 
 /// Manages a child process connected via a pseudo-terminal (PTY).

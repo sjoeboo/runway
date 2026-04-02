@@ -1,7 +1,8 @@
 import Foundation
 import Models
+
 #if canImport(Network)
-import Network
+    import Network
 #endif
 
 /// Lightweight HTTP server that receives Claude Code lifecycle hook events.
@@ -27,7 +28,10 @@ public actor HookServer {
     /// Start listening for hook events.
     public func start() throws {
         let params = NWParameters.tcp
-        let listener = try NWListener(using: params, on: NWEndpoint.Port(rawValue: port)!)
+        guard let nwPort = NWEndpoint.Port(rawValue: port) else {
+            throw HookServerError.invalidPort(port)
+        }
+        let listener = try NWListener(using: params, on: nwPort)
         self.listener = listener
 
         listener.newConnectionHandler = { [weak self] connection in
@@ -72,7 +76,8 @@ public actor HookServer {
     private func processRequest(data: Data, connection: NWConnection) {
         // Parse HTTP request body (skip headers, find blank line)
         if let bodyRange = findHTTPBody(in: data),
-           var event = try? JSONDecoder().decode(HookEvent.self, from: data[bodyRange]) {
+            var event = try? JSONDecoder().decode(HookEvent.self, from: data[bodyRange])
+        {
             // Use X-Runway-Session-Id header if present (bridges Claude's session ID to Runway's)
             if let runwayID = extractHeader(named: "X-Runway-Session-Id", from: data), !runwayID.isEmpty {
                 event.sessionID = runwayID
@@ -84,19 +89,19 @@ public actor HookServer {
 
         // Send 200 OK response
         let response = "HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n"
-        connection.send(content: response.data(using: .utf8), completion: .contentProcessed { _ in
-            connection.cancel()
-        })
+        connection.send(
+            content: response.data(using: .utf8),
+            completion: .contentProcessed { _ in
+                connection.cancel()
+            })
     }
 
     private func extractHeader(named name: String, from data: Data) -> String? {
         guard let headerEnd = data.range(of: Data("\r\n\r\n".utf8)) else { return nil }
         guard let headerStr = String(data: data[data.startIndex..<headerEnd.lowerBound], encoding: .utf8) else { return nil }
         let needle = name.lowercased() + ":"
-        for line in headerStr.components(separatedBy: "\r\n") {
-            if line.lowercased().hasPrefix(needle) {
-                return String(line.dropFirst(needle.count)).trimmingCharacters(in: .whitespaces)
-            }
+        for line in headerStr.components(separatedBy: "\r\n") where line.lowercased().hasPrefix(needle) {
+            return String(line.dropFirst(needle.count)).trimmingCharacters(in: .whitespaces)
         }
         return nil
     }
@@ -107,5 +112,18 @@ public actor HookServer {
         let bodyStart = range.upperBound
         guard bodyStart < data.endIndex else { return nil }
         return bodyStart..<data.endIndex
+    }
+}
+
+// MARK: - Errors
+
+public enum HookServerError: Error, LocalizedError {
+    case invalidPort(UInt16)
+
+    public var errorDescription: String? {
+        switch self {
+        case .invalidPort(let port):
+            "Invalid port number: \(port)"
+        }
     }
 }

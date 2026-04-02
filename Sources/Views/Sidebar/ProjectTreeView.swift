@@ -1,5 +1,5 @@
-import SwiftUI
 import Models
+import SwiftUI
 import Theme
 
 /// Sidebar view showing the hierarchical project tree with sessions.

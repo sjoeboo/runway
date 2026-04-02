@@ -99,7 +99,8 @@ public struct HookInjector: Sendable {
         let settingsPath = "\(dir)/settings.json"
 
         guard let rawSettings = try? readSettings(at: settingsPath),
-              let hooks = rawSettings["hooks"] as? [String: Any] else {
+            let hooks = rawSettings["hooks"] as? [String: Any]
+        else {
             return false
         }
 
@@ -132,10 +133,7 @@ public struct HookInjector: Sendable {
             options: [.prettyPrinted, .sortedKeys]
         )
 
-        // Atomic write: tmpfile + rename
-        let tmpPath = path + ".tmp"
-        try data.write(to: URL(fileURLWithPath: tmpPath), options: .atomic)
-        try FileManager.default.moveItem(atPath: tmpPath, toPath: path)
+        try data.write(to: URL(fileURLWithPath: path), options: .atomic)
     }
 
     private func httpHooksInstalled(in hooks: [String: Any], url: String?) -> Bool {
@@ -160,8 +158,8 @@ public struct HookInjector: Sendable {
 
         for block in blocks {
             if let hookList = block["hooks"] as? [[String: Any]] {
-                for hook in hookList {
-                    if isRunwayHook(hook) { return true }
+                for hook in hookList where isRunwayHook(hook) {
+                    return true
                 }
             }
         }

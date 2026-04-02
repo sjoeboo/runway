@@ -145,5 +145,20 @@ let package = Package(
             dependencies: ["GitOperations"],
             path: "Tests/GitOperationsTests"
         ),
+        .testTarget(
+            name: "ThemeTests",
+            dependencies: ["Theme"],
+            path: "Tests/ThemeTests"
+        ),
+        .testTarget(
+            name: "GitHubOperationsTests",
+            dependencies: ["GitHubOperations"],
+            path: "Tests/GitHubOperationsTests"
+        ),
+        .testTarget(
+            name: "TerminalTests",
+            dependencies: ["Terminal"],
+            path: "Tests/TerminalTests"
+        ),
     ]
 )

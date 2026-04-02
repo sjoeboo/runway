@@ -1,5 +1,5 @@
-import SwiftUI
 import Models
+import SwiftUI
 import Theme
 
 /// Modal dialog for registering a new project (git repository).

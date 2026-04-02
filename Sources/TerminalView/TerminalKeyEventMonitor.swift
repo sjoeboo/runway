@@ -1,6 +1,6 @@
 import AppKit
-import SwiftUI
 import GhosttyKit
+import SwiftUI
 
 /// Monitors keyboard events at the application level and forwards them
 /// directly to the Ghostty AppTerminalView, bypassing SwiftUI's event
@@ -152,15 +152,15 @@ public final class TerminalKeyEventMonitor {
     /// Map special keys to their terminal escape sequences.
     private static func specialKeySequence(_ event: NSEvent) -> String? {
         switch event.keyCode {
-        case 36: return "\r"          // Return/Enter
-        case 76: return "\r"          // Numpad Enter
-        case 53: return "\u{1B}"      // Escape
-        case 48: return "\t"          // Tab
-        case 51: return "\u{7F}"      // Backspace (DEL)
-        case 123: return "\u{1B}[D"   // Left arrow
-        case 124: return "\u{1B}[C"   // Right arrow
-        case 125: return "\u{1B}[B"   // Down arrow
-        case 126: return "\u{1B}[A"   // Up arrow
+        case 36: return "\r"  // Return/Enter
+        case 76: return "\r"  // Numpad Enter
+        case 53: return "\u{1B}"  // Escape
+        case 48: return "\t"  // Tab
+        case 51: return "\u{7F}"  // Backspace (DEL)
+        case 123: return "\u{1B}[D"  // Left arrow
+        case 124: return "\u{1B}[C"  // Right arrow
+        case 125: return "\u{1B}[B"  // Down arrow
+        case 126: return "\u{1B}[A"  // Up arrow
         default: return nil
         }
     }

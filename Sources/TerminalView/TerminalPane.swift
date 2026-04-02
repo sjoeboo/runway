@@ -1,6 +1,6 @@
 import AppKit
-import SwiftUI
 import SwiftTerm
+import SwiftUI
 import Terminal
 import Theme
 
@@ -61,7 +61,8 @@ public struct TerminalPane: NSViewRepresentable {
         // Font
         let fontSize = CGFloat(config.fontSize ?? 13)
         let fontName = config.fontFamily ?? "MesloLGS Nerd Font"
-        terminal.font = NSFont(name: fontName, size: fontSize)
+        terminal.font =
+            NSFont(name: fontName, size: fontSize)
             ?? NSFont.monospacedSystemFont(ofSize: fontSize, weight: .regular)
 
         // Colors
@@ -81,7 +82,8 @@ public struct TerminalPane: NSViewRepresentable {
         // cd + optionally run command
         if let cwd = config.workingDirectory {
             if config.command != "/bin/zsh" && config.command != "/bin/bash"
-                && config.command != shell {
+                && config.command != shell
+            {
                 // Build full command with arguments (e.g. "claude --dangerously-skip-permissions")
                 let fullCommand = ([config.command] + config.arguments).joined(separator: " ")
                 terminal.send(txt: "cd \(shellEscape(cwd)) && \(fullCommand)\r")
@@ -129,7 +131,7 @@ public struct TerminalPane: NSViewRepresentable {
 class TerminalContainerView: NSView {
     func embed(_ terminal: NSView) {
         // Remove previous
-        subviews.forEach { $0.removeFromSuperview() }
+        for subview in subviews { subview.removeFromSuperview() }
 
         terminal.translatesAutoresizingMaskIntoConstraints = false
         addSubview(terminal)
@@ -159,7 +161,7 @@ class ShiftEnterMonitor {
             if event.keyCode == 36 && event.modifierFlags.contains(.shift) {
                 if let terminal = NSApplication.shared.keyWindow?.firstResponder as? LocalProcessTerminalView {
                     terminal.send(txt: "\u{1B}[13;2u")
-                    return nil // consumed
+                    return nil  // consumed
                 }
             }
             return event

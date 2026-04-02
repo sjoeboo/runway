@@ -30,22 +30,22 @@ extension AppTheme {
             cursor: Color(hex: 0xC0CAF5),
             selection: Color(hex: 0x33467C),
             ansi: [
-                Color(hex: 0x15161E), // black
-                Color(hex: 0xF7768E), // red
-                Color(hex: 0x9ECE6A), // green
-                Color(hex: 0xE0AF68), // yellow
-                Color(hex: 0x7AA2F7), // blue
-                Color(hex: 0xBB9AF7), // magenta
-                Color(hex: 0x7DCFFF), // cyan
-                Color(hex: 0xA9B1D6), // white
-                Color(hex: 0x414868), // bright black
-                Color(hex: 0xF7768E), // bright red
-                Color(hex: 0x9ECE6A), // bright green
-                Color(hex: 0xE0AF68), // bright yellow
-                Color(hex: 0x7AA2F7), // bright blue
-                Color(hex: 0xBB9AF7), // bright magenta
-                Color(hex: 0x7DCFFF), // bright cyan
-                Color(hex: 0xC0CAF5), // bright white
+                Color(hex: 0x15161E),  // black
+                Color(hex: 0xF7768E),  // red
+                Color(hex: 0x9ECE6A),  // green
+                Color(hex: 0xE0AF68),  // yellow
+                Color(hex: 0x7AA2F7),  // blue
+                Color(hex: 0xBB9AF7),  // magenta
+                Color(hex: 0x7DCFFF),  // cyan
+                Color(hex: 0xA9B1D6),  // white
+                Color(hex: 0x414868),  // bright black
+                Color(hex: 0xF7768E),  // bright red
+                Color(hex: 0x9ECE6A),  // bright green
+                Color(hex: 0xE0AF68),  // bright yellow
+                Color(hex: 0x7AA2F7),  // bright blue
+                Color(hex: 0xBB9AF7),  // bright magenta
+                Color(hex: 0x7DCFFF),  // bright cyan
+                Color(hex: 0xC0CAF5),  // bright white
             ]
         )
     )
@@ -77,22 +77,22 @@ extension AppTheme {
             cursor: Color(hex: 0xFFCC66),
             selection: Color(hex: 0x34455A),
             ansi: [
-                Color(hex: 0x191E2A), // black
-                Color(hex: 0xFF3333), // red
-                Color(hex: 0xBAE67E), // green
-                Color(hex: 0xFFCC66), // yellow
-                Color(hex: 0x73D0FF), // blue
-                Color(hex: 0xD4BFFF), // magenta
-                Color(hex: 0x95E6CB), // cyan
-                Color(hex: 0xCBCCC6), // white
-                Color(hex: 0x707A8C), // bright black
-                Color(hex: 0xFF3333), // bright red
-                Color(hex: 0xBAE67E), // bright green
-                Color(hex: 0xFFD580), // bright yellow
-                Color(hex: 0x73D0FF), // bright blue
-                Color(hex: 0xD4BFFF), // bright magenta
-                Color(hex: 0x95E6CB), // bright cyan
-                Color(hex: 0xF0F0F0), // bright white
+                Color(hex: 0x191E2A),  // black
+                Color(hex: 0xFF3333),  // red
+                Color(hex: 0xBAE67E),  // green
+                Color(hex: 0xFFCC66),  // yellow
+                Color(hex: 0x73D0FF),  // blue
+                Color(hex: 0xD4BFFF),  // magenta
+                Color(hex: 0x95E6CB),  // cyan
+                Color(hex: 0xCBCCC6),  // white
+                Color(hex: 0x707A8C),  // bright black
+                Color(hex: 0xFF3333),  // bright red
+                Color(hex: 0xBAE67E),  // bright green
+                Color(hex: 0xFFD580),  // bright yellow
+                Color(hex: 0x73D0FF),  // bright blue
+                Color(hex: 0xD4BFFF),  // bright magenta
+                Color(hex: 0x95E6CB),  // bright cyan
+                Color(hex: 0xF0F0F0),  // bright white
             ]
         )
     )
@@ -124,22 +124,22 @@ extension AppTheme {
             cursor: Color(hex: 0xD3C6AA),
             selection: Color(hex: 0x475258),
             ansi: [
-                Color(hex: 0x232A2E), // black
-                Color(hex: 0xE67E80), // red
-                Color(hex: 0xA7C080), // green
-                Color(hex: 0xDBBC7F), // yellow
-                Color(hex: 0x7FBBB3), // blue
-                Color(hex: 0xD699B6), // magenta
-                Color(hex: 0x83C092), // cyan
-                Color(hex: 0xD3C6AA), // white
-                Color(hex: 0x7A8478), // bright black
-                Color(hex: 0xE67E80), // bright red
-                Color(hex: 0xA7C080), // bright green
-                Color(hex: 0xDBBC7F), // bright yellow
-                Color(hex: 0x7FBBB3), // bright blue
-                Color(hex: 0xD699B6), // bright magenta
-                Color(hex: 0x83C092), // bright cyan
-                Color(hex: 0xE3DCC4), // bright white
+                Color(hex: 0x232A2E),  // black
+                Color(hex: 0xE67E80),  // red
+                Color(hex: 0xA7C080),  // green
+                Color(hex: 0xDBBC7F),  // yellow
+                Color(hex: 0x7FBBB3),  // blue
+                Color(hex: 0xD699B6),  // magenta
+                Color(hex: 0x83C092),  // cyan
+                Color(hex: 0xD3C6AA),  // white
+                Color(hex: 0x7A8478),  // bright black
+                Color(hex: 0xE67E80),  // bright red
+                Color(hex: 0xA7C080),  // bright green
+                Color(hex: 0xDBBC7F),  // bright yellow
+                Color(hex: 0x7FBBB3),  // bright blue
+                Color(hex: 0xD699B6),  // bright magenta
+                Color(hex: 0x83C092),  // bright cyan
+                Color(hex: 0xE3DCC4),  // bright white
             ]
         )
     )
@@ -171,22 +171,22 @@ extension AppTheme {
             cursor: Color(hex: 0x5C6A72),
             selection: Color(hex: 0xE6E2CC),
             ansi: [
-                Color(hex: 0x5C6A72), // black
-                Color(hex: 0xF85552), // red
-                Color(hex: 0x8DA101), // green
-                Color(hex: 0xDFA000), // yellow
-                Color(hex: 0x3A94C5), // blue
-                Color(hex: 0xDF69BA), // magenta
-                Color(hex: 0x35A77C), // cyan
-                Color(hex: 0xE0DCC7), // white
-                Color(hex: 0x829181), // bright black
-                Color(hex: 0xF85552), // bright red
-                Color(hex: 0x8DA101), // bright green
-                Color(hex: 0xDFA000), // bright yellow
-                Color(hex: 0x3A94C5), // bright blue
-                Color(hex: 0xDF69BA), // bright magenta
-                Color(hex: 0x35A77C), // bright cyan
-                Color(hex: 0x5C6A72), // bright white
+                Color(hex: 0x5C6A72),  // black
+                Color(hex: 0xF85552),  // red
+                Color(hex: 0x8DA101),  // green
+                Color(hex: 0xDFA000),  // yellow
+                Color(hex: 0x3A94C5),  // blue
+                Color(hex: 0xDF69BA),  // magenta
+                Color(hex: 0x35A77C),  // cyan
+                Color(hex: 0xE0DCC7),  // white
+                Color(hex: 0x829181),  // bright black
+                Color(hex: 0xF85552),  // bright red
+                Color(hex: 0x8DA101),  // bright green
+                Color(hex: 0xDFA000),  // bright yellow
+                Color(hex: 0x3A94C5),  // bright blue
+                Color(hex: 0xDF69BA),  // bright magenta
+                Color(hex: 0x35A77C),  // bright cyan
+                Color(hex: 0x5C6A72),  // bright white
             ]
         )
     )
@@ -218,22 +218,22 @@ extension AppTheme {
             cursor: Color(hex: 0x58B8FD),
             selection: Color(hex: 0x264870),
             ansi: [
-                Color(hex: 0x101825), // black
-                Color(hex: 0xFF7979), // red
-                Color(hex: 0x53D390), // green
-                Color(hex: 0xF0E68C), // yellow
-                Color(hex: 0x58B8FD), // blue
-                Color(hex: 0xC695FF), // magenta
-                Color(hex: 0x68C0B6), // cyan
-                Color(hex: 0xD9E6FA), // white
-                Color(hex: 0x8FB0D0), // bright black
-                Color(hex: 0xFF7979), // bright red
-                Color(hex: 0x53D390), // bright green
-                Color(hex: 0xF0E68C), // bright yellow
-                Color(hex: 0x58B8FD), // bright blue
-                Color(hex: 0xC695FF), // bright magenta
-                Color(hex: 0x68C0B6), // bright cyan
-                Color(hex: 0xD9E6FA), // bright white
+                Color(hex: 0x101825),  // black
+                Color(hex: 0xFF7979),  // red
+                Color(hex: 0x53D390),  // green
+                Color(hex: 0xF0E68C),  // yellow
+                Color(hex: 0x58B8FD),  // blue
+                Color(hex: 0xC695FF),  // magenta
+                Color(hex: 0x68C0B6),  // cyan
+                Color(hex: 0xD9E6FA),  // white
+                Color(hex: 0x8FB0D0),  // bright black
+                Color(hex: 0xFF7979),  // bright red
+                Color(hex: 0x53D390),  // bright green
+                Color(hex: 0xF0E68C),  // bright yellow
+                Color(hex: 0x58B8FD),  // bright blue
+                Color(hex: 0xC695FF),  // bright magenta
+                Color(hex: 0x68C0B6),  // bright cyan
+                Color(hex: 0xD9E6FA),  // bright white
             ]
         )
     )
@@ -265,22 +265,22 @@ extension AppTheme {
             cursor: Color(hex: 0x1670AD),
             selection: Color(hex: 0xB2DCFE),
             ansi: [
-                Color(hex: 0x10426D), // black
-                Color(hex: 0x663021), // red
-                Color(hex: 0x1B491D), // green
-                Color(hex: 0x6B2E00), // yellow
-                Color(hex: 0x1670AD), // blue
-                Color(hex: 0x46259F), // magenta
-                Color(hex: 0x064658), // cyan
-                Color(hex: 0xD0E8FE), // white
-                Color(hex: 0x1F3F71), // bright black
-                Color(hex: 0x663021), // bright red
-                Color(hex: 0x1B491D), // bright green
-                Color(hex: 0x6B2E00), // bright yellow
-                Color(hex: 0x1670AD), // bright blue
-                Color(hex: 0x46259F), // bright magenta
-                Color(hex: 0x064658), // bright cyan
-                Color(hex: 0x10426D), // bright white
+                Color(hex: 0x10426D),  // black
+                Color(hex: 0x663021),  // red
+                Color(hex: 0x1B491D),  // green
+                Color(hex: 0x6B2E00),  // yellow
+                Color(hex: 0x1670AD),  // blue
+                Color(hex: 0x46259F),  // magenta
+                Color(hex: 0x064658),  // cyan
+                Color(hex: 0xD0E8FE),  // white
+                Color(hex: 0x1F3F71),  // bright black
+                Color(hex: 0x663021),  // bright red
+                Color(hex: 0x1B491D),  // bright green
+                Color(hex: 0x6B2E00),  // bright yellow
+                Color(hex: 0x1670AD),  // bright blue
+                Color(hex: 0x46259F),  // bright magenta
+                Color(hex: 0x064658),  // bright cyan
+                Color(hex: 0x10426D),  // bright white
             ]
         )
     )

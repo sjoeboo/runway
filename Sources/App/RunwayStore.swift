@@ -1,12 +1,12 @@
 import Foundation
-import SwiftUI
+import GitHubOperations
+import GitOperations
 import Models
 import Persistence
-import Theme
-import Terminal
-import GitOperations
-import GitHubOperations
 import StatusDetection
+import SwiftUI
+import Terminal
+import Theme
 
 /// Root application state — the single source of truth for the Runway app.
 @Observable
