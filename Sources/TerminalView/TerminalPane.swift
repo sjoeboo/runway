@@ -110,7 +110,18 @@ public struct TerminalPane: NSViewRepresentable {
         terminal.selectedTextBackgroundColor = NSColor(palette.selection)
 
         // Apply ANSI palette (16 colors: 0-7 normal, 8-15 bright)
-        terminal.installColors(palette.ansi)
+        // Convert SwiftUI.Color → SwiftTerm.Color (16-bit RGB)
+        let termColors = palette.ansi.map { swiftUIColor -> SwiftTerm.Color in
+            let nsColor =
+                NSColor(swiftUIColor).usingColorSpace(.sRGB)
+                ?? NSColor(swiftUIColor)
+            return SwiftTerm.Color(
+                red: UInt16(nsColor.redComponent * 65535),
+                green: UInt16(nsColor.greenComponent * 65535),
+                blue: UInt16(nsColor.blueComponent * 65535)
+            )
+        }
+        terminal.installColors(termColors)
 
         // Force redraw to apply new colors
         terminal.needsDisplay = true
