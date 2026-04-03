@@ -7,7 +7,7 @@
 - [x] **Session status indicators** — Hook server extracts `X-Runway-Session-Id` header to map events to correct Runway session; status updates flow through RunwayStore
 - [x] **Bypass permissions option** — PermissionMode picker (Default / Accept Edits / Bypass All) in NewSessionDialog, persisted to DB, passed as CLI flags to claude
 - [x] **Worktree default branch detection** — `git symbolic-ref refs/remotes/origin/HEAD` with fallback to local branch check; auto-detects on project load and creation
-- [ ] **Session persistence** — Sessions should continue running when navigating away (to another session, PR tab, etc.) or closing the app. Similar to Hangar's tmux-based approach — the underlying process must survive view changes and app lifecycle events
+- [x] **Session persistence** — Sessions should continue running when navigating away (to another session, PR tab, etc.) or closing the app. Similar to Hangar's tmux-based approach — the underlying process must survive view changes and app lifecycle events
 - [x] **Auto-detect master/main branch** — When adding a new project, auto-detect whether the repo uses `master` or `main` as its default branch
 
 ## Terminal / Session UX
