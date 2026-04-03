@@ -60,11 +60,13 @@ struct ContentView: View {
     @Environment(RunwayStore.self) private var store
     @Environment(\.theme) private var theme
     @Environment(\.colorScheme) private var colorScheme
+    @AppStorage("sidebarWidth") private var sidebarWidth: Double = 280
 
     var body: some View {
         ZStack(alignment: .bottom) {
             NavigationSplitView {
                 sidebar
+                    .navigationSplitViewColumnWidth(min: 200, ideal: CGFloat(sidebarWidth), max: 500)
                     .background(theme.chrome.surface)
             } detail: {
                 detail

@@ -71,10 +71,10 @@ public final class TerminalKeyEventMonitor {
         }
 
         // Let Cmd+key shortcuts through to the menu system
-        // EXCEPT Cmd+C (SIGINT) which the terminal needs
+        // EXCEPT Cmd+C and Cmd+V which the terminal handles (copy/paste/SIGINT)
         if event.modifierFlags.contains(.command) && event.type == .keyDown {
             let key = event.charactersIgnoringModifiers ?? ""
-            if key != "c" && !key.isEmpty {
+            if key != "c" && key != "v" && !key.isEmpty {
                 return false
             }
         }
@@ -169,7 +169,13 @@ public final class TerminalKeyEventMonitor {
         guard let view else { return nil }
         for subview in view.subviews {
             let name = String(describing: type(of: subview))
-            if name.contains("AppTerminalView") && subview.acceptsFirstResponder {
+            // Match Ghostty's AppTerminalView or SwiftTerm's LocalProcessTerminalView/TerminalView
+            if subview.acceptsFirstResponder
+                && (name.contains("AppTerminalView") || name.contains("TerminalView"))
+                && !(subview is NSTextField)
+                && !(subview is NSButton)
+                && !(subview is NSScrollView)
+            {
                 return subview
             }
             if let found = findTerminalView(in: subview) {

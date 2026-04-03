@@ -151,15 +151,46 @@ public struct TerminalPane: NSViewRepresentable {
 
 // MARK: - Container View
 
-/// Simple NSView container that holds the terminal view.
-/// Ensures proper autoresizing when embedded in SwiftUI.
+/// NSView container that holds the terminal view and passes mouse events through.
+/// Also registers for file drag-drop so users can drag files into the terminal.
 class TerminalContainerView: NSView {
-    func embed(_ terminal: NSView) {
-        // Remove previous
-        for subview in subviews { subview.removeFromSuperview() }
+    private var terminalRef: LocalProcessTerminalView?
 
+    override func hitTest(_ point: NSPoint) -> NSView? {
+        // Pass mouse events through to the terminal subview
+        if let terminal = subviews.first {
+            let converted = convert(point, to: terminal)
+            return terminal.hitTest(converted) ?? super.hitTest(point)
+        }
+        return super.hitTest(point)
+    }
+
+    override func draggingEntered(_ sender: NSDraggingInfo) -> NSDragOperation {
+        .copy
+    }
+
+    override func performDragOperation(_ sender: NSDraggingInfo) -> Bool {
+        guard let items = sender.draggingPasteboard.readObjects(forClasses: [NSURL.self]) as? [URL] else {
+            return false
+        }
+        let paths = items.map { url -> String in
+            url.path.replacingOccurrences(of: " ", with: "\\ ")
+                .replacingOccurrences(of: "(", with: "\\(")
+                .replacingOccurrences(of: ")", with: "\\)")
+                .replacingOccurrences(of: "'", with: "\\'")
+        }
+        terminalRef?.send(txt: paths.joined(separator: " "))
+        return true
+    }
+
+    func embed(_ terminal: NSView) {
+        for subview in subviews { subview.removeFromSuperview() }
+        if let localTerminal = terminal as? LocalProcessTerminalView {
+            terminalRef = localTerminal
+        }
         terminal.translatesAutoresizingMaskIntoConstraints = false
         addSubview(terminal)
+        registerForDraggedTypes([.fileURL])
         NSLayoutConstraint.activate([
             terminal.topAnchor.constraint(equalTo: topAnchor),
             terminal.bottomAnchor.constraint(equalTo: bottomAnchor),
