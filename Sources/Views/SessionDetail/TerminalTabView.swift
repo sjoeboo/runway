@@ -49,6 +49,13 @@ public struct TerminalTabView: View {
             }
         }
         .onAppear { initializeTabs() }
+        .onChange(of: session.id) { _, _ in
+            // Reset tabs when switching to a different session — without this,
+            // @State persists the old session's tabs and the wrong terminal shows.
+            tabs = []
+            selectedTabID = nil
+            initializeTabs()
+        }
     }
 
     // MARK: - Tab Bar

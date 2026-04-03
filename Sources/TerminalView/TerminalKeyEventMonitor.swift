@@ -70,16 +70,21 @@ public final class TerminalKeyEventMonitor {
             return false
         }
 
-        // Let Cmd+key shortcuts through to the menu system
-        // EXCEPT Cmd+C and Cmd+V which the terminal handles (copy/paste/SIGINT)
+        // Let ALL Cmd+key shortcuts through to the normal responder chain.
+        // SwiftTerm handles Cmd+C (copy/SIGINT) and Cmd+V (paste) via
+        // performKeyEquivalent / NSTextInputClient, not keyDown.
         if event.modifierFlags.contains(.command) && event.type == .keyDown {
-            let key = event.charactersIgnoringModifiers ?? ""
-            if key != "c" && key != "v" && !key.isEmpty {
-                return false
+            // Just ensure the terminal is first responder so it receives
+            // performKeyEquivalent calls, then let the event flow normally.
+            if let terminal = findTerminalView(in: window.contentView) {
+                if !(fr === terminal) {
+                    window.makeFirstResponder(terminal)
+                }
             }
+            return false
         }
 
-        // Find the terminal view and forward the event directly
+        // Find the terminal view and forward non-Cmd key events directly
         guard let terminal = findTerminalView(in: window.contentView) else {
             return false
         }
@@ -169,12 +174,11 @@ public final class TerminalKeyEventMonitor {
         guard let view else { return nil }
         for subview in view.subviews {
             let name = String(describing: type(of: subview))
-            // Match Ghostty's AppTerminalView or SwiftTerm's LocalProcessTerminalView/TerminalView
+            // Match Ghostty's AppTerminalView or SwiftTerm's LocalProcessTerminalView
+            // Be specific: "LocalProcessTerminalView" or "AppTerminalView" — avoid
+            // matching TerminalContainerView or other wrappers.
             if subview.acceptsFirstResponder
-                && (name.contains("AppTerminalView") || name.contains("TerminalView"))
-                && !(subview is NSTextField)
-                && !(subview is NSButton)
-                && !(subview is NSScrollView)
+                && (name.contains("AppTerminalView") || name.contains("LocalProcessTerminalView"))
             {
                 return subview
             }
