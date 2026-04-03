@@ -115,7 +115,7 @@ public struct NewIssueSheet: View {
     @Environment(\.theme) private var theme
 
     @State private var title: String = ""
-    @State private var body: String = ""
+    @State private var issueBody: String = ""
     @State private var selectedLabels: Set<String> = []
 
     public init(
@@ -147,7 +147,7 @@ public struct NewIssueSheet: View {
                 Text("Body")
                     .font(.caption)
                     .foregroundColor(theme.chrome.textDim)
-                TextEditor(text: $body)
+                TextEditor(text: $issueBody)
                     .font(.system(.body, design: .monospaced))
                     .frame(minHeight: 120)
                     .overlay(
@@ -188,7 +188,7 @@ public struct NewIssueSheet: View {
                     .keyboardShortcut(.cancelAction)
                 Spacer()
                 Button("Create Issue") {
-                    onCreate(title, body, Array(selectedLabels))
+                    onCreate(title, issueBody, Array(selectedLabels))
                     dismiss()
                 }
                 .keyboardShortcut(.defaultAction)
