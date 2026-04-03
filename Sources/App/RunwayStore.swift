@@ -142,7 +142,7 @@ public final class RunwayStore {
             }
         }
 
-        let session = Session(
+        var session = Session(
             title: request.title,
             groupID: request.projectID,
             path: sessionPath,
@@ -152,11 +152,8 @@ public final class RunwayStore {
             permissionMode: request.permissionMode
         )
 
-        sessions.append(session)
-        try? database?.saveSession(session)
-        selectedSessionID = session.id
-
-        // Create tmux session if available
+        // Create tmux session BEFORE adding to UI — TerminalPane needs it to exist
+        // when it tries to attach
         if tmuxAvailable {
             let tmuxName = "runway-\(session.id)"
             let command: String?
@@ -178,11 +175,18 @@ public final class RunwayStore {
                         "RUNWAY_TITLE": session.title,
                     ]
                 )
+                session.status = .running
             } catch {
                 print("[Runway] Failed to create tmux session: \(error)")
                 statusMessage = "tmux session failed: \(error.localizedDescription)"
+                // Fall through — session still created, TerminalPane will use direct spawn fallback
             }
         }
+
+        // Now add to UI — tmux session is ready for TerminalPane to attach
+        sessions.append(session)
+        try? database?.saveSession(session)
+        selectedSessionID = session.id
     }
 
     // MARK: - Session Lifecycle
