@@ -102,6 +102,7 @@ public struct PRDashboardView: View {
                     }
                 }
             }
+            .frame(minWidth: 300, idealWidth: 400)
 
             // Right: PR detail drawer
             if let pr = selectedPR {
@@ -112,27 +113,16 @@ public struct PRDashboardView: View {
                     onApprove: { onApprove(pr) },
                     onComment: { body in onComment(pr, body) }
                 )
-                .frame(minWidth: 400)
+                .frame(minWidth: 400, idealWidth: 500)
             }
         }
         .onAppear { onRefresh() }
     }
 
     private var filteredPRs: [PullRequest] {
-        switch selectedTab {
-        case .all:
-            pullRequests
-        case .mine:
-            pullRequests.filter { $0.author == currentUser }
-        case .reviewRequested:
-            pullRequests  // Filtered server-side by PRManager when filter is .reviewRequested
-        }
-    }
-
-    private var currentUser: String {
-        // When filter is .mine, PRManager already filters server-side via --author @me
-        // So for local filtering, we show all when tab is .mine
-        ""
+        // All filtering is done server-side by PRManager (--author @me, --review-requested @me)
+        // Local filtering just passes through since each tab triggers a server re-fetch
+        pullRequests
     }
 
     private func tabButton(_ tab: PRTab) -> some View {

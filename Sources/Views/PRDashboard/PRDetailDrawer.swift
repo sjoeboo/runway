@@ -168,7 +168,7 @@ public struct PRDetailDrawer: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 12) {
                 if let body = detail?.body, !body.isEmpty {
-                    Text(body)
+                    Text(stripHTML(body))
                         .font(.body)
                         .foregroundColor(theme.chrome.text)
                         .textSelection(.enabled)
@@ -346,6 +346,17 @@ public struct PRDetailDrawer: View {
         case .none:
             EmptyView()
         }
+    }
+
+    private func stripHTML(_ html: String) -> String {
+        // Strip HTML tags for plain text display
+        html.replacingOccurrences(of: "<[^>]+>", with: "", options: .regularExpression)
+            .replacingOccurrences(of: "&amp;", with: "&")
+            .replacingOccurrences(of: "&lt;", with: "<")
+            .replacingOccurrences(of: "&gt;", with: ">")
+            .replacingOccurrences(of: "&quot;", with: "\"")
+            .replacingOccurrences(of: "&#39;", with: "'")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
     }
 }
 

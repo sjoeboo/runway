@@ -36,25 +36,10 @@ public actor PRManager {
 
     /// Discover all hosts the user is authenticated with via `gh auth status`.
     private func discoverHosts() async -> [String] {
-        // gh auth status prints to stderr; capture it directly
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
-        process.arguments = ["gh", "auth", "status"]
-
-        let errPipe = Pipe()
-        process.standardOutput = Pipe()
-        process.standardError = errPipe
-
-        do {
-            try process.run()
-            process.waitUntilExit()
-        } catch {
+        guard let output = try? await runGH(args: ["auth", "status"]) else {
             return ["github.com"]
         }
-
-        let errData = errPipe.fileHandleForReading.readDataToEndOfFile()
-        let errOutput = String(data: errData, encoding: .utf8) ?? ""
-        return parseHosts(from: errOutput)
+        return parseHosts(from: output)
     }
 
     /// Fetch detailed PR information.
