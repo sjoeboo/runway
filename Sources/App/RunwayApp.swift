@@ -60,11 +60,13 @@ struct ContentView: View {
     @Environment(RunwayStore.self) private var store
     @Environment(\.theme) private var theme
     @Environment(\.colorScheme) private var colorScheme
+    @AppStorage("sidebarWidth") private var sidebarWidth: Double = 280
 
     var body: some View {
         ZStack(alignment: .bottom) {
             NavigationSplitView {
                 sidebar
+                    .navigationSplitViewColumnWidth(min: 200, ideal: CGFloat(sidebarWidth), max: 500)
                     .background(theme.chrome.surface)
             } detail: {
                 detail
@@ -179,10 +181,26 @@ struct ContentView: View {
                     store.newSessionProjectID = projectID
                     store.showNewSessionDialog = true
                 },
-                onNewProject: { store.showNewProjectDialog = true }
+                onNewProject: { store.showNewProjectDialog = true },
+                onReorderSessions: { projectID, fromOffsets, toOffset in
+                    store.reorderSessions(in: projectID, fromOffsets: fromOffsets, toOffset: toOffset)
+                },
+                onReorderProjects: { fromOffsets, toOffset in
+                    store.reorderProjects(fromOffsets: fromOffsets, toOffset: toOffset)
+                }
             )
         }
-        .frame(minWidth: 240)
+        .frame(minWidth: 200)
+        .background(
+            GeometryReader { geo in
+                Color.clear
+                    .onChange(of: geo.size.width) { _, newWidth in
+                        if abs(Double(newWidth) - sidebarWidth) > 5 {
+                            sidebarWidth = Double(newWidth)
+                        }
+                    }
+            }
+        )
     }
 
     private var viewPicker: some View {
@@ -232,7 +250,10 @@ struct ContentView: View {
                 },
                 onRefresh: { Task { await store.fetchPRs() } },
                 onApprove: { pr in Task { await store.approvePR(pr) } },
-                onComment: { pr, body in Task { await store.commentOnPR(pr, body: body) } }
+                onComment: { pr, body in Task { await store.commentOnPR(pr, body: body) } },
+                onRequestChanges: { pr, body in Task { await store.requestChangesOnPR(pr, body: body) } },
+                onMerge: { pr, strategy in Task { await store.mergePR(pr, strategy: strategy) } },
+                onToggleDraft: { pr in Task { await store.togglePRDraft(pr) } }
             )
         }
     }

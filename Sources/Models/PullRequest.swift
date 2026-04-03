@@ -67,6 +67,30 @@ public enum PRState: String, Codable, Sendable {
     case closed = "CLOSED"
 }
 
+// MARK: - Merge Strategy
+
+public enum MergeStrategy: String, Codable, Sendable, CaseIterable {
+    case squash
+    case merge
+    case rebase
+
+    public var displayName: String {
+        switch self {
+        case .squash: "Squash and merge"
+        case .merge: "Merge commit"
+        case .rebase: "Rebase and merge"
+        }
+    }
+
+    public var cliFlag: String {
+        switch self {
+        case .squash: "--squash"
+        case .merge: "--merge"
+        case .rebase: "--rebase"
+        }
+    }
+}
+
 // MARK: - Review Decision
 
 public enum ReviewDecision: String, Codable, Sendable {

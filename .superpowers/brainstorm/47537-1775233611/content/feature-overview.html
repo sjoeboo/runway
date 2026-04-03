@@ -1,0 +1,117 @@
+<h2>Feature Round: Overview & Approaches</h2>
+<p class="subtitle">7 features across 4 areas — here's how they connect and the key design decisions</p>
+
+<div class="section">
+  <h3>1. Global Default Permission Mode</h3>
+  <p>Add <code>@AppStorage("defaultPermissionMode")</code> to General settings tab. NewSessionDialog reads it as initial selection. Simple, no real alternatives needed.</p>
+  <div style="background: rgba(255,255,255,0.05); border-radius: 8px; padding: 16px; margin-top: 8px; border-left: 3px solid #7aa2f7;">
+    <strong>Approach:</strong> Single @AppStorage key, segmented picker in General tab, NewSessionDialog reads on init.<br>
+    <span style="color: #9ece6a;">Low complexity — straightforward extension of existing patterns.</span>
+  </div>
+</div>
+
+<div class="section">
+  <h3>2. PR Actions</h3>
+  <p>Approve and comment already exist. Adding: <strong>request changes</strong>, <strong>merge (squash default)</strong>, <strong>mark ready/convert to draft</strong>.</p>
+
+  <div class="options">
+    <div class="option" data-choice="a" onclick="toggleSelect(this)">
+      <div class="letter">A</div>
+      <div class="content">
+        <h3>Action Bar (Recommended)</h3>
+        <p>Horizontal button bar at top of PR detail panel. Contextual buttons based on PR state (e.g. "Mark Ready" only shows for drafts, "Merge" only for approved PRs). Merge button has a dropdown for strategy override.</p>
+        <div class="pros-cons">
+          <div class="pros"><h4>Pros</h4><ul><li>Always visible, discoverable</li><li>Contextual — shows only valid actions</li><li>Familiar GitHub-like pattern</li></ul></div>
+          <div class="cons"><h4>Cons</h4><ul><li>Takes vertical space in detail panel</li></ul></div>
+        </div>
+      </div>
+    </div>
+    <div class="option" data-choice="b" onclick="toggleSelect(this)">
+      <div class="letter">B</div>
+      <div class="content">
+        <h3>Toolbar Menu</h3>
+        <p>Single "Actions" dropdown button in the PR detail header. All actions in a menu, with destructive actions (merge) separated by divider.</p>
+        <div class="pros-cons">
+          <div class="pros"><h4>Pros</h4><ul><li>Compact — saves vertical space</li><li>Clean header</li></ul></div>
+          <div class="cons"><h4>Cons</h4><ul><li>Extra click for every action</li><li>Less discoverable</li></ul></div>
+        </div>
+      </div>
+    </div>
+    <div class="option" data-choice="c" onclick="toggleSelect(this)">
+      <div class="letter">C</div>
+      <div class="content">
+        <h3>Hybrid: Primary + Overflow</h3>
+        <p>One or two primary actions as buttons (Approve, Merge) plus a "..." overflow menu for less common actions (request changes, draft toggle). Primary buttons change based on PR state.</p>
+        <div class="pros-cons">
+          <div class="pros"><h4>Pros</h4><ul><li>Quick access to common actions</li><li>Clean — not cluttered</li><li>State-aware primary actions</li></ul></div>
+          <div class="cons"><h4>Cons</h4><ul><li>Slightly more complex logic</li></ul></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>3. Auto-Detect PR for Sessions</h3>
+  <p>PRManager.fetchPRForWorktree() already exists and RunwayStore.enrichPRs() calls it. This is about making it more visible and reactive.</p>
+  <div style="background: rgba(255,255,255,0.05); border-radius: 8px; padding: 16px; margin-top: 8px; border-left: 3px solid #7aa2f7;">
+    <strong>Approach:</strong> Enhance enrichPRs() to run on session creation and periodically. Show linked PR badge in session row. Clicking the badge opens PR detail drawer. Add "View PR" to session context menu.<br>
+    <span style="color: #9ece6a;">Mostly wiring — infrastructure exists.</span>
+  </div>
+</div>
+
+<div class="section">
+  <h3>4. ANSI Color Palette Sync</h3>
+  <p>Themes already define all 16 ANSI colors in TerminalPalette. The question is whether they're actually being applied to SwiftTerm at runtime.</p>
+  <div style="background: rgba(255,255,255,0.05); border-radius: 8px; padding: 16px; margin-top: 8px; border-left: 3px solid #7aa2f7;">
+    <strong>Approach:</strong> Verify ANSI palette application in TerminalPane. If not wired, map theme.terminal.ansi[0..15] → SwiftTerm's color settings. Update live when theme changes.<br>
+    <span style="color: #9ece6a;">Likely a small fix — verify and wire.</span>
+  </div>
+</div>
+
+<div class="section">
+  <h3>5. Sidebar Context Menus + Drag Reorder</h3>
+  <p>Current: restart/delete on sessions. Adding full context menus for both sessions and projects, plus drag-to-reorder.</p>
+  <div style="background: rgba(255,255,255,0.05); border-radius: 8px; padding: 16px; margin-top: 8px; border-left: 3px solid #7aa2f7;">
+    <strong>Approach:</strong> SwiftUI <code>.contextMenu</code> modifiers on session and project rows. Drag reorder via <code>.onMove</code> with a persisted <code>sortOrder: Int</code> column in GRDB for both Session and Project tables. Migration adds the column.<br>
+    <span style="color: #e0af68;">Medium complexity — needs GRDB migration + drag gesture handling in List vs ForEach.</span>
+  </div>
+</div>
+
+<div class="section">
+  <h3>6. Window Title</h3>
+  <p>Already implemented! <code>windowTitle</code> in RunwayApp.swift shows "Runway — {session.title}" when a session is selected.</p>
+  <div style="background: rgba(255,255,255,0.05); border-radius: 8px; padding: 16px; margin-top: 8px; border-left: 3px solid #9ece6a;">
+    <span style="color: #9ece6a;">✓ Already done — no work needed.</span>
+  </div>
+</div>
+
+<div class="section">
+  <h3>7. Responsive Layout with Persisted Widths</h3>
+  <p>Persist sidebar width and PR list/detail split positions across restarts.</p>
+
+  <div class="options">
+    <div class="option" data-choice="d" onclick="toggleSelect(this)">
+      <div class="letter">D</div>
+      <div class="content">
+        <h3>@AppStorage (Recommended)</h3>
+        <p>Store widths as <code>@AppStorage("sidebarWidth")</code>, <code>@AppStorage("prListWidth")</code>, etc. Read on launch, update on drag. Simple, consistent with existing font/theme storage.</p>
+        <div class="pros-cons">
+          <div class="pros"><h4>Pros</h4><ul><li>Consistent with existing pattern</li><li>Simple implementation</li><li>Instant on launch</li></ul></div>
+          <div class="cons"><h4>Cons</h4><ul><li>NavigationSplitView doesn't expose divider position directly — may need custom split view</li></ul></div>
+        </div>
+      </div>
+    </div>
+    <div class="option" data-choice="e" onclick="toggleSelect(this)">
+      <div class="letter">E</div>
+      <div class="content">
+        <h3>Custom HSplitView</h3>
+        <p>Replace NavigationSplitView with a custom resizable split. Full control over divider position, persisted via @AppStorage. More work but more control.</p>
+        <div class="pros-cons">
+          <div class="pros"><h4>Pros</h4><ul><li>Full control over widths</li><li>Reliable persistence</li><li>Can animate resizes</li></ul></div>
+          <div class="cons"><h4>Cons</h4><ul><li>Lose NavigationSplitView's built-in sidebar toggle</li><li>More code to maintain</li></ul></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

@@ -145,6 +145,12 @@ public final class Database: Sendable {
             }
         }
 
+        migrator.registerMigration("v5_session_sort_order") { db in
+            try db.alter(table: "sessions") { t in
+                t.add(column: "sortOrder", .integer).notNull().defaults(to: 0)
+            }
+        }
+
         try migrator.migrate(dbQueue)
     }
 
@@ -159,7 +165,7 @@ public final class Database: Sendable {
 
     public func allSessions() throws -> [Session] {
         try dbQueue.read { db in
-            try SessionRecord.fetchAll(db).map { $0.toSession() }
+            try SessionRecord.order(Column("sortOrder"), Column("createdAt")).fetchAll(db).map { $0.toSession() }
         }
     }
 
@@ -189,6 +195,24 @@ public final class Database: Sendable {
                 record.lastAccessedAt = Date()
                 try record.update(db)
             }
+        }
+    }
+
+    public func updateSessionSortOrder(id: String, sortOrder: Int) throws {
+        try dbQueue.write { db in
+            try db.execute(
+                sql: "UPDATE sessions SET sortOrder = ? WHERE id = ?",
+                arguments: [sortOrder, id]
+            )
+        }
+    }
+
+    public func updateProjectSortOrder(id: String, sortOrder: Int) throws {
+        try dbQueue.write { db in
+            try db.execute(
+                sql: "UPDATE projects SET sortOrder = ? WHERE id = ?",
+                arguments: [sortOrder, id]
+            )
         }
     }
 

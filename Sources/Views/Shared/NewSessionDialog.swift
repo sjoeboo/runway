@@ -13,6 +13,7 @@ public struct NewSessionDialog: View {
     @State private var useWorktree: Bool = true
     @State private var branchName: String = ""
     @State private var branchManuallyEdited: Bool = false
+    @AppStorage("defaultPermissionMode") private var defaultPermissionMode: PermissionMode = .default
     @State private var permissionMode: PermissionMode = .default
     @State private var validationError: String?
 
@@ -130,6 +131,9 @@ public struct NewSessionDialog: View {
         }
         .padding(24)
         .frame(width: 420)
+        .onAppear {
+            permissionMode = defaultPermissionMode
+        }
     }
 
     private func field(_ label: String, text: Binding<String>, placeholder: String) -> some View {

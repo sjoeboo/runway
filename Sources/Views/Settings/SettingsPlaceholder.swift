@@ -1,3 +1,4 @@
+import Models
 import SwiftUI
 import Theme
 
@@ -6,6 +7,7 @@ public struct SettingsView: View {
     @Environment(ThemeManager.self) private var themeManager
     @AppStorage("terminalFontFamily") private var fontFamily: String = "MesloLGS Nerd Font"
     @AppStorage("terminalFontSize") private var fontSize: Double = 13
+    @AppStorage("defaultPermissionMode") private var defaultPermissionMode: PermissionMode = .default
 
     public init() {}
 
@@ -170,6 +172,21 @@ public struct SettingsView: View {
 
     private var generalSettings: some View {
         Form {
+            Section("Session Defaults") {
+                Picker("Default Permission Mode", selection: $defaultPermissionMode) {
+                    ForEach(PermissionMode.allCases, id: \.self) { mode in
+                        Text(mode.displayName).tag(mode)
+                    }
+                }
+                .pickerStyle(.segmented)
+
+                if defaultPermissionMode == .bypassAll {
+                    Text("New sessions will skip all permission prompts by default")
+                        .font(.caption)
+                        .foregroundColor(.orange)
+                }
+            }
+
             Section("Hooks") {
                 LabeledContent("Hook Server Port") {
                     Text("47437")

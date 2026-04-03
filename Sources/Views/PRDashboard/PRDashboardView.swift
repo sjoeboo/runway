@@ -13,8 +13,12 @@ public struct PRDashboardView: View {
     let onRefresh: () -> Void
     let onApprove: (PullRequest) -> Void
     let onComment: (PullRequest, String) -> Void
+    var onRequestChanges: ((PullRequest, String) -> Void)?
+    var onMerge: ((PullRequest, MergeStrategy) -> Void)?
+    var onToggleDraft: ((PullRequest) -> Void)?
 
     @State private var selectedTab: PRTab = .mine
+    @AppStorage("prListWidth") private var prListWidth: Double = 380
     @Environment(\.theme) private var theme
 
     public init(
@@ -26,7 +30,10 @@ public struct PRDashboardView: View {
         onFilterChange: @escaping (PRTab) -> Void = { _ in },
         onRefresh: @escaping () -> Void = {},
         onApprove: @escaping (PullRequest) -> Void = { _ in },
-        onComment: @escaping (PullRequest, String) -> Void = { _, _ in }
+        onComment: @escaping (PullRequest, String) -> Void = { _, _ in },
+        onRequestChanges: ((PullRequest, String) -> Void)? = nil,
+        onMerge: ((PullRequest, MergeStrategy) -> Void)? = nil,
+        onToggleDraft: ((PullRequest) -> Void)? = nil
     ) {
         self.pullRequests = pullRequests
         self.selectedPRID = selectedPRID
@@ -37,6 +44,9 @@ public struct PRDashboardView: View {
         self.onRefresh = onRefresh
         self.onApprove = onApprove
         self.onComment = onComment
+        self.onRequestChanges = onRequestChanges
+        self.onMerge = onMerge
+        self.onToggleDraft = onToggleDraft
     }
 
     private var selectedPR: PullRequest? {
@@ -74,7 +84,7 @@ public struct PRDashboardView: View {
                 Divider()
 
                 // PR list
-                if filteredPRs.isEmpty && !isLoading {
+                if pullRequests.isEmpty && !isLoading {
                     Spacer()
                     VStack(spacing: 8) {
                         Image(systemName: "pull.request")
@@ -88,7 +98,7 @@ public struct PRDashboardView: View {
                     Spacer()
                 } else {
                     List(
-                        filteredPRs,
+                        pullRequests,
                         selection: Binding(
                             get: { selectedPRID },
                             set: { id in
@@ -103,7 +113,7 @@ public struct PRDashboardView: View {
                 }
             }
             .frame(minWidth: 300)
-            .frame(maxWidth: selectedPR == nil ? .infinity : 480)
+            .frame(maxWidth: selectedPR == nil ? .infinity : CGFloat(prListWidth))
 
             // Right: PR detail drawer
             if let pr = selectedPR {
@@ -113,18 +123,15 @@ public struct PRDashboardView: View {
                     detail: detail,
                     onClose: { onSelectPR(nil) },
                     onApprove: { onApprove(pr) },
-                    onComment: { body in onComment(pr, body) }
+                    onComment: { body in onComment(pr, body) },
+                    onRequestChanges: { body in onRequestChanges?(pr, body) },
+                    onMerge: { strategy in onMerge?(pr, strategy) },
+                    onToggleDraft: { onToggleDraft?(pr) }
                 )
                 .frame(maxWidth: .infinity)
             }
         }
         .onAppear { onRefresh() }
-    }
-
-    private var filteredPRs: [PullRequest] {
-        // All filtering is done server-side by PRManager (--author @me, --review-requested @me)
-        // Local filtering just passes through since each tab triggers a server re-fetch
-        pullRequests
     }
 
     private func tabButton(_ tab: PRTab) -> some View {

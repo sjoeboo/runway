@@ -48,7 +48,13 @@ public struct TerminalPane: NSViewRepresentable {
 
     public func updateNSView(_ nsView: NSView, context: Context) {
         if let terminal = context.coordinator.terminal {
-            applyTheme(terminal)
+            // Only reapply theme when it actually changes — avoids redundant
+            // installColors + needsDisplay on every unrelated state mutation.
+            let themeID = theme.id
+            if context.coordinator.lastThemeID != themeID {
+                context.coordinator.lastThemeID = themeID
+                applyTheme(terminal)
+            }
         }
     }
 
@@ -108,6 +114,23 @@ public struct TerminalPane: NSViewRepresentable {
         terminal.nativeForegroundColor = NSColor(palette.foreground)
         terminal.nativeBackgroundColor = NSColor(palette.background)
         terminal.selectedTextBackgroundColor = NSColor(palette.selection)
+
+        // Apply ANSI palette (16 colors: 0-7 normal, 8-15 bright)
+        // Convert SwiftUI.Color → SwiftTerm.Color (16-bit RGB)
+        let termColors = palette.ansi.map { swiftUIColor -> SwiftTerm.Color in
+            let nsColor =
+                NSColor(swiftUIColor).usingColorSpace(.sRGB)
+                ?? NSColor(swiftUIColor)
+            return SwiftTerm.Color(
+                red: UInt16(nsColor.redComponent * 65535),
+                green: UInt16(nsColor.greenComponent * 65535),
+                blue: UInt16(nsColor.blueComponent * 65535)
+            )
+        }
+        terminal.installColors(termColors)
+
+        // Force redraw to apply new colors
+        terminal.needsDisplay = true
     }
 
     private func buildEnvironment() -> [String] {
@@ -123,26 +146,54 @@ public struct TerminalPane: NSViewRepresentable {
         return env.map { "\($0.key)=\($0.value)" }
     }
 
-    private func shellEscape(_ path: String) -> String {
-        "'" + path.replacingOccurrences(of: "'", with: "'\\''") + "'"
-    }
-
     public class Coordinator {
         var terminal: LocalProcessTerminalView?
+        var lastThemeID: String?
     }
+}
+
+/// POSIX-safe shell escaping via single quotes.
+private func shellEscape(_ path: String) -> String {
+    "'" + path.replacingOccurrences(of: "'", with: "'\\''") + "'"
 }
 
 // MARK: - Container View
 
-/// Simple NSView container that holds the terminal view.
-/// Ensures proper autoresizing when embedded in SwiftUI.
+/// NSView container that holds the terminal view and passes mouse events through.
+/// Also registers for file drag-drop so users can drag files into the terminal.
 class TerminalContainerView: NSView {
-    func embed(_ terminal: NSView) {
-        // Remove previous
-        for subview in subviews { subview.removeFromSuperview() }
+    private var terminalRef: LocalProcessTerminalView?
 
+    override func hitTest(_ point: NSPoint) -> NSView? {
+        // Pass mouse events through to the terminal subview
+        if let terminal = subviews.first {
+            let converted = convert(point, to: terminal)
+            return terminal.hitTest(converted) ?? super.hitTest(point)
+        }
+        return super.hitTest(point)
+    }
+
+    override func draggingEntered(_ sender: NSDraggingInfo) -> NSDragOperation {
+        .copy
+    }
+
+    override func performDragOperation(_ sender: NSDraggingInfo) -> Bool {
+        guard let items = sender.draggingPasteboard.readObjects(forClasses: [NSURL.self]) as? [URL] else {
+            return false
+        }
+        let paths = items.map { shellEscape($0.path) }
+        terminalRef?.send(txt: paths.joined(separator: " "))
+        return true
+    }
+
+    func embed(_ terminal: NSView) {
+        for subview in subviews { subview.removeFromSuperview() }
+        if let localTerminal = terminal as? LocalProcessTerminalView {
+            terminalRef = localTerminal
+        }
         terminal.translatesAutoresizingMaskIntoConstraints = false
         addSubview(terminal)
+        registerForDraggedTypes([.fileURL])
         NSLayoutConstraint.activate([
             terminal.topAnchor.constraint(equalTo: topAnchor),
             terminal.bottomAnchor.constraint(equalTo: bottomAnchor),

@@ -49,6 +49,45 @@ import Testing
     #expect(projects.first?.name == "my-project")
 }
 
+@Test func sessionSortOrderPersistence() throws {
+    let db = try Database(inMemory: true)
+
+    let session = Session(title: "test", path: "/tmp", sortOrder: 7)
+    try db.saveSession(session)
+
+    let fetched = try db.session(id: session.id)
+    #expect(fetched?.sortOrder == 7)
+}
+
+@Test func updateSessionSortOrder() throws {
+    let db = try Database(inMemory: true)
+
+    let session = Session(title: "test", path: "/tmp", sortOrder: 0)
+    try db.saveSession(session)
+
+    try db.updateSessionSortOrder(id: session.id, sortOrder: 5)
+    let updated = try db.session(id: session.id)
+    #expect(updated?.sortOrder == 5)
+}
+
+@Test func allSessionsOrderedBySortOrder() throws {
+    let db = try Database(inMemory: true)
+
+    // Insert sessions with non-sequential sort orders
+    let s1 = Session(title: "first", path: "/tmp", sortOrder: 10)
+    let s2 = Session(title: "second", path: "/tmp", sortOrder: 5)
+    let s3 = Session(title: "third", path: "/tmp", sortOrder: 20)
+    try db.saveSession(s1)
+    try db.saveSession(s2)
+    try db.saveSession(s3)
+
+    let sessions = try db.allSessions()
+    #expect(sessions.count == 3)
+    #expect(sessions[0].title == "second")  // sortOrder 5
+    #expect(sessions[1].title == "first")  // sortOrder 10
+    #expect(sessions[2].title == "third")  // sortOrder 20
+}
+
 @Test func todoCRUD() throws {
     let db = try Database(inMemory: true)
 
