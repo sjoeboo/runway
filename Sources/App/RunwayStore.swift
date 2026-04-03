@@ -340,6 +340,11 @@ public final class RunwayStore {
         isLoadingPRs = true
         defer { isLoadingPRs = false }
 
+        // Show cached PRs immediately while fetching fresh data
+        if pullRequests.isEmpty, let cached = try? database?.cachedPRs() {
+            pullRequests = cached
+        }
+
         do {
             // Search across all repos — like Hangar, shows all user's PRs globally
             pullRequests = try await prManager.fetchPRs(filter: prFilter)
@@ -378,6 +383,10 @@ public final class RunwayStore {
             }
 
         }
+
+        // Cache enriched PRs to database
+        try? database?.cachePRs(pullRequests)
+        try? database?.cleanPRCache()
 
         // Link PRs to sessions by running gh pr view in each session's worktree directory
         // (like Hangar — gh CLI auto-detects branch from the git checkout)

@@ -136,6 +136,14 @@ public final class Database: Sendable {
             try db.rename(table: "sessions_new", to: "sessions")
         }
 
+        migrator.registerMigration("v4_pr_cache") { db in
+            try db.create(table: "pr_cache") { t in
+                t.primaryKey("id", .text)          // "owner/repo#number"
+                t.column("json", .text).notNull()   // Full PullRequest as JSON
+                t.column("fetchedAt", .datetime).notNull()
+            }
+        }
+
         try migrator.migrate(dbQueue)
     }
 
@@ -201,6 +209,60 @@ public final class Database: Sendable {
     public func deleteProject(id: String) throws {
         try dbQueue.write { db in
             _ = try ProjectRecord.deleteOne(db, key: id)
+        }
+    }
+
+    // MARK: - PR Cache
+
+    /// Load all cached PRs that haven't expired.
+    public func cachedPRs(maxAge: TimeInterval = 300) throws -> [PullRequest] {
+        let cutoff = Date().addingTimeInterval(-maxAge)
+        return try dbQueue.read { db in
+            let rows = try Row.fetchAll(
+                db,
+                sql: "SELECT json FROM pr_cache WHERE fetchedAt > ?",
+                arguments: [cutoff]
+            )
+            return rows.compactMap { row -> PullRequest? in
+                guard let jsonStr = row["json"] as? String,
+                      let data = jsonStr.data(using: .utf8)
+                else { return nil }
+                return try? JSONDecoder().decode(PullRequest.self, from: data)
+            }
+        }
+    }
+
+    /// Save or update a PR in the cache.
+    public func cachePR(_ pr: PullRequest) throws {
+        let data = try JSONEncoder().encode(pr)
+        let json = String(data: data, encoding: .utf8) ?? ""
+        try dbQueue.write { db in
+            try db.execute(
+                sql: "INSERT OR REPLACE INTO pr_cache (id, json, fetchedAt) VALUES (?, ?, ?)",
+                arguments: [pr.id, json, Date()]
+            )
+        }
+    }
+
+    /// Save multiple PRs to the cache.
+    public func cachePRs(_ prs: [PullRequest]) throws {
+        try dbQueue.write { db in
+            for pr in prs {
+                let data = try JSONEncoder().encode(pr)
+                let json = String(data: data, encoding: .utf8) ?? ""
+                try db.execute(
+                    sql: "INSERT OR REPLACE INTO pr_cache (id, json, fetchedAt) VALUES (?, ?, ?)",
+                    arguments: [pr.id, json, Date()]
+                )
+            }
+        }
+    }
+
+    /// Clear expired PR cache entries.
+    public func cleanPRCache(maxAge: TimeInterval = 3600) throws {
+        let cutoff = Date().addingTimeInterval(-maxAge)
+        try dbQueue.write { db in
+            try db.execute(sql: "DELETE FROM pr_cache WHERE fetchedAt < ?", arguments: [cutoff])
         }
     }
 
