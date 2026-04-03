@@ -15,6 +15,7 @@ public struct PRDashboardView: View {
     let onComment: (PullRequest, String) -> Void
 
     @State private var selectedTab: PRTab = .mine
+    @AppStorage("prListWidth") private var prListWidth: Double = 380
     @Environment(\.theme) private var theme
 
     public init(
@@ -103,7 +104,7 @@ public struct PRDashboardView: View {
                 }
             }
             .frame(minWidth: 300)
-            .frame(maxWidth: selectedPR == nil ? .infinity : 480)
+            .frame(maxWidth: selectedPR == nil ? .infinity : CGFloat(prListWidth))
 
             // Right: PR detail drawer
             if let pr = selectedPR {

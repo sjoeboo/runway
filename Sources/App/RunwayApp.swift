@@ -184,7 +184,17 @@ struct ContentView: View {
                 onNewProject: { store.showNewProjectDialog = true }
             )
         }
-        .frame(minWidth: 240)
+        .frame(minWidth: 200)
+        .background(
+            GeometryReader { geo in
+                Color.clear
+                    .onChange(of: geo.size.width) { _, newWidth in
+                        if abs(Double(newWidth) - sidebarWidth) > 5 {
+                            sidebarWidth = Double(newWidth)
+                        }
+                    }
+            }
+        )
     }
 
     private var viewPicker: some View {
