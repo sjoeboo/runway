@@ -50,6 +50,24 @@ import Testing
     #expect(detail.files.first?.path == "src/main.swift")
 }
 
+// MARK: - MergeStrategy
+
+@Test func mergeStrategyCliFlags() {
+    #expect(MergeStrategy.squash.cliFlag == "--squash")
+    #expect(MergeStrategy.merge.cliFlag == "--merge")
+    #expect(MergeStrategy.rebase.cliFlag == "--rebase")
+}
+
+@Test func mergeStrategyDisplayNames() {
+    #expect(MergeStrategy.squash.displayName == "Squash and merge")
+    #expect(MergeStrategy.merge.displayName == "Merge commit")
+    #expect(MergeStrategy.rebase.displayName == "Rebase and merge")
+}
+
+@Test func mergeStrategyCaseIterable() {
+    #expect(MergeStrategy.allCases.count == 3)
+}
+
 // MARK: - PRManager Actor
 
 @Test func prManagerCanBeCreated() async {

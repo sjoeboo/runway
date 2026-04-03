@@ -19,6 +19,16 @@ import Testing
     #expect(session.parentID == nil)
 }
 
+@Test func sessionSortOrderDefaultsToZero() {
+    let session = Session(title: "test", path: "/tmp")
+    #expect(session.sortOrder == 0)
+}
+
+@Test func sessionSortOrderPreserved() {
+    let session = Session(title: "test", path: "/tmp", sortOrder: 42)
+    #expect(session.sortOrder == 42)
+}
+
 @Test func toolDisplayNames() {
     #expect(Tool.claude.displayName == "Claude")
     #expect(Tool.shell.displayName == "Shell")

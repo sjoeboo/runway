@@ -108,6 +108,12 @@ public struct TerminalPane: NSViewRepresentable {
         terminal.nativeForegroundColor = NSColor(palette.foreground)
         terminal.nativeBackgroundColor = NSColor(palette.background)
         terminal.selectedTextBackgroundColor = NSColor(palette.selection)
+
+        // Apply ANSI palette (16 colors: 0-7 normal, 8-15 bright)
+        terminal.installColors(palette.ansi)
+
+        // Force redraw to apply new colors
+        terminal.needsDisplay = true
     }
 
     private func buildEnvironment() -> [String] {

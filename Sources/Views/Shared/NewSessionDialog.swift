@@ -13,6 +13,7 @@ public struct NewSessionDialog: View {
     @State private var useWorktree: Bool = true
     @State private var branchName: String = ""
     @State private var branchManuallyEdited: Bool = false
+    @AppStorage("defaultPermissionMode") private var defaultPermissionMode: String = "default"
     @State private var permissionMode: PermissionMode = .default
     @State private var validationError: String?
 

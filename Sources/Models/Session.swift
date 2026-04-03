@@ -12,6 +12,7 @@ public struct Session: Identifiable, Codable, Sendable {
     public var parentID: String?
     public var command: String?
     public var permissionMode: PermissionMode
+    public var sortOrder: Int
     public var createdAt: Date
     public var lastAccessedAt: Date
 
@@ -26,6 +27,7 @@ public struct Session: Identifiable, Codable, Sendable {
         parentID: String? = nil,
         command: String? = nil,
         permissionMode: PermissionMode = .default,
+        sortOrder: Int = 0,
         createdAt: Date = Date(),
         lastAccessedAt: Date = Date()
     ) {
@@ -39,6 +41,7 @@ public struct Session: Identifiable, Codable, Sendable {
         self.parentID = parentID
         self.command = command
         self.permissionMode = permissionMode
+        self.sortOrder = sortOrder
         self.createdAt = createdAt
         self.lastAccessedAt = lastAccessedAt
     }

@@ -92,6 +92,47 @@ public actor PRManager {
         try await runGH(args: ["pr", "view", "\(number)", "--repo", repo, "--web"])
     }
 
+    /// Request changes on a PR.
+    public func requestChanges(repo: String, number: Int, body: String, host: String? = nil) async throws {
+        try await runGH(
+            args: ["pr", "review", "\(number)", "--repo", repo, "--request-changes", "--body", body],
+            host: host
+        )
+    }
+
+    /// Merge a PR with the specified strategy.
+    public func merge(repo: String, number: Int, strategy: MergeStrategy = .squash, host: String? = nil) async throws {
+        try await runGH(
+            args: ["pr", "merge", "\(number)", "--repo", repo, strategy.cliFlag, "--delete-branch"],
+            host: host
+        )
+    }
+
+    /// Toggle draft state. `gh pr ready` to mark ready; GraphQL mutation to convert to draft.
+    public func toggleDraft(repo: String, number: Int, isDraft: Bool, host: String? = nil) async throws {
+        if isDraft {
+            // Currently ready → convert to draft via GraphQL
+            let nodeOutput = try await runGH(
+                args: ["pr", "view", "\(number)", "--repo", repo, "--json", "id", "-q", ".id"],
+                host: host
+            )
+            let nodeID = nodeOutput.trimmingCharacters(in: .whitespacesAndNewlines)
+            try await runGH(
+                args: [
+                    "api", "graphql",
+                    "-f", "query=mutation { convertPullRequestToDraft(input: {pullRequestId: \"\(nodeID)\"}) { pullRequest { isDraft } } }",
+                ],
+                host: host
+            )
+        } else {
+            // Currently draft → mark as ready
+            try await runGH(
+                args: ["pr", "ready", "\(number)", "--repo", repo],
+                host: host
+            )
+        }
+    }
+
     // MARK: - Private
 
     @discardableResult
