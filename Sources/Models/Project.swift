@@ -9,13 +9,27 @@ public struct Project: Identifiable, Codable, Sendable {
     public var sortOrder: Int
     public var createdAt: Date
 
+    // Per-project overrides (nil = use global default)
+    public var themeID: String?
+    public var permissionMode: PermissionMode?
+
+    // GitHub integration
+    public var ghRepo: String?
+    public var ghHost: String?
+    public var issuesEnabled: Bool
+
     public init(
         id: String = Project.generateID(),
         name: String,
         path: String,
         defaultBranch: String = "main",
         sortOrder: Int = 0,
-        createdAt: Date = Date()
+        createdAt: Date = Date(),
+        themeID: String? = nil,
+        permissionMode: PermissionMode? = nil,
+        ghRepo: String? = nil,
+        ghHost: String? = nil,
+        issuesEnabled: Bool = false
     ) {
         self.id = id
         self.name = name
@@ -23,6 +37,11 @@ public struct Project: Identifiable, Codable, Sendable {
         self.defaultBranch = defaultBranch
         self.sortOrder = sortOrder
         self.createdAt = createdAt
+        self.themeID = themeID
+        self.permissionMode = permissionMode
+        self.ghRepo = ghRepo
+        self.ghHost = ghHost
+        self.issuesEnabled = issuesEnabled
     }
 
     public static func generateID() -> String {

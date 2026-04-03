@@ -59,8 +59,9 @@ public struct TerminalPane: NSViewRepresentable {
     }
 
     private func createTerminal() -> LocalProcessTerminalView {
-        // Start the Shift+Enter monitor (idempotent)
+        // Start event monitors (idempotent)
         ShiftEnterMonitor.shared.start()
+        MouseSelectionMonitor.shared.start()
 
         let terminal = LocalProcessTerminalView(frame: .zero)
 
@@ -157,6 +158,36 @@ private func shellEscape(_ path: String) -> String {
     "'" + path.replacingOccurrences(of: "'", with: "'\\''") + "'"
 }
 
+// MARK: - Mouse Selection Monitor
+
+/// Intercepts mouse events via a local event monitor and temporarily disables
+/// SwiftTerm's mouse reporting so native text selection always works.
+/// Scroll wheel events are unaffected so tmux scrollback still functions.
+@MainActor
+class MouseSelectionMonitor {
+    static let shared = MouseSelectionMonitor()
+    private var monitor: Any?
+
+    func start() {
+        guard monitor == nil else { return }
+        monitor = NSEvent.addLocalMonitorForEvents(
+            matching: [.leftMouseDown, .leftMouseDragged, .leftMouseUp]
+        ) { event in
+            if let terminal = NSApplication.shared.keyWindow?.firstResponder
+                as? LocalProcessTerminalView
+            {
+                let saved = terminal.allowMouseReporting
+                terminal.allowMouseReporting = false
+                // Restore after the event is dispatched (next run loop iteration)
+                DispatchQueue.main.async {
+                    terminal.allowMouseReporting = saved
+                }
+            }
+            return event
+        }
+    }
+}
+
 // MARK: - Container View
 
 /// NSView container that holds the terminal view and passes mouse events through.
@@ -181,7 +212,7 @@ class TerminalContainerView: NSView {
         guard let items = sender.draggingPasteboard.readObjects(forClasses: [NSURL.self]) as? [URL] else {
             return false
         }
-        let paths = items.map { shellEscape($0.path) }
+        let paths = items.map { "@" + $0.path }
         terminalRef?.send(txt: paths.joined(separator: " "))
         return true
     }

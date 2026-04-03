@@ -151,6 +151,21 @@ public final class Database: Sendable {
             }
         }
 
+        migrator.registerMigration("v6_project_settings_and_issues") { db in
+            try db.alter(table: "projects") { t in
+                t.add(column: "themeID", .text)
+                t.add(column: "permissionMode", .text)
+                t.add(column: "ghRepo", .text)
+                t.add(column: "ghHost", .text)
+                t.add(column: "issuesEnabled", .boolean).notNull().defaults(to: false)
+            }
+            try db.create(table: "issue_cache") { t in
+                t.primaryKey("id", .text)
+                t.column("json", .text).notNull()
+                t.column("fetchedAt", .datetime).notNull()
+            }
+        }
+
         try migrator.migrate(dbQueue)
     }
 
@@ -237,6 +252,13 @@ public final class Database: Sendable {
         }
     }
 
+    public func updateProject(_ project: Project) throws {
+        try dbQueue.write { db in
+            var record = ProjectRecord(project)
+            try record.update(db)
+        }
+    }
+
     // MARK: - PR Cache
 
     /// Load all cached PRs that haven't expired.
@@ -288,6 +310,49 @@ public final class Database: Sendable {
         let cutoff = Date().addingTimeInterval(-maxAge)
         try dbQueue.write { db in
             try db.execute(sql: "DELETE FROM pr_cache WHERE fetchedAt < ?", arguments: [cutoff])
+        }
+    }
+
+    // MARK: - Issue Cache
+
+    /// Load all cached issues for a repo that haven't expired.
+    public func cachedIssues(repo: String, maxAge: TimeInterval = 300) throws -> [GitHubIssue] {
+        let cutoff = Date().addingTimeInterval(-maxAge)
+        let pattern = "\(repo)#%"
+        return try dbQueue.read { db in
+            let rows = try Row.fetchAll(
+                db,
+                sql: "SELECT json FROM issue_cache WHERE id LIKE ? AND fetchedAt > ?",
+                arguments: [pattern, cutoff]
+            )
+            return rows.compactMap { row -> GitHubIssue? in
+                guard let jsonStr = row["json"] as? String,
+                    let data = jsonStr.data(using: .utf8)
+                else { return nil }
+                return try? JSONDecoder().decode(GitHubIssue.self, from: data)
+            }
+        }
+    }
+
+    /// Save multiple issues to the cache.
+    public func cacheIssues(_ issues: [GitHubIssue]) throws {
+        try dbQueue.write { db in
+            for issue in issues {
+                let data = try JSONEncoder().encode(issue)
+                let json = String(data: data, encoding: .utf8) ?? ""
+                try db.execute(
+                    sql: "INSERT OR REPLACE INTO issue_cache (id, json, fetchedAt) VALUES (?, ?, ?)",
+                    arguments: [issue.id, json, Date()]
+                )
+            }
+        }
+    }
+
+    /// Clear expired issue cache entries.
+    public func cleanIssueCache(maxAge: TimeInterval = 3600) throws {
+        let cutoff = Date().addingTimeInterval(-maxAge)
+        try dbQueue.write { db in
+            try db.execute(sql: "DELETE FROM issue_cache WHERE fetchedAt < ?", arguments: [cutoff])
         }
     }
 
