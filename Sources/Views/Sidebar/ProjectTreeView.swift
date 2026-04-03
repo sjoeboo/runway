@@ -257,6 +257,12 @@ struct ProjectSection: View {
                 Label("Open in Finder", systemImage: "folder")
             }
 
+            Button {
+                onSelectProject?(project.id)
+            } label: {
+                Label("Project Settings\u{2026}", systemImage: "gear")
+            }
+
             Divider()
 
             Button(role: .destructive) {
