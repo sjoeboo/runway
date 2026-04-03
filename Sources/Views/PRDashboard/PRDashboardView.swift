@@ -19,6 +19,7 @@ public struct PRDashboardView: View {
 
     @State private var selectedTab: PRTab = .mine
     @AppStorage("prListWidth") private var prListWidth: Double = 380
+    @AppStorage("hideDrafts") private var hideDrafts: Bool = false
     @Environment(\.theme) private var theme
 
     public init(
@@ -53,6 +54,10 @@ public struct PRDashboardView: View {
         pullRequests.first(where: { $0.id == selectedPRID })
     }
 
+    private var visiblePRs: [PullRequest] {
+        hideDrafts ? pullRequests.filter { !$0.isDraft } : pullRequests
+    }
+
     public var body: some View {
         HStack(spacing: 0) {
             // Left: PR list
@@ -69,6 +74,16 @@ public struct PRDashboardView: View {
                             .controlSize(.small)
                             .padding(.trailing, 12)
                     }
+
+                    Button {
+                        hideDrafts.toggle()
+                    } label: {
+                        Image(systemName: hideDrafts ? "eye.slash" : "eye")
+                            .font(.caption)
+                    }
+                    .buttonStyle(.plain)
+                    .help(hideDrafts ? "Show drafts" : "Hide drafts")
+                    .padding(.trailing, 8)
 
                     Button(action: onRefresh) {
                         Image(systemName: "arrow.clockwise")
@@ -98,7 +113,7 @@ public struct PRDashboardView: View {
                     Spacer()
                 } else {
                     List(
-                        pullRequests,
+                        visiblePRs,
                         selection: Binding(
                             get: { selectedPRID },
                             set: { id in
