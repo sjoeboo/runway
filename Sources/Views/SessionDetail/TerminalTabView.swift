@@ -34,10 +34,8 @@ public struct TerminalTabView: View {
 
     public var body: some View {
         VStack(spacing: 0) {
-            if tabs.count > 1 {
-                tabBar
-                Divider()
-            }
+            tabBar
+            Divider()
 
             // Terminal for selected tab
             if let tab = selectedTab {

@@ -22,12 +22,16 @@ public struct ProjectTreeView: View {
     public var body: some View {
         List(selection: $selectedSessionID) {
             ForEach(projects) { project in
-                Section(project.name) {
+                Section {
                     let projectSessions = sessions.filter { $0.groupID == project.id }
                     ForEach(projectSessions) { session in
                         SessionRowView(session: session)
                             .tag(session.id)
                     }
+                } header: {
+                    Text(project.name)
+                        .font(.system(.title3, weight: .semibold))
+                        .foregroundColor(theme.chrome.text)
                 }
             }
 

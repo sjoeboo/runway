@@ -97,9 +97,19 @@ struct ContentView: View {
             }
         }
         .background(theme.chrome.background)
+        .navigationTitle(windowTitle)
         .onChange(of: colorScheme) { _, newScheme in
             store.themeManager.updateForColorScheme(newScheme)
         }
+    }
+
+    private var windowTitle: String {
+        if let id = store.selectedSessionID,
+           let session = store.sessions.first(where: { $0.id == id })
+        {
+            return "Runway — \(session.title)"
+        }
+        return "Runway"
     }
 
     // MARK: - Status Toast
