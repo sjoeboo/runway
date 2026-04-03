@@ -51,13 +51,12 @@ public actor HookServer {
         }
 
         // Use a continuation to bridge NWListener's callback into async/await.
-        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
-            listener.stateUpdateHandler = { [weak self] state in
+        let resolvedPort = try await withCheckedThrowingContinuation {
+            (continuation: CheckedContinuation<UInt16?, Error>) in
+            listener.stateUpdateHandler = { state in
                 switch state {
                 case .ready:
-                    let port = listener.port?.rawValue
-                    Task { await self?.setActualPort(port) }
-                    continuation.resume()
+                    continuation.resume(returning: listener.port?.rawValue)
                 case .failed(let error):
                     continuation.resume(throwing: error)
                 default:
@@ -66,6 +65,9 @@ public actor HookServer {
             }
             listener.start(queue: DispatchQueue(label: "runway.hookserver"))
         }
+
+        // Set actualPort on the actor before returning to caller — no race
+        self.actualPort = resolvedPort
     }
 
     /// Stop the hook server.
@@ -76,10 +78,6 @@ public actor HookServer {
     }
 
     // MARK: - Private
-
-    private func setActualPort(_ port: UInt16?) {
-        self.actualPort = port
-    }
 
     private func handleConnection(_ connection: NWConnection) {
         connection.start(queue: DispatchQueue(label: "runway.hookserver.conn"))
