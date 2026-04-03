@@ -29,11 +29,12 @@
 
 ## PR Integration
 
-- [ ] **Fetch PRs on app launch** — RunwayStore should fetch PRs for all registered projects
-- [ ] **PR detail loading** — clicking a PR should fetch full detail (body, reviews, comments, files) via `gh pr view --json`
-- [ ] **PR actions** — approve, comment, request changes from the PR detail drawer
+- [x] **Fetch PRs on app launch** — RunwayStore should fetch PRs for all registered projects
+- [x] **PR detail loading** — clicking a PR should fetch full detail (body, reviews, comments, files) via `gh pr view --json`
+- [x] **PR actions** — approve, comment, request changes from the PR detail drawer
 - [x] **Open PR in browser** — wire the "Open in Browser" button
-- [ ] **Session ↔ PR linking** — auto-detect PR for a session's worktree branch
+- [x] **Session ↔ PR linking** — auto-detect PR for a session's worktree branch
+- [ ] **Expand changed file to view diff** — clicking a file in the Diff tab should expand to show the inline diff with syntax-highlighted additions/deletions
 
 ## UI Polish
 
