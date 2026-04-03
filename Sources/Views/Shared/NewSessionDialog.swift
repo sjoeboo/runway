@@ -131,6 +131,11 @@ public struct NewSessionDialog: View {
         }
         .padding(24)
         .frame(width: 420)
+        .onAppear {
+            if let mode = PermissionMode(rawValue: defaultPermissionMode) {
+                permissionMode = mode
+            }
+        }
     }
 
     private func field(_ label: String, text: Binding<String>, placeholder: String) -> some View {
