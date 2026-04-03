@@ -12,16 +12,16 @@
 
 ## Terminal / Session UX
 
-- [ ] **Add terminal tabs** — the "+" button for adding shell tabs to a session doesn't appear (tab bar only shows when >1 tab exists, but you can't create the second tab)
+- [x] **Add terminal tabs** — the "+" button for adding shell tabs to a session doesn't appear (tab bar only shows when >1 tab exists, but you can't create the second tab)
 - [ ] **Right sidebar/footer for extra terminals** — option to show additional shell tabs as a split pane (bottom or right) instead of tabs
 - [ ] **PR/diff info panel for session** — header/footer/sidebar showing worktree branch, diff summary (+/-), PR status, checks — visible while working in the terminal
-- [ ] **Session restart** — ability to restart a stopped/exited session without creating a new one
-- [ ] **Session delete** — right-click or keyboard shortcut to delete sessions and clean up worktrees
+- [x] **Session restart** — ability to restart a stopped/exited session without creating a new one
+- [x] **Session delete** — right-click or keyboard shortcut to delete sessions and clean up worktrees
 - [ ] **Send text to session** — the SendTextBar component exists but isn't wired into the UI
 
 ## Sidebar UX
 
-- [ ] **Project names larger** — increase font size/weight for project names in the sidebar for better visual hierarchy
+- [x] **Project names larger** — increase font size/weight for project names in the sidebar for better visual hierarchy
 - [ ] **Collapsible/expandable projects** — projects should be collapsible disclosure groups; remember expanded state
 - [ ] **Inline "+" button per project** — each project header gets a "+" button to add a new session directly
 - [ ] **Add project from sidebar** — ability to add a new project from the sidebar (e.g., "+" at the top or bottom of the project list)
@@ -38,11 +38,11 @@
 ## UI Polish
 
 - [ ] **Sidebar styling** — project/session list needs better visual hierarchy, hover states, context menus
-- [ ] **Session context menu** — right-click for rename, delete, move, restart, open in editor
+- [x] **Session context menu** — right-click for rename, delete, move, restart, open in editor
 - [ ] **Responsive layout** — sidebar width persistence, detail area minimum sizes
 - [ ] **Status toast improvements** — currently only shows errors; add success/info toasts
 - [ ] **Empty states** — better empty states for PR and Todo tabs (with action buttons)
-- [ ] **Window title** — show current session name in window title bar
+- [x] **Window title** — show current session name in window title bar
 - [ ] **Drag and drop** — reorder sessions within projects, move between projects
 
 ## Theme / Appearance
