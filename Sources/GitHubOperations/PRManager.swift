@@ -9,10 +9,19 @@ public actor PRManager {
     public init() {}
 
     /// Fetch PRs for a given category.
+    ///
+    /// When `repo` is nil, uses `gh search prs` to find PRs across all repos.
+    /// When `repo` is provided, uses `gh pr list` scoped to that repo.
     public func fetchPRs(repo: String? = nil, filter: PRFilter = .mine) async throws -> [PullRequest] {
-        let args = buildListArgs(repo: repo, filter: filter)
-        let output = try await runGH(args: args)
-        return try parsePRList(output)
+        if let repo {
+            let args = buildListArgs(repo: repo, filter: filter)
+            let output = try await runGH(args: args)
+            return try parsePRList(output)
+        } else {
+            let args = buildSearchArgs(filter: filter)
+            let output = try await runGH(args: args)
+            return try parseSearchResults(output)
+        }
     }
 
     /// Fetch detailed PR information.
@@ -92,15 +101,32 @@ public actor PRManager {
         return output
     }
 
-    private func buildListArgs(repo: String?, filter: PRFilter) -> [String] {
+    private func buildSearchArgs(filter: PRFilter) -> [String] {
+        var args = [
+            "search", "prs",
+            "--state", "open",
+            "--json", "number,title,state,repository,url,isDraft,createdAt,updatedAt,author",
+            "--limit", "50",
+        ]
+
+        switch filter {
+        case .mine:
+            args += ["--author", "@me"]
+        case .reviewRequested:
+            args += ["--review-requested", "@me"]
+        case .all:
+            args += ["--author", "@me"]
+        }
+
+        return args
+    }
+
+    private func buildListArgs(repo: String, filter: PRFilter) -> [String] {
         var args = [
             "pr", "list", "--json",
             "number,title,state,headRefName,baseRefName,author,url,isDraft,additions,deletions,changedFiles,createdAt,updatedAt,reviewDecision",
+            "--repo", repo,
         ]
-
-        if let repo {
-            args += ["--repo", repo]
-        }
 
         switch filter {
         case .mine:
@@ -113,6 +139,12 @@ public actor PRManager {
 
         args += ["--limit", "50"]
         return args
+    }
+
+    private func parseSearchResults(_ json: String) throws -> [PullRequest] {
+        guard let data = json.data(using: .utf8) else { return [] }
+        let items = try JSONDecoder.gh.decode([GHSearchPRItem].self, from: data)
+        return items.map { $0.toPullRequest() }
     }
 
     private func parsePRList(_ json: String) throws -> [PullRequest] {
@@ -223,6 +255,58 @@ private struct GHPRItem: Decodable {
         }
         return ""
     }
+}
+
+// MARK: - GH Search JSON Models
+
+private struct GHSearchPRItem: Decodable {
+    let number: Int
+    let title: String
+    let state: String
+    let repository: GHRepository
+    let url: String?
+    let isDraft: Bool?
+    let createdAt: String?
+    let updatedAt: String?
+    let author: GHSearchAuthor?
+
+    func toPullRequest() -> PullRequest {
+        let prState: PRState
+        if isDraft == true {
+            prState = .draft
+        } else {
+            switch state.lowercased() {
+            case "merged": prState = .merged
+            case "closed": prState = .closed
+            default: prState = .open
+            }
+        }
+
+        return PullRequest(
+            number: number,
+            title: title,
+            state: prState,
+            headBranch: "",
+            baseBranch: "",
+            author: author?.login ?? "",
+            repo: repository.nameWithOwner,
+            url: url ?? "",
+            isDraft: isDraft ?? false,
+            reviewDecision: .none,
+            additions: 0,
+            deletions: 0,
+            changedFiles: 0
+        )
+    }
+}
+
+private struct GHRepository: Decodable {
+    let name: String
+    let nameWithOwner: String
+}
+
+private struct GHSearchAuthor: Decodable {
+    let login: String
 }
 
 private struct GHAuthor: Decodable {

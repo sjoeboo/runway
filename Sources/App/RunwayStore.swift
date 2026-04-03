@@ -338,22 +338,8 @@ public final class RunwayStore {
         defer { isLoadingPRs = false }
 
         do {
-            var allPRs: [PullRequest] = []
-
-            if projects.isEmpty {
-                // No projects — fetch for current repo context
-                allPRs = try await prManager.fetchPRs(filter: prFilter)
-            } else {
-                // Fetch PRs for each project's repo
-                for project in projects {
-                    let repo = await detectRepo(for: project)
-                    guard let repo else { continue }
-                    let prs = try await prManager.fetchPRs(repo: repo, filter: prFilter)
-                    allPRs.append(contentsOf: prs)
-                }
-            }
-
-            pullRequests = allPRs
+            // Search across all repos — like Hangar, shows all user's PRs globally
+            pullRequests = try await prManager.fetchPRs(filter: prFilter)
             prLastFetched = Date()
         } catch {
             print("[Runway] Failed to fetch PRs: \(error)")
