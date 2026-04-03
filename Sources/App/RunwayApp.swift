@@ -232,6 +232,25 @@ struct ContentView: View {
                 let session = store.sessions.first(where: { $0.id == sessionID })
             {
                 SessionDetailView(session: session, linkedPR: store.sessionPRs[sessionID])
+            } else if let projectID = store.selectedProjectID,
+                let project = store.projects.first(where: { $0.id == projectID })
+            {
+                ProjectPageView(
+                    project: project,
+                    issues: store.projectIssues[projectID] ?? [],
+                    pullRequests: store.pullRequests.filter { $0.repo == project.ghRepo },
+                    labels: store.projectLabels[projectID] ?? [],
+                    isLoadingIssues: store.isLoadingIssues,
+                    onRefreshIssues: { Task { await store.fetchIssues(forProject: projectID) } },
+                    onCreateIssue: { title, body, labels in
+                        Task { await store.createIssue(forProject: projectID, title: title, body: body, labels: labels) }
+                    },
+                    onOpenIssue: { store.openIssueInBrowser($0) },
+                    onSelectPR: { pr in Task { await store.selectPR(pr) } },
+                    onUpdateProject: { store.updateProjectSettings($0) },
+                    onDetectRepo: { await store.detectGHRepo(for: project) },
+                    onFetchLabels: { Task { await store.fetchLabels(forProject: projectID) } }
+                )
             } else {
                 EmptyStateView(
                     title: "No Session Selected",
