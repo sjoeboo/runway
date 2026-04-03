@@ -106,6 +106,36 @@ public final class Database: Sendable {
             }
         }
 
+        // Fix: sessions.groupID referenced "groups" table but code stores project IDs.
+        // GRDB enforces FK constraints by default, so saveSession() silently failed
+        // for any session assigned to a project. Recreate without the FK constraint.
+        migrator.registerMigration("v3_fix_session_groupid_fk") { db in
+            try db.create(table: "sessions_new") { t in
+                t.primaryKey("id", .text)
+                t.column("title", .text).notNull()
+                t.column("groupID", .text)  // No FK — stores project ID directly
+                t.column("path", .text).notNull()
+                t.column("tool", .text).notNull().defaults(to: "claude")
+                t.column("status", .text).notNull().defaults(to: "starting")
+                t.column("worktreeBranch", .text)
+                t.column("parentID", .text)
+                t.column("command", .text)
+                t.column("permissionMode", .text).notNull().defaults(to: "default")
+                t.column("createdAt", .datetime).notNull()
+                t.column("lastAccessedAt", .datetime).notNull()
+            }
+
+            try db.execute(sql: """
+                INSERT INTO sessions_new
+                SELECT id, title, groupID, path, tool, status, worktreeBranch,
+                       parentID, command, permissionMode, createdAt, lastAccessedAt
+                FROM sessions
+                """)
+
+            try db.drop(table: "sessions")
+            try db.rename(table: "sessions_new", to: "sessions")
+        }
+
         try migrator.migrate(dbQueue)
     }
 
