@@ -44,6 +44,9 @@ public actor TmuxSessionManager {
         // Create detached session with working directory
         try await runTmux(args: ["new-session", "-d", "-s", name, "-c", workDir])
 
+        // Hide tmux status bar — tmux is an implementation detail, not user-facing
+        _ = try? await runTmux(args: ["set-option", "-t", name, "status", "off"])
+
         // Set environment variables
         for (key, value) in env {
             _ = try? await runTmux(args: ["set-environment", "-t", name, key, value])
