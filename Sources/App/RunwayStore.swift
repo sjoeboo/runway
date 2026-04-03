@@ -58,9 +58,8 @@ public final class RunwayStore {
         // Load initial state
         Task { await loadState() }
 
-        // Start hook server + inject Claude hooks
+        // Start hook server + inject Claude hooks (sequenced — inject needs the port)
         Task { await startHookServer() }
-        Task { try? hookInjector.inject() }
 
         // Fetch PRs on launch
         Task { await fetchPRs() }
@@ -182,6 +181,13 @@ public final class RunwayStore {
 
         do {
             try await hookServer.start()
+
+            // Inject Claude hooks with the actual port
+            if let port = await hookServer.actualPort {
+                try hookInjector.inject(port: port)
+            } else {
+                print("[Runway] Hook server started but no port available")
+            }
         } catch {
             print("[Runway] Failed to start hook server: \(error)")
         }
