@@ -377,15 +377,13 @@ public final class RunwayStore {
                 pullRequests[i].changedFiles = detail.changedFiles
             }
 
-            // Link PR to session by matching headBranch to worktreeBranch
-            if !detail.headBranch.isEmpty {
-                for session in sessions {
-                    if let branch = session.worktreeBranch,
-                       branch == detail.headBranch || branch.hasSuffix("/\(detail.headBranch)")
-                    {
-                        sessionPRs[session.id] = pullRequests[i]
-                    }
-                }
+        }
+
+        // Link PRs to sessions by running gh pr view in each session's worktree directory
+        // (like Hangar — gh CLI auto-detects branch from the git checkout)
+        for session in sessions where session.worktreeBranch != nil {
+            if let pr = try? await prManager.fetchPRForWorktree(path: session.path) {
+                sessionPRs[session.id] = pr
             }
         }
     }
