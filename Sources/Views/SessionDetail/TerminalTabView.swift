@@ -220,7 +220,7 @@ public struct TerminalTabView: View {
     private func closeTab(_ id: String) {
         // Kill tmux session for this tab
         if let tab = tabs.first(where: { $0.id == id }),
-           let tmuxName = tab.config.tmuxSessionName
+            let tmuxName = tab.config.tmuxSessionName
         {
             Task {
                 let manager = TmuxSessionManager()

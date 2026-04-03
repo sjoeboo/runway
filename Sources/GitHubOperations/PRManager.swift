@@ -44,11 +44,13 @@ public actor PRManager {
 
     /// Fetch detailed PR information.
     public func fetchDetail(repo: String, number: Int, host: String? = nil) async throws -> PRDetail {
-        let output = try await runGH(args: [
-            "pr", "view", "\(number)",
-            "--repo", repo,
-            "--json", "body,reviews,comments,files,statusCheckRollup,reviewDecision,headRefName,baseRefName,additions,deletions,changedFiles",
-        ], host: host)
+        let output = try await runGH(
+            args: [
+                "pr", "view", "\(number)",
+                "--repo", repo,
+                "--json",
+                "body,reviews,comments,files,statusCheckRollup,reviewDecision,headRefName,baseRefName,additions,deletions,changedFiles",
+            ], host: host)
         return try parsePRDetail(output)
     }
 
@@ -405,7 +407,9 @@ private struct GHPRDetailResponse: Decodable {
     }
 
     private func parseChecks(_ checks: [GHCheck]) -> CheckSummary {
-        var passed = 0, failed = 0, pending = 0
+        var passed = 0
+        var failed = 0
+        var pending = 0
         for check in checks {
             let status = check.status?.uppercased() ?? ""
             let conclusion = check.conclusion?.uppercased() ?? ""

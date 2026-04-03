@@ -73,13 +73,16 @@ public actor TmuxSessionManager {
     /// - Parameter prefix: Only return sessions whose name starts with this prefix.
     ///   Defaults to "runway-" to filter out user's personal tmux sessions.
     public func listSessions(prefix: String = "runway-") async -> [TmuxSession] {
-        guard let output = try? await runTmux(args: [
-            "list-sessions", "-F", "#{session_name}\t#{session_created}\t#{session_attached}",
-        ]) else {
+        guard
+            let output = try? await runTmux(args: [
+                "list-sessions", "-F", "#{session_name}\t#{session_created}\t#{session_attached}",
+            ])
+        else {
             return []
         }
 
-        return output
+        return
+            output
             .trimmingCharacters(in: .whitespacesAndNewlines)
             .components(separatedBy: "\n")
             .filter { !$0.isEmpty }

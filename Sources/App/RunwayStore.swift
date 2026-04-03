@@ -384,9 +384,11 @@ public final class RunwayStore {
 
             let host = await prManager.hostFromURL(pr.url)
 
-            guard let detail = try? await prManager.fetchDetail(
-                repo: pr.repo, number: pr.number, host: host
-            ) else { continue }
+            guard
+                let detail = try? await prManager.fetchDetail(
+                    repo: pr.repo, number: pr.number, host: host
+                )
+            else { continue }
 
             // Enrich the list-level PR with detail data
             if i < pullRequests.count, pullRequests[i].id == pr.id {

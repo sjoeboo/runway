@@ -125,12 +125,13 @@ public final class Database: Sendable {
                 t.column("lastAccessedAt", .datetime).notNull()
             }
 
-            try db.execute(sql: """
-                INSERT INTO sessions_new
-                SELECT id, title, groupID, path, tool, status, worktreeBranch,
-                       parentID, command, permissionMode, createdAt, lastAccessedAt
-                FROM sessions
-                """)
+            try db.execute(
+                sql: """
+                    INSERT INTO sessions_new
+                    SELECT id, title, groupID, path, tool, status, worktreeBranch,
+                           parentID, command, permissionMode, createdAt, lastAccessedAt
+                    FROM sessions
+                    """)
 
             try db.drop(table: "sessions")
             try db.rename(table: "sessions_new", to: "sessions")
@@ -138,8 +139,8 @@ public final class Database: Sendable {
 
         migrator.registerMigration("v4_pr_cache") { db in
             try db.create(table: "pr_cache") { t in
-                t.primaryKey("id", .text)          // "owner/repo#number"
-                t.column("json", .text).notNull()   // Full PullRequest as JSON
+                t.primaryKey("id", .text)  // "owner/repo#number"
+                t.column("json", .text).notNull()  // Full PullRequest as JSON
                 t.column("fetchedAt", .datetime).notNull()
             }
         }
@@ -225,7 +226,7 @@ public final class Database: Sendable {
             )
             return rows.compactMap { row -> PullRequest? in
                 guard let jsonStr = row["json"] as? String,
-                      let data = jsonStr.data(using: .utf8)
+                    let data = jsonStr.data(using: .utf8)
                 else { return nil }
                 return try? JSONDecoder().decode(PullRequest.self, from: data)
             }

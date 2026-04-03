@@ -24,7 +24,7 @@ public final class ThemeManager {
 
         // Restore persisted theme selection
         if let savedID = UserDefaults.standard.string(forKey: "runway.selectedThemeID"),
-           let saved = AppTheme.builtIn.first(where: { $0.id == savedID })
+            let saved = AppTheme.builtIn.first(where: { $0.id == savedID })
         {
             self.currentTheme = saved
             self.selectedThemeID = savedID

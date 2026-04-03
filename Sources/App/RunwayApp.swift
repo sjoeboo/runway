@@ -119,7 +119,7 @@ struct ContentView: View {
 
     private var windowTitle: String {
         if let id = store.selectedSessionID,
-           let session = store.sessions.first(where: { $0.id == id })
+            let session = store.sessions.first(where: { $0.id == id })
         {
             return "Runway — \(session.title)"
         }
@@ -130,10 +130,14 @@ struct ContentView: View {
 
     private func statusToast(_ msg: StatusMessage) -> some View {
         HStack(spacing: 6) {
-            Image(systemName: msg.kind == .success ? "checkmark.circle.fill"
-                  : msg.kind == .info ? "info.circle.fill"
-                  : "exclamationmark.triangle.fill")
-                .font(.caption)
+            Image(
+                systemName: msg.kind == .success
+                    ? "checkmark.circle.fill"
+                    : msg.kind == .info
+                        ? "info.circle.fill"
+                        : "exclamationmark.triangle.fill"
+            )
+            .font(.caption)
             Text(msg.text)
                 .font(.caption)
         }
