@@ -27,6 +27,7 @@ public final class RunwayStore {
     var showNewSessionDialog: Bool = false
     var showNewProjectDialog: Bool = false
     var statusMessage: String?
+    var tmuxAvailable: Bool = false
 
     // MARK: - Managers
     let themeManager: ThemeManager
@@ -36,6 +37,7 @@ public final class RunwayStore {
     let worktreeManager: WorktreeManager
     let prManager: PRManager
     let hookInjector: HookInjector
+    let tmuxManager: TmuxSessionManager
 
     // MARK: - Init
 
@@ -46,6 +48,7 @@ public final class RunwayStore {
         self.worktreeManager = WorktreeManager()
         self.prManager = PRManager()
         self.hookInjector = HookInjector()
+        self.tmuxManager = TmuxSessionManager()
 
         // Open database
         do {
@@ -55,8 +58,11 @@ public final class RunwayStore {
             self.database = nil
         }
 
-        // Load initial state
-        Task { await loadState() }
+        // Check tmux availability, then load state (reconciliation needs tmux status)
+        Task {
+            tmuxAvailable = await tmuxManager.isAvailable()
+            await loadState()
+        }
 
         // Start hook server + inject Claude hooks (sequenced — inject needs the port)
         Task { await startHookServer() }
@@ -105,10 +111,8 @@ public final class RunwayStore {
                 )
                 worktreeBranch = branchName
             } catch {
-                // Worktree failed — create session at project path instead
                 print("[Runway] Worktree creation failed, using project path: \(error)")
                 statusMessage = "Worktree failed: \(error.localizedDescription)"
-                // Don't return — still create the session
             }
         }
 
@@ -117,7 +121,7 @@ public final class RunwayStore {
             groupID: request.projectID,
             path: sessionPath,
             tool: request.tool,
-            status: .idle,
+            status: .starting,
             worktreeBranch: worktreeBranch,
             permissionMode: request.permissionMode
         )
@@ -126,8 +130,33 @@ public final class RunwayStore {
         try? database?.saveSession(session)
         selectedSessionID = session.id
 
-        // Note: The terminal is managed by Ghostty's TerminalSurfaceView in the UI.
-        // We don't need to start a PTY here — the view handles it when displayed.
+        // Create tmux session if available
+        if tmuxAvailable {
+            let tmuxName = "runway-\(session.id)"
+            let command: String?
+            if session.tool == .claude {
+                command = ([session.tool.command] + session.permissionMode.cliFlags).joined(separator: " ")
+            } else if session.tool != .shell {
+                command = session.tool.command
+            } else {
+                command = nil
+            }
+
+            do {
+                try await tmuxManager.createSession(
+                    name: tmuxName,
+                    workDir: sessionPath,
+                    command: command,
+                    env: [
+                        "RUNWAY_SESSION_ID": session.id,
+                        "RUNWAY_TITLE": session.title,
+                    ]
+                )
+            } catch {
+                print("[Runway] Failed to create tmux session: \(error)")
+                statusMessage = "tmux session failed: \(error.localizedDescription)"
+            }
+        }
     }
 
     // MARK: - Session Lifecycle
@@ -144,6 +173,13 @@ public final class RunwayStore {
         try? database?.deleteSession(id: id)
         if selectedSessionID == id {
             selectedSessionID = sessions.first?.id
+        }
+
+        // Clean up tmux session
+        if tmuxAvailable {
+            Task {
+                try? await tmuxManager.killSession(name: "runway-\(id)")
+            }
         }
     }
 
