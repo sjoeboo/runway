@@ -87,6 +87,32 @@ public final class RunwayStore {
                     try? db.saveProject(projects[i])
                 }
             }
+
+            // Reconcile DB sessions with live tmux sessions
+            if tmuxAvailable {
+                let liveTmux = await tmuxManager.listSessions()
+                let liveNames = Set(liveTmux.map(\.name))
+
+                for i in sessions.indices {
+                    let expectedName = "runway-\(sessions[i].id)"
+                    if sessions[i].status != .stopped {
+                        if liveNames.contains(expectedName) {
+                            // tmux session alive — mark as idle (hooks will update when reattached)
+                            sessions[i].status = .idle
+                        } else {
+                            // tmux session gone — mark as stopped
+                            sessions[i].status = .stopped
+                        }
+                        try? db.updateSessionStatus(id: sessions[i].id, status: sessions[i].status)
+                    }
+                }
+
+                // Clean up orphaned tmux sessions (exist in tmux but not in DB)
+                let dbIDs = Set(sessions.map { "runway-\($0.id)" })
+                for tmuxSession in liveTmux where !dbIDs.contains(tmuxSession.name) {
+                    try? await tmuxManager.killSession(name: tmuxSession.name)
+                }
+            }
         } catch {
             print("[Runway] Failed to load state: \(error)")
         }
