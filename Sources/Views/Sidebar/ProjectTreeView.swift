@@ -17,6 +17,8 @@ public struct ProjectTreeView: View {
     var onRenameProject: ((String, String) -> Void)?
     var onDeleteProject: ((String) -> Void)?
     var onViewPR: ((String) -> Void)?
+    var onReorderSessions: ((String?, IndexSet, Int) -> Void)?
+    var onReorderProjects: ((IndexSet, Int) -> Void)?
     @Environment(\.theme) private var theme
 
     public init(
@@ -31,7 +33,9 @@ public struct ProjectTreeView: View {
         onRenameSession: ((String, String) -> Void)? = nil,
         onRenameProject: ((String, String) -> Void)? = nil,
         onDeleteProject: ((String) -> Void)? = nil,
-        onViewPR: ((String) -> Void)? = nil
+        onViewPR: ((String) -> Void)? = nil,
+        onReorderSessions: ((String?, IndexSet, Int) -> Void)? = nil,
+        onReorderProjects: ((IndexSet, Int) -> Void)? = nil
     ) {
         self.projects = projects
         self.sessions = sessions
@@ -45,6 +49,8 @@ public struct ProjectTreeView: View {
         self.onRenameProject = onRenameProject
         self.onDeleteProject = onDeleteProject
         self.onViewPR = onViewPR
+        self.onReorderSessions = onReorderSessions
+        self.onReorderProjects = onReorderProjects
     }
 
     public var body: some View {
@@ -60,8 +66,14 @@ public struct ProjectTreeView: View {
                     onRenameSession: onRenameSession,
                     onRenameProject: onRenameProject,
                     onDeleteProject: onDeleteProject,
-                    onViewPR: onViewPR
+                    onViewPR: onViewPR,
+                    onReorderSessions: { fromOffsets, toOffset in
+                        onReorderSessions?(project.id, fromOffsets, toOffset)
+                    }
                 )
+            }
+            .onMove { fromOffsets, toOffset in
+                onReorderProjects?(fromOffsets, toOffset)
             }
 
             // Ungrouped sessions
@@ -78,6 +90,9 @@ public struct ProjectTreeView: View {
                             onViewPR: onViewPR
                         )
                         .tag(session.id)
+                    }
+                    .onMove { fromOffsets, toOffset in
+                        onReorderSessions?(nil, fromOffsets, toOffset)
                     }
                 }
             }
@@ -111,6 +126,7 @@ struct ProjectSection: View {
     var onRenameProject: ((String, String) -> Void)?
     var onDeleteProject: ((String) -> Void)?
     var onViewPR: ((String) -> Void)?
+    var onReorderSessions: ((IndexSet, Int) -> Void)?
     @AppStorage private var isExpanded: Bool
     @State private var isHeaderHovered = false
     @State private var isRenaming = false
@@ -127,7 +143,8 @@ struct ProjectSection: View {
         onRenameSession: ((String, String) -> Void)? = nil,
         onRenameProject: ((String, String) -> Void)? = nil,
         onDeleteProject: ((String) -> Void)? = nil,
-        onViewPR: ((String) -> Void)? = nil
+        onViewPR: ((String) -> Void)? = nil,
+        onReorderSessions: ((IndexSet, Int) -> Void)? = nil
     ) {
         self.project = project
         self.sessions = sessions
@@ -139,6 +156,7 @@ struct ProjectSection: View {
         self.onRenameProject = onRenameProject
         self.onDeleteProject = onDeleteProject
         self.onViewPR = onViewPR
+        self.onReorderSessions = onReorderSessions
         self._isExpanded = AppStorage(wrappedValue: true, "project.expanded.\(project.id)")
     }
 
@@ -154,6 +172,9 @@ struct ProjectSection: View {
                     onViewPR: onViewPR
                 )
                 .tag(session.id)
+            }
+            .onMove { fromOffsets, toOffset in
+                onReorderSessions?(fromOffsets, toOffset)
             }
         } label: {
             HStack(spacing: 4) {

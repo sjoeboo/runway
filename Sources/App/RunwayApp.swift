@@ -181,7 +181,13 @@ struct ContentView: View {
                     store.newSessionProjectID = projectID
                     store.showNewSessionDialog = true
                 },
-                onNewProject: { store.showNewProjectDialog = true }
+                onNewProject: { store.showNewProjectDialog = true },
+                onReorderSessions: { projectID, fromOffsets, toOffset in
+                    store.reorderSessions(in: projectID, fromOffsets: fromOffsets, toOffset: toOffset)
+                },
+                onReorderProjects: { fromOffsets, toOffset in
+                    store.reorderProjects(fromOffsets: fromOffsets, toOffset: toOffset)
+                }
             )
         }
         .frame(minWidth: 200)
