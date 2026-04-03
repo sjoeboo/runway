@@ -7,6 +7,8 @@
 - [x] **Session status indicators** — Hook server extracts `X-Runway-Session-Id` header to map events to correct Runway session; status updates flow through RunwayStore
 - [x] **Bypass permissions option** — PermissionMode picker (Default / Accept Edits / Bypass All) in NewSessionDialog, persisted to DB, passed as CLI flags to claude
 - [x] **Worktree default branch detection** — `git symbolic-ref refs/remotes/origin/HEAD` with fallback to local branch check; auto-detects on project load and creation
+- [ ] **Session persistence** — Sessions should continue running when navigating away (to another session, PR tab, etc.) or closing the app. Similar to Hangar's tmux-based approach — the underlying process must survive view changes and app lifecycle events
+- [x] **Auto-detect master/main branch** — When adding a new project, auto-detect whether the repo uses `master` or `main` as its default branch
 
 ## Terminal / Session UX
 
@@ -16,6 +18,14 @@
 - [ ] **Session restart** — ability to restart a stopped/exited session without creating a new one
 - [ ] **Session delete** — right-click or keyboard shortcut to delete sessions and clean up worktrees
 - [ ] **Send text to session** — the SendTextBar component exists but isn't wired into the UI
+
+## Sidebar UX
+
+- [ ] **Project names larger** — increase font size/weight for project names in the sidebar for better visual hierarchy
+- [ ] **Collapsible/expandable projects** — projects should be collapsible disclosure groups; remember expanded state
+- [ ] **Inline "+" button per project** — each project header gets a "+" button to add a new session directly
+- [ ] **Add project from sidebar** — ability to add a new project from the sidebar (e.g., "+" at the top or bottom of the project list)
+- [ ] **Remove top-right new session/project buttons** — once sidebar has inline add controls, remove the redundant buttons from the upper-right toolbar
 
 ## PR Integration
 
@@ -46,6 +56,7 @@
 
 - [ ] **libghostty terminal** — revisit when libghostty-spm supports embedding in NavigationSplitView (SwiftTerm is current workaround)
 - [ ] **Hook server testing** — verify Claude Code hooks actually fire and update session status
+- [x] **Hook server dynamic port** — hook server gets "address in use" errors on startup; switch to dynamic port selection (bind to port 0 or scan for available port) to avoid conflicts. This may be why sidebar session statuses aren't updating
 - [ ] **Claude Code hook injection** — verify/test the settings.json injection works
 - [ ] **Database cleanup** — session cleanup for exited/orphaned sessions
 - [ ] **Proper .app bundle** — build as a real .app with Info.plist, icon, entitlements (currently SPM executable)
