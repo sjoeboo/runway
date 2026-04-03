@@ -278,6 +278,7 @@ private struct GHPRItem: Decodable {
     let createdAt: String?
     let updatedAt: String?
     let reviewDecision: String?
+    let statusCheckRollup: [GHCheck]?
 
     func toPullRequest() -> PullRequest {
         let prState: PRState
@@ -299,6 +300,8 @@ private struct GHPRItem: Decodable {
         default: review = .none
         }
 
+        let checks = parseChecks(statusCheckRollup ?? [])
+
         return PullRequest(
             number: number,
             title: title,
@@ -309,11 +312,40 @@ private struct GHPRItem: Decodable {
             repo: extractRepo(from: url ?? ""),
             url: url ?? "",
             isDraft: isDraft ?? false,
+            checks: checks,
             reviewDecision: review,
             additions: additions ?? 0,
             deletions: deletions ?? 0,
             changedFiles: changedFiles ?? 0
         )
+    }
+
+    private func parseChecks(_ rollup: [GHCheck]) -> CheckSummary {
+        var passed = 0
+        var failed = 0
+        var pending = 0
+        for check in rollup {
+            let status = check.status?.uppercased() ?? ""
+            let conclusion = check.conclusion?.uppercased() ?? ""
+            let checkState = check.state?.uppercased() ?? ""
+
+            if status == "COMPLETED" {
+                if conclusion == "SUCCESS" || conclusion == "NEUTRAL" || conclusion == "SKIPPED" {
+                    passed += 1
+                } else if conclusion == "FAILURE" || conclusion == "TIMED_OUT" || conclusion == "CANCELLED" {
+                    failed += 1
+                } else {
+                    pending += 1
+                }
+            } else if checkState == "SUCCESS" {
+                passed += 1
+            } else if checkState == "FAILURE" || checkState == "ERROR" {
+                failed += 1
+            } else {
+                pending += 1
+            }
+        }
+        return CheckSummary(passed: passed, failed: failed, pending: pending)
     }
 
     private func extractRepo(from url: String) -> String {
