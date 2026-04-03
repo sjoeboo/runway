@@ -350,10 +350,22 @@ public final class RunwayStore {
 
         do {
             // Search across all repos — like Hangar, shows all user's PRs globally
-            pullRequests = try await prManager.fetchPRs(filter: prFilter)
+            let freshPRs = try await prManager.fetchPRs(filter: prFilter)
             prLastFetched = Date()
 
-            // Background: enrich each PR with detail (checks, review, branches, diff counts)
+            // Merge: keep enriched data from cache/previous enrichment where available
+            let existingByID = Dictionary(pullRequests.map { ($0.id, $0) }, uniquingKeysWith: { _, new in new })
+            pullRequests = freshPRs.map { fresh in
+                guard var existing = existingByID[fresh.id] else { return fresh }
+                // Update fields that search refreshes (state, title, etc.)
+                existing.title = fresh.title
+                existing.state = fresh.state
+                existing.isDraft = fresh.isDraft
+                existing.author = fresh.author
+                return existing
+            }
+
+            // Background: enrich any PRs that don't have detail data yet
             Task { await enrichPRs() }
         } catch {
             print("[Runway] Failed to fetch PRs: \(error)")
@@ -366,6 +378,10 @@ public final class RunwayStore {
     private func enrichPRs() async {
         for i in pullRequests.indices {
             let pr = pullRequests[i]
+
+            // Skip if already enriched (has checks data from cache)
+            if pr.checks.total > 0 { continue }
+
             let host = await prManager.hostFromURL(pr.url)
 
             guard let detail = try? await prManager.fetchDetail(
