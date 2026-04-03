@@ -188,9 +188,11 @@ struct PRRowView: View {
 
             Spacer()
 
-            Text("+\(pr.additions) -\(pr.deletions)")
-                .font(.caption)
-                .foregroundColor(theme.chrome.textDim)
+            if pr.additions > 0 || pr.deletions > 0 {
+                Text("+\(pr.additions) -\(pr.deletions)")
+                    .font(.caption)
+                    .foregroundColor(theme.chrome.textDim)
+            }
         }
         .padding(.vertical, 4)
         .opacity(pr.isDraft ? 0.5 : 1.0)

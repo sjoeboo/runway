@@ -230,7 +230,7 @@ public struct PRDetailDrawer: View {
                     path: file.path,
                     additions: file.additions,
                     deletions: file.deletions,
-                    lines: file.patch.map { DiffFile.parse(patch: $0).first?.lines ?? [] } ?? []
+                    lines: file.patch.map { parsePatchLines($0) } ?? []
                 )
             }
             DiffView(files: diffFiles)
@@ -241,6 +241,41 @@ public struct PRDetailDrawer: View {
                 systemImage: "doc.text"
             )
         }
+    }
+
+    /// Parse a per-file patch (from gh --json files) into DiffLines.
+    /// Unlike full unified diffs, these don't have "diff --git" or "+++ b/" headers.
+    private func parsePatchLines(_ patch: String) -> [DiffLine] {
+        var lines: [DiffLine] = []
+        var oldLine = 0
+        var newLine = 0
+
+        for rawLine in patch.components(separatedBy: "\n") {
+            if rawLine.hasPrefix("@@") {
+                let parts = rawLine.components(separatedBy: " ")
+                if parts.count >= 3 {
+                    let newPart = parts[2]
+                    let nums = newPart.dropFirst().components(separatedBy: ",")
+                    newLine = Int(nums[0]) ?? 0
+                    let oldPart = parts[1]
+                    let oldNums = oldPart.dropFirst().components(separatedBy: ",")
+                    oldLine = Int(oldNums[0]) ?? 0
+                }
+                lines.append(DiffLine(type: .hunk, content: rawLine, oldLineNo: nil, newLineNo: nil))
+            } else if rawLine.hasPrefix("+") {
+                lines.append(DiffLine(type: .addition, content: String(rawLine.dropFirst()), oldLineNo: nil, newLineNo: newLine))
+                newLine += 1
+            } else if rawLine.hasPrefix("-") {
+                lines.append(DiffLine(type: .deletion, content: String(rawLine.dropFirst()), oldLineNo: oldLine, newLineNo: nil))
+                oldLine += 1
+            } else if rawLine.hasPrefix(" ") {
+                lines.append(DiffLine(type: .context, content: String(rawLine.dropFirst()), oldLineNo: oldLine, newLineNo: newLine))
+                oldLine += 1
+                newLine += 1
+            }
+        }
+
+        return lines
     }
 
     private var conversationTab: some View {
