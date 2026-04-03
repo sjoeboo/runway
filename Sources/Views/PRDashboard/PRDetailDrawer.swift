@@ -9,9 +9,17 @@ public struct PRDetailDrawer: View {
     let onClose: () -> Void
     let onApprove: () -> Void
     let onComment: (String) -> Void
+    let onRequestChanges: (String) -> Void
+    let onMerge: (MergeStrategy) -> Void
+    let onToggleDraft: () -> Void
 
     @State private var selectedTab: PRDetailTab = .overview
     @State private var commentText: String = ""
+    @State private var showMergeConfirm: Bool = false
+    @State private var selectedMergeStrategy: MergeStrategy = .squash
+    @State private var showRequestChanges: Bool = false
+    @State private var requestChangesText: String = ""
+    @State private var showCommentSheet: Bool = false
     @Environment(\.theme) private var theme
 
     public init(
@@ -19,13 +27,19 @@ public struct PRDetailDrawer: View {
         detail: PRDetail? = nil,
         onClose: @escaping () -> Void = {},
         onApprove: @escaping () -> Void = {},
-        onComment: @escaping (String) -> Void = { _ in }
+        onComment: @escaping (String) -> Void = { _ in },
+        onRequestChanges: @escaping (String) -> Void = { _ in },
+        onMerge: @escaping (MergeStrategy) -> Void = { _ in },
+        onToggleDraft: @escaping () -> Void = {}
     ) {
         self.pr = pr
         self.detail = detail
         self.onClose = onClose
         self.onApprove = onApprove
         self.onComment = onComment
+        self.onRequestChanges = onRequestChanges
+        self.onMerge = onMerge
+        self.onToggleDraft = onToggleDraft
     }
 
     public var body: some View {
@@ -95,19 +109,107 @@ public struct PRDetailDrawer: View {
                 detailReviewBadge(reviewStatus)
             }
 
-            // Action buttons
+            // Action bar
             HStack(spacing: 8) {
                 Button("Approve") { onApprove() }
                     .buttonStyle(.borderedProminent)
                     .tint(theme.chrome.green)
                     .controlSize(.small)
 
-                Button("Open in Browser") {
+                Button("Request Changes") { showRequestChanges = true }
+                    .controlSize(.small)
+
+                Button("Comment") { showCommentSheet = true }
+                    .controlSize(.small)
+
+                Spacer()
+
+                if pr.isDraft {
+                    Button("Mark Ready") { onToggleDraft() }
+                        .controlSize(.small)
+                        .tint(theme.chrome.accent)
+                } else if pr.state == .open {
+                    Button("Convert to Draft") { onToggleDraft() }
+                        .controlSize(.small)
+                }
+
+                if !pr.isDraft && pr.state == .open {
+                    Menu {
+                        ForEach(MergeStrategy.allCases, id: \.self) { strategy in
+                            Button(strategy.displayName) {
+                                selectedMergeStrategy = strategy
+                                showMergeConfirm = true
+                            }
+                        }
+                    } label: {
+                        Label("Merge", systemImage: "arrow.triangle.merge")
+                    }
+                    .menuStyle(.borderedButton)
+                    .controlSize(.small)
+                }
+
+                Button {
                     if let url = URL(string: pr.url) {
                         NSWorkspace.shared.open(url)
                     }
+                } label: {
+                    Image(systemName: "safari")
                 }
                 .controlSize(.small)
+                .help("Open in browser")
+            }
+            .alert("Merge Pull Request", isPresented: $showMergeConfirm) {
+                Button("Cancel", role: .cancel) {}
+                Button("Merge", role: .destructive) {
+                    onMerge(selectedMergeStrategy)
+                }
+            } message: {
+                Text("This will \(selectedMergeStrategy.displayName.lowercased()) #\(pr.number) into \(pr.baseBranch).")
+            }
+            .sheet(isPresented: $showRequestChanges) {
+                VStack(spacing: 12) {
+                    Text("Request Changes on #\(pr.number)")
+                        .font(.headline)
+                    TextEditor(text: $requestChangesText)
+                        .frame(minHeight: 100)
+                        .border(Color.secondary.opacity(0.3))
+                    HStack {
+                        Button("Cancel") { showRequestChanges = false }
+                        Spacer()
+                        Button("Submit") {
+                            onRequestChanges(requestChangesText)
+                            requestChangesText = ""
+                            showRequestChanges = false
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .tint(theme.chrome.orange)
+                        .disabled(requestChangesText.isEmpty)
+                    }
+                }
+                .padding()
+                .frame(width: 400)
+            }
+            .sheet(isPresented: $showCommentSheet) {
+                VStack(spacing: 12) {
+                    Text("Comment on #\(pr.number)")
+                        .font(.headline)
+                    TextEditor(text: $commentText)
+                        .frame(minHeight: 100)
+                        .border(Color.secondary.opacity(0.3))
+                    HStack {
+                        Button("Cancel") { showCommentSheet = false }
+                        Spacer()
+                        Button("Comment") {
+                            onComment(commentText)
+                            commentText = ""
+                            showCommentSheet = false
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .disabled(commentText.isEmpty)
+                    }
+                }
+                .padding()
+                .frame(width: 400)
             }
         }
         .padding(12)

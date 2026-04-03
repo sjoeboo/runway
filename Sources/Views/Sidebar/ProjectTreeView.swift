@@ -1,3 +1,4 @@
+import AppKit
 import Models
 import SwiftUI
 import Theme
@@ -12,6 +13,10 @@ public struct ProjectTreeView: View {
     var onDelete: ((String) -> Void)?
     var onNewSession: ((String?) -> Void)?
     var onNewProject: (() -> Void)?
+    var onRenameSession: ((String, String) -> Void)?
+    var onRenameProject: ((String, String) -> Void)?
+    var onDeleteProject: ((String) -> Void)?
+    var onViewPR: ((String) -> Void)?
     @Environment(\.theme) private var theme
 
     public init(
@@ -22,7 +27,11 @@ public struct ProjectTreeView: View {
         onRestart: ((String) -> Void)? = nil,
         onDelete: ((String) -> Void)? = nil,
         onNewSession: ((String?) -> Void)? = nil,
-        onNewProject: (() -> Void)? = nil
+        onNewProject: (() -> Void)? = nil,
+        onRenameSession: ((String, String) -> Void)? = nil,
+        onRenameProject: ((String, String) -> Void)? = nil,
+        onDeleteProject: ((String) -> Void)? = nil,
+        onViewPR: ((String) -> Void)? = nil
     ) {
         self.projects = projects
         self.sessions = sessions
@@ -32,6 +41,10 @@ public struct ProjectTreeView: View {
         self.onDelete = onDelete
         self.onNewSession = onNewSession
         self.onNewProject = onNewProject
+        self.onRenameSession = onRenameSession
+        self.onRenameProject = onRenameProject
+        self.onDeleteProject = onDeleteProject
+        self.onViewPR = onViewPR
     }
 
     public var body: some View {
@@ -43,7 +56,11 @@ public struct ProjectTreeView: View {
                     sessionPRs: sessionPRs,
                     onRestart: onRestart,
                     onDelete: onDelete,
-                    onNewSession: { onNewSession?(project.id) }
+                    onNewSession: { onNewSession?(project.id) },
+                    onRenameSession: onRenameSession,
+                    onRenameProject: onRenameProject,
+                    onDeleteProject: onDeleteProject,
+                    onViewPR: onViewPR
                 )
             }
 
@@ -56,7 +73,9 @@ public struct ProjectTreeView: View {
                             session: session,
                             linkedPR: sessionPRs[session.id],
                             onRestart: onRestart,
-                            onDelete: onDelete
+                            onDelete: onDelete,
+                            onRenameSession: onRenameSession,
+                            onViewPR: onViewPR
                         )
                         .tag(session.id)
                     }
@@ -88,8 +107,14 @@ struct ProjectSection: View {
     var onRestart: ((String) -> Void)?
     var onDelete: ((String) -> Void)?
     var onNewSession: (() -> Void)?
+    var onRenameSession: ((String, String) -> Void)?
+    var onRenameProject: ((String, String) -> Void)?
+    var onDeleteProject: ((String) -> Void)?
+    var onViewPR: ((String) -> Void)?
     @AppStorage private var isExpanded: Bool
     @State private var isHeaderHovered = false
+    @State private var isRenaming = false
+    @State private var editName: String = ""
     @Environment(\.theme) private var theme
 
     init(
@@ -98,7 +123,11 @@ struct ProjectSection: View {
         sessionPRs: [String: PullRequest],
         onRestart: ((String) -> Void)?,
         onDelete: ((String) -> Void)?,
-        onNewSession: (() -> Void)?
+        onNewSession: (() -> Void)?,
+        onRenameSession: ((String, String) -> Void)? = nil,
+        onRenameProject: ((String, String) -> Void)? = nil,
+        onDeleteProject: ((String) -> Void)? = nil,
+        onViewPR: ((String) -> Void)? = nil
     ) {
         self.project = project
         self.sessions = sessions
@@ -106,6 +135,10 @@ struct ProjectSection: View {
         self.onRestart = onRestart
         self.onDelete = onDelete
         self.onNewSession = onNewSession
+        self.onRenameSession = onRenameSession
+        self.onRenameProject = onRenameProject
+        self.onDeleteProject = onDeleteProject
+        self.onViewPR = onViewPR
         self._isExpanded = AppStorage(wrappedValue: true, "project.expanded.\(project.id)")
     }
 
@@ -116,18 +149,35 @@ struct ProjectSection: View {
                     session: session,
                     linkedPR: sessionPRs[session.id],
                     onRestart: onRestart,
-                    onDelete: onDelete
+                    onDelete: onDelete,
+                    onRenameSession: onRenameSession,
+                    onViewPR: onViewPR
                 )
                 .tag(session.id)
             }
         } label: {
             HStack(spacing: 4) {
-                Text(project.name)
+                if isRenaming {
+                    TextField(
+                        "Project name", text: $editName,
+                        onCommit: {
+                            if !editName.isEmpty {
+                                onRenameProject?(project.id, editName)
+                            }
+                            isRenaming = false
+                        }
+                    )
+                    .textFieldStyle(.plain)
                     .font(.system(.title3, weight: .semibold))
-                    .foregroundColor(theme.chrome.text)
+                    .onAppear { editName = project.name }
+                } else {
+                    Text(project.name)
+                        .font(.system(.title3, weight: .semibold))
+                        .foregroundColor(theme.chrome.text)
+                }
                 Spacer()
 
-                if isHeaderHovered {
+                if isHeaderHovered && !isRenaming {
                     Button {
                         onNewSession?()
                     } label: {
@@ -144,6 +194,34 @@ struct ProjectSection: View {
                 isHeaderHovered = hovering
             }
         }
+        .contextMenu {
+            Button {
+                isRenaming = true
+            } label: {
+                Label("Rename Project", systemImage: "pencil")
+            }
+
+            Button {
+                NSPasteboard.general.clearContents()
+                NSPasteboard.general.setString(project.path, forType: .string)
+            } label: {
+                Label("Copy Path", systemImage: "doc.on.doc")
+            }
+
+            Button {
+                NSWorkspace.shared.selectFile(nil, inFileViewerRootedAtPath: project.path)
+            } label: {
+                Label("Open in Finder", systemImage: "folder")
+            }
+
+            Divider()
+
+            Button(role: .destructive) {
+                onDeleteProject?(project.id)
+            } label: {
+                Label("Remove Project", systemImage: "folder.badge.minus")
+            }
+        }
     }
 }
 
@@ -155,16 +233,35 @@ struct SessionRowView: View {
     var linkedPR: PullRequest?
     var onRestart: ((String) -> Void)?
     var onDelete: ((String) -> Void)?
+    var onRenameSession: ((String, String) -> Void)?
+    var onViewPR: ((String) -> Void)?
     @State private var isHovered = false
+    @State private var isRenaming = false
+    @State private var editTitle: String = ""
     @Environment(\.theme) private var theme
 
     var body: some View {
         HStack(spacing: 8) {
             statusIndicator
             VStack(alignment: .leading, spacing: 2) {
-                Text(session.title)
+                if isRenaming {
+                    TextField(
+                        "Session name", text: $editTitle,
+                        onCommit: {
+                            if !editTitle.isEmpty {
+                                onRenameSession?(session.id, editTitle)
+                            }
+                            isRenaming = false
+                        }
+                    )
+                    .textFieldStyle(.plain)
                     .font(.system(.body, design: .default))
-                    .foregroundColor(theme.chrome.text)
+                    .onAppear { editTitle = session.title }
+                } else {
+                    Text(session.title)
+                        .font(.system(.body, design: .default))
+                        .foregroundColor(theme.chrome.text)
+                }
                 if let branch = session.worktreeBranch {
                     Text(branch)
                         .font(.caption)
@@ -247,12 +344,69 @@ struct SessionRowView: View {
         }
         .contextMenu {
             Button {
+                isRenaming = true
+            } label: {
+                Label("Rename Session", systemImage: "pencil")
+            }
+
+            Divider()
+
+            Button {
+                NSPasteboard.general.clearContents()
+                NSPasteboard.general.setString(session.path, forType: .string)
+            } label: {
+                Label("Copy Worktree Path", systemImage: "doc.on.doc")
+            }
+
+            if let branch = session.worktreeBranch {
+                Button {
+                    NSPasteboard.general.clearContents()
+                    NSPasteboard.general.setString(branch, forType: .string)
+                } label: {
+                    Label("Copy Branch Name", systemImage: "arrow.triangle.branch")
+                }
+            }
+
+            Button {
+                NSWorkspace.shared.selectFile(nil, inFileViewerRootedAtPath: session.path)
+            } label: {
+                Label("Open in Finder", systemImage: "folder")
+            }
+
+            Button {
+                let process = Process()
+                process.executableURL = URL(fileURLWithPath: "/usr/bin/open")
+                process.arguments = ["-a", "Terminal", session.path]
+                try? process.run()
+            } label: {
+                Label("Open in Terminal", systemImage: "terminal")
+            }
+
+            if linkedPR != nil {
+                Divider()
+
+                Button {
+                    onViewPR?(session.id)
+                } label: {
+                    Label("View PR", systemImage: "arrow.triangle.pull")
+                }
+
+                if let prURL = linkedPR?.url, let url = URL(string: prURL) {
+                    Button {
+                        NSWorkspace.shared.open(url)
+                    } label: {
+                        Label("Open PR in Browser", systemImage: "safari")
+                    }
+                }
+            }
+
+            Divider()
+
+            Button {
                 onRestart?(session.id)
             } label: {
                 Label("Restart Session", systemImage: "arrow.counterclockwise")
             }
-
-            Divider()
 
             Button(role: .destructive) {
                 onDelete?(session.id)

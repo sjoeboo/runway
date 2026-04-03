@@ -244,7 +244,10 @@ struct ContentView: View {
                 },
                 onRefresh: { Task { await store.fetchPRs() } },
                 onApprove: { pr in Task { await store.approvePR(pr) } },
-                onComment: { pr, body in Task { await store.commentOnPR(pr, body: body) } }
+                onComment: { pr, body in Task { await store.commentOnPR(pr, body: body) } },
+                onRequestChanges: { pr, body in Task { await store.requestChangesOnPR(pr, body: body) } },
+                onMerge: { pr, strategy in Task { await store.mergePR(pr, strategy: strategy) } },
+                onToggleDraft: { pr in Task { await store.togglePRDraft(pr) } }
             )
         }
     }
