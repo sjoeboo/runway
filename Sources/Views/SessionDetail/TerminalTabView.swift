@@ -1,5 +1,6 @@
 import Models
 import SwiftUI
+import Terminal
 import TerminalView
 import Theme
 
@@ -116,6 +117,7 @@ public struct TerminalTabView: View {
         guard tabs.isEmpty else { return }
 
         let mainTabID = "\(session.id)_main"
+        let tmuxName = "runway-\(session.id)"
 
         // For Claude sessions, build the command with permission flags
         let command: String
@@ -140,7 +142,8 @@ public struct TerminalTabView: View {
                     "RUNWAY_TITLE": session.title,
                 ],
                 fontFamily: fontFamily,
-                fontSize: Float(fontSize)
+                fontSize: Float(fontSize),
+                tmuxSessionName: tmuxName
             ),
             isMain: true
         )
@@ -152,6 +155,20 @@ public struct TerminalTabView: View {
     private func addShellTab() {
         let shellCount = tabs.filter { !$0.isMain }.count + 1
         let tabID = "\(session.id)_shell\(shellCount)"
+        let tmuxName = "runway-\(session.id)-shell\(shellCount)"
+
+        // Create tmux session for this shell tab (fire and forget — TerminalPane
+        // will fall back to direct spawn if this fails)
+        Task {
+            let manager = TmuxSessionManager()
+            try? await manager.createSession(
+                name: tmuxName,
+                workDir: session.path,
+                command: nil,
+                env: ["RUNWAY_SESSION_ID": session.id]
+            )
+        }
+
         let tab = TerminalTab(
             id: tabID,
             title: "Shell \(shellCount)",
@@ -162,7 +179,8 @@ public struct TerminalTabView: View {
                     "RUNWAY_SESSION_ID": session.id
                 ],
                 fontFamily: fontFamily,
-                fontSize: Float(fontSize)
+                fontSize: Float(fontSize),
+                tmuxSessionName: tmuxName
             )
         )
 
@@ -171,6 +189,16 @@ public struct TerminalTabView: View {
     }
 
     private func closeTab(_ id: String) {
+        // Kill tmux session for this tab
+        if let tab = tabs.first(where: { $0.id == id }),
+           let tmuxName = tab.config.tmuxSessionName
+        {
+            Task {
+                let manager = TmuxSessionManager()
+                try? await manager.killSession(name: tmuxName)
+            }
+        }
+
         tabs.removeAll { $0.id == id }
         if selectedTabID == id {
             selectedTabID = tabs.first?.id
