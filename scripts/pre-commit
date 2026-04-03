@@ -1,0 +1,24 @@
+#!/bin/bash
+# Pre-commit hook: auto-fix lint/format, then verify everything passes.
+# Install: make install-hooks
+
+set -e
+
+echo "🔧 Running pre-commit checks..."
+
+# Auto-fix lint and format issues on staged files
+make fix-lint 2>/dev/null || true
+make fix-format 2>/dev/null || true
+
+# Re-stage any auto-fixed files
+git diff --name-only | xargs -I{} git add "{}" 2>/dev/null || true
+
+# Verify lint passes
+echo "🔍 Checking lint..."
+make lint
+
+# Verify format passes
+echo "📐 Checking format..."
+make format-check
+
+echo "✅ Pre-commit checks passed"

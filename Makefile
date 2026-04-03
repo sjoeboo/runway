@@ -47,7 +47,13 @@ precommit: fix lint format-check test ## Auto-fix, then verify everything passes
 clean: ## Clean build artifacts
 	swift package clean
 
-setup: ## Install development tools via Homebrew
+install-hooks: ## Install git pre-commit hook
+	@mkdir -p $$(git rev-parse --git-common-dir)/hooks
+	cp scripts/pre-commit $$(git rev-parse --git-common-dir)/hooks/pre-commit
+	chmod +x $$(git rev-parse --git-common-dir)/hooks/pre-commit
+	@echo "✅ Pre-commit hook installed"
+
+setup: install-hooks ## Install development tools via Homebrew + hooks
 	brew install swiftlint swift-format
 
 ## Help ──────────────────────────────────────────
