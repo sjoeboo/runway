@@ -22,10 +22,10 @@
 ## Sidebar UX
 
 - [x] **Project names larger** — increase font size/weight for project names in the sidebar for better visual hierarchy
-- [ ] **Collapsible/expandable projects** — projects should be collapsible disclosure groups; remember expanded state
-- [ ] **Inline "+" button per project** — each project header gets a "+" button to add a new session directly
-- [ ] **Add project from sidebar** — ability to add a new project from the sidebar (e.g., "+" at the top or bottom of the project list)
-- [ ] **Remove top-right new session/project buttons** — once sidebar has inline add controls, remove the redundant buttons from the upper-right toolbar
+- [x] **Collapsible/expandable projects** — projects should be collapsible disclosure groups; remember expanded state
+- [x] **Inline "+" button per project** — each project header gets a "+" button to add a new session directly
+- [x] **Add project from sidebar** — ability to add a new project from the sidebar (e.g., "+" at the top or bottom of the project list)
+- [x] **Remove top-right new session/project buttons** — once sidebar has inline add controls, remove the redundant buttons from the upper-right toolbar
 
 ## PR Integration
 
