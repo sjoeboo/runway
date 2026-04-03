@@ -148,6 +148,37 @@ public struct TerminalTabView: View {
 
         tabs = [mainTab]
         selectedTabID = mainTab.id
+
+        // Discover surviving shell tmux sessions from a previous app launch
+        Task {
+            let manager = TmuxSessionManager()
+            let shellPrefix = "runway-\(session.id)-shell"
+            let shellSessions = await manager.listSessions(prefix: shellPrefix)
+
+            for tmuxSession in shellSessions.sorted(by: { $0.name < $1.name }) {
+                // Extract shell number from name (e.g., "runway-id-shell2" → "2")
+                let suffix = tmuxSession.name.dropFirst(shellPrefix.count)
+                let shellNum = Int(suffix) ?? (tabs.filter { !$0.isMain }.count + 1)
+                let tabID = "\(session.id)_shell\(shellNum)"
+
+                let tab = TerminalTab(
+                    id: tabID,
+                    title: "Shell \(shellNum)",
+                    config: TerminalConfig(
+                        command: ProcessInfo.processInfo.environment["SHELL"] ?? "/bin/zsh",
+                        workingDirectory: session.path,
+                        environment: [
+                            "RUNWAY_SESSION_ID": session.id
+                        ],
+                        fontFamily: fontFamily,
+                        fontSize: Float(fontSize),
+                        tmuxSessionName: tmuxSession.name
+                    )
+                )
+
+                tabs.append(tab)
+            }
+        }
     }
 
     private func addShellTab() {

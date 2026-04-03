@@ -109,9 +109,13 @@ public final class RunwayStore {
                 }
 
                 // Clean up orphaned tmux sessions (exist in tmux but not in DB)
-                let dbIDs = Set(sessions.map { "runway-\($0.id)" })
-                for tmuxSession in liveTmux where !dbIDs.contains(tmuxSession.name) {
-                    try? await tmuxManager.killSession(name: tmuxSession.name)
+                // Use prefix matching so shell tabs (runway-{id}-shell1) aren't killed
+                let dbPrefixes = sessions.map { "runway-\($0.id)" }
+                for tmuxSession in liveTmux {
+                    let isOwned = dbPrefixes.contains { tmuxSession.name.hasPrefix($0) }
+                    if !isOwned {
+                        try? await tmuxManager.killSession(name: tmuxSession.name)
+                    }
                 }
             }
         } catch {
