@@ -359,15 +359,17 @@ public final class RunwayStore {
         guard let pr else { return }
 
         do {
-            prDetail = try await prManager.fetchDetail(repo: pr.repo, number: pr.number)
+            let host = await prManager.hostFromURL(pr.url)
+            prDetail = try await prManager.fetchDetail(repo: pr.repo, number: pr.number, host: host)
         } catch {
             print("[Runway] Failed to fetch PR detail: \(error)")
         }
     }
 
     func approvePR(_ pr: PullRequest) async {
+        let host = await prManager.hostFromURL(pr.url)
         do {
-            try await prManager.approve(repo: pr.repo, number: pr.number)
+            try await prManager.approve(repo: pr.repo, number: pr.number, host: host)
             statusMessage = .success("Approved #\(pr.number)")
             await fetchPRs()
         } catch {
@@ -376,10 +378,11 @@ public final class RunwayStore {
     }
 
     func commentOnPR(_ pr: PullRequest, body: String) async {
+        let host = await prManager.hostFromURL(pr.url)
         do {
-            try await prManager.comment(repo: pr.repo, number: pr.number, body: body)
+            try await prManager.comment(repo: pr.repo, number: pr.number, body: body, host: host)
             // Refresh detail to show new comment
-            prDetail = try await prManager.fetchDetail(repo: pr.repo, number: pr.number)
+            prDetail = try await prManager.fetchDetail(repo: pr.repo, number: pr.number, host: host)
         } catch {
             statusMessage = .error("Comment failed: \(error.localizedDescription)")
         }

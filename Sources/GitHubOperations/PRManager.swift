@@ -43,13 +43,19 @@ public actor PRManager {
     }
 
     /// Fetch detailed PR information.
-    public func fetchDetail(repo: String, number: Int) async throws -> PRDetail {
+    public func fetchDetail(repo: String, number: Int, host: String? = nil) async throws -> PRDetail {
         let output = try await runGH(args: [
             "pr", "view", "\(number)",
             "--repo", repo,
             "--json", "body,reviews,comments,files,statusCheckRollup,reviewDecision,headRefName,baseRefName,additions,deletions,changedFiles",
-        ])
+        ], host: host)
         return try parsePRDetail(output)
+    }
+
+    /// Extract the GitHub host from a PR URL (e.g., "https://ghe.spotify.net/..." → "ghe.spotify.net").
+    public func hostFromURL(_ url: String) -> String? {
+        guard let parsed = URL(string: url), let host = parsed.host else { return nil }
+        return host == "github.com" ? nil : host  // nil means default (github.com)
     }
 
     /// Fetch PR for a specific worktree directory (by current branch).
@@ -66,17 +72,17 @@ public actor PRManager {
     }
 
     /// Approve a PR.
-    public func approve(repo: String, number: Int, body: String? = nil) async throws {
+    public func approve(repo: String, number: Int, body: String? = nil, host: String? = nil) async throws {
         var args = ["pr", "review", "\(number)", "--repo", repo, "--approve"]
         if let body {
             args += ["--body", body]
         }
-        try await runGH(args: args)
+        try await runGH(args: args, host: host)
     }
 
     /// Add a comment to a PR.
-    public func comment(repo: String, number: Int, body: String) async throws {
-        try await runGH(args: ["pr", "comment", "\(number)", "--repo", repo, "--body", body])
+    public func comment(repo: String, number: Int, body: String, host: String? = nil) async throws {
+        try await runGH(args: ["pr", "comment", "\(number)", "--repo", repo, "--body", body], host: host)
     }
 
     /// Open PR in browser.
@@ -373,17 +379,21 @@ private struct GHPRDetailResponse: Decodable {
         default: review = .none
         }
 
+        let mappedReviews: [PRReview] = (reviews ?? []).map { r in
+            PRReview(id: r.id ?? "0", author: r.author?.login ?? "", state: r.state ?? "", body: r.body ?? "")
+        }
+        let mappedComments: [PRComment] = (comments ?? []).map { c in
+            PRComment(id: c.id ?? "0", author: c.author?.login ?? "", body: c.body ?? "")
+        }
+        let mappedFiles: [PRFileChange] = (files ?? []).map { f in
+            PRFileChange(path: f.path ?? "", additions: f.additions ?? 0, deletions: f.deletions ?? 0, patch: f.patch)
+        }
+
         return PRDetail(
             body: body ?? "",
-            reviews: (reviews ?? []).map {
-                PRReview(id: $0.id ?? "0", author: $0.author?.login ?? "", state: $0.state ?? "", body: $0.body ?? "")
-            },
-            comments: (comments ?? []).map {
-                PRComment(id: $0.id ?? "0", author: $0.author?.login ?? "", body: $0.body ?? "")
-            },
-            files: (files ?? []).map {
-                PRFileChange(path: $0.path ?? "", additions: $0.additions ?? 0, deletions: $0.deletions ?? 0, patch: $0.patch)
-            },
+            reviews: mappedReviews,
+            comments: mappedComments,
+            files: mappedFiles,
             checks: checks,
             reviewDecision: review,
             headBranch: headRefName ?? "",
