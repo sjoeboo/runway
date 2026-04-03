@@ -155,8 +155,7 @@ public struct TerminalTabView: View {
         let tabID = "\(session.id)_shell\(shellCount)"
         let tmuxName = "runway-\(session.id)-shell\(shellCount)"
 
-        // Create tmux session for this shell tab (fire and forget — TerminalPane
-        // will fall back to direct spawn if this fails)
+        // Create tmux session BEFORE adding the tab — TerminalPane needs it to exist
         Task {
             let manager = TmuxSessionManager()
             try? await manager.createSession(
@@ -165,25 +164,26 @@ public struct TerminalTabView: View {
                 command: nil,
                 env: ["RUNWAY_SESSION_ID": session.id]
             )
-        }
 
-        let tab = TerminalTab(
-            id: tabID,
-            title: "Shell \(shellCount)",
-            config: TerminalConfig(
-                command: ProcessInfo.processInfo.environment["SHELL"] ?? "/bin/zsh",
-                workingDirectory: session.path,
-                environment: [
-                    "RUNWAY_SESSION_ID": session.id
-                ],
-                fontFamily: fontFamily,
-                fontSize: Float(fontSize),
-                tmuxSessionName: tmuxName
+            // Add tab after tmux session is ready
+            let tab = TerminalTab(
+                id: tabID,
+                title: "Shell \(shellCount)",
+                config: TerminalConfig(
+                    command: ProcessInfo.processInfo.environment["SHELL"] ?? "/bin/zsh",
+                    workingDirectory: session.path,
+                    environment: [
+                        "RUNWAY_SESSION_ID": session.id
+                    ],
+                    fontFamily: fontFamily,
+                    fontSize: Float(fontSize),
+                    tmuxSessionName: tmuxName
+                )
             )
-        )
 
-        tabs.append(tab)
-        selectedTabID = tab.id
+            tabs.append(tab)
+            selectedTabID = tab.id
+        }
     }
 
     private func closeTab(_ id: String) {
