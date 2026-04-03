@@ -170,12 +170,17 @@ struct PRRowView: View {
                 }
 
                 HStack(spacing: 8) {
+                    Text(pr.repo)
+                        .font(.caption)
+                        .foregroundColor(theme.chrome.cyan)
                     Text(pr.author)
                         .font(.caption)
                         .foregroundColor(theme.chrome.textDim)
-                    Text(pr.headBranch)
-                        .font(.caption)
-                        .foregroundColor(theme.chrome.accent)
+                    if !pr.headBranch.isEmpty {
+                        Text(pr.headBranch)
+                            .font(.caption)
+                            .foregroundColor(theme.chrome.accent)
+                    }
                     checksSummary
                     reviewBadge
                 }
@@ -188,6 +193,7 @@ struct PRRowView: View {
                 .foregroundColor(theme.chrome.textDim)
         }
         .padding(.vertical, 4)
+        .opacity(pr.isDraft ? 0.5 : 1.0)
     }
 
     @ViewBuilder

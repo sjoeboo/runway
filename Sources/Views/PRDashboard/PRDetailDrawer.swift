@@ -62,17 +62,37 @@ public struct PRDetailDrawer: View {
                 .font(.title3)
                 .fontWeight(.semibold)
 
+            // Repo name
+            Text(pr.repo)
+                .font(.caption)
+                .foregroundColor(theme.chrome.cyan)
+
             HStack(spacing: 12) {
                 Label(pr.author, systemImage: "person")
-                Label("\(pr.headBranch) → \(pr.baseBranch)", systemImage: "arrow.triangle.branch")
-                Label("+\(pr.additions) -\(pr.deletions)", systemImage: "doc.text")
+                let head = detail?.headBranch.isEmpty == false ? detail!.headBranch : pr.headBranch
+                let base = detail?.baseBranch.isEmpty == false ? detail!.baseBranch : pr.baseBranch
+                if !head.isEmpty {
+                    Label("\(head) → \(base)", systemImage: "arrow.triangle.branch")
+                }
+                let adds = detail?.additions ?? pr.additions
+                let dels = detail?.deletions ?? pr.deletions
+                if adds > 0 || dels > 0 {
+                    Label("+\(adds) -\(dels)", systemImage: "doc.text")
+                }
             }
             .font(.caption)
             .foregroundColor(theme.chrome.textDim)
 
-            // Checks summary
-            if pr.checks.total > 0 {
-                checksBar
+            // Checks summary (from detail if available, otherwise from PR)
+            let checks = detail?.checks ?? pr.checks
+            if checks.total > 0 {
+                detailChecksBar(checks)
+            }
+
+            // Review decision (from detail if available)
+            let reviewStatus = detail?.reviewDecision ?? pr.reviewDecision
+            if reviewStatus != .none {
+                detailReviewBadge(reviewStatus)
             }
 
             // Action buttons
@@ -93,19 +113,38 @@ public struct PRDetailDrawer: View {
         .padding(12)
     }
 
-    private var checksBar: some View {
+    private func detailChecksBar(_ checks: CheckSummary) -> some View {
         HStack(spacing: 8) {
-            if pr.checks.passed > 0 {
-                Label("\(pr.checks.passed) passed", systemImage: "checkmark.circle.fill")
+            if checks.passed > 0 {
+                Label("\(checks.passed) passed", systemImage: "checkmark.circle.fill")
                     .foregroundColor(theme.chrome.green)
             }
-            if pr.checks.pending > 0 {
-                Label("\(pr.checks.pending) pending", systemImage: "clock.fill")
+            if checks.pending > 0 {
+                Label("\(checks.pending) pending", systemImage: "clock.fill")
                     .foregroundColor(theme.chrome.yellow)
             }
-            if pr.checks.failed > 0 {
-                Label("\(pr.checks.failed) failed", systemImage: "xmark.circle.fill")
+            if checks.failed > 0 {
+                Label("\(checks.failed) failed", systemImage: "xmark.circle.fill")
                     .foregroundColor(theme.chrome.red)
+            }
+        }
+        .font(.caption)
+    }
+
+    private func detailReviewBadge(_ decision: ReviewDecision) -> some View {
+        HStack(spacing: 4) {
+            switch decision {
+            case .approved:
+                Label("Approved", systemImage: "checkmark.circle.fill")
+                    .foregroundColor(theme.chrome.green)
+            case .changesRequested:
+                Label("Changes requested", systemImage: "exclamationmark.triangle.fill")
+                    .foregroundColor(theme.chrome.orange)
+            case .pending:
+                Label("Review required", systemImage: "clock")
+                    .foregroundColor(theme.chrome.yellow)
+            case .none:
+                EmptyView()
             }
         }
         .font(.caption)

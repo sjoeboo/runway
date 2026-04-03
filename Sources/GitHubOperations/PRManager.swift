@@ -47,7 +47,7 @@ public actor PRManager {
         let output = try await runGH(args: [
             "pr", "view", "\(number)",
             "--repo", repo,
-            "--json", "body,reviews,comments,files",
+            "--json", "body,reviews,comments,files,statusCheckRollup,reviewDecision,headRefName,baseRefName,additions,deletions,changedFiles",
         ])
         return try parsePRDetail(output)
     }
@@ -140,6 +140,7 @@ public actor PRManager {
         var args = [
             "search", "prs",
             "--state", "open",
+            "--archived=false",
             "--json", "number,title,state,repository,url,isDraft,createdAt,updatedAt,author",
             "--limit", "50",
         ]
@@ -353,21 +354,78 @@ private struct GHPRDetailResponse: Decodable {
     let reviews: [GHReview]?
     let comments: [GHComment]?
     let files: [GHFile]?
+    let statusCheckRollup: [GHCheck]?
+    let reviewDecision: String?
+    let headRefName: String?
+    let baseRefName: String?
+    let additions: Int?
+    let deletions: Int?
+    let changedFiles: Int?
 
     func toPRDetail() -> PRDetail {
-        PRDetail(
+        let checks = parseChecks(statusCheckRollup ?? [])
+
+        let review: ReviewDecision
+        switch reviewDecision?.uppercased() {
+        case "APPROVED": review = .approved
+        case "CHANGES_REQUESTED": review = .changesRequested
+        case "REVIEW_REQUIRED": review = .pending
+        default: review = .none
+        }
+
+        return PRDetail(
             body: body ?? "",
             reviews: (reviews ?? []).map {
-                PRReview(id: $0.id ?? "0", author: $0.author?.login ?? "", state: $0.state ?? "")
+                PRReview(id: $0.id ?? "0", author: $0.author?.login ?? "", state: $0.state ?? "", body: $0.body ?? "")
             },
             comments: (comments ?? []).map {
                 PRComment(id: $0.id ?? "0", author: $0.author?.login ?? "", body: $0.body ?? "")
             },
             files: (files ?? []).map {
                 PRFileChange(path: $0.path ?? "", additions: $0.additions ?? 0, deletions: $0.deletions ?? 0, patch: $0.patch)
-            }
+            },
+            checks: checks,
+            reviewDecision: review,
+            headBranch: headRefName ?? "",
+            baseBranch: baseRefName ?? "",
+            additions: additions ?? 0,
+            deletions: deletions ?? 0,
+            changedFiles: changedFiles ?? 0
         )
     }
+
+    private func parseChecks(_ checks: [GHCheck]) -> CheckSummary {
+        var passed = 0, failed = 0, pending = 0
+        for check in checks {
+            let status = check.status?.uppercased() ?? ""
+            let conclusion = check.conclusion?.uppercased() ?? ""
+            let state = check.state?.uppercased() ?? ""
+
+            if status == "COMPLETED" {
+                if conclusion == "SUCCESS" || conclusion == "NEUTRAL" || conclusion == "SKIPPED" {
+                    passed += 1
+                } else if conclusion == "FAILURE" || conclusion == "TIMED_OUT" || conclusion == "CANCELLED" {
+                    failed += 1
+                } else {
+                    pending += 1
+                }
+            } else if state == "SUCCESS" {
+                passed += 1
+            } else if state == "FAILURE" || state == "ERROR" {
+                failed += 1
+            } else {
+                pending += 1
+            }
+        }
+        return CheckSummary(passed: passed, failed: failed, pending: pending)
+    }
+}
+
+private struct GHCheck: Decodable {
+    let name: String?
+    let status: String?
+    let conclusion: String?
+    let state: String?  // For StatusContext type checks
 }
 
 private struct GHReview: Decodable {
