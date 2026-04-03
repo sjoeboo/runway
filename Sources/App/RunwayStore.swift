@@ -61,7 +61,6 @@ public final class RunwayStore {
         // Check tmux availability, then load state (reconciliation needs tmux status)
         Task {
             tmuxAvailable = await tmuxManager.isAvailable()
-            print("[Runway] tmux available: \(tmuxAvailable)")
             await loadState()
         }
 
@@ -75,14 +74,10 @@ public final class RunwayStore {
     // MARK: - State Loading
 
     func loadState() async {
-        guard let db = database else {
-            print("[Runway] loadState: no database")
-            return
-        }
+        guard let db = database else { return }
         do {
             projects = try db.allProjects()
             sessions = try db.allSessions()
-            print("[Runway] loadState: loaded \(projects.count) projects, \(sessions.count) sessions")
 
             // Auto-detect default branches for projects that still have the placeholder "main"
             for i in projects.indices {
@@ -121,7 +116,6 @@ public final class RunwayStore {
         } catch {
             print("[Runway] Failed to load state: \(error)")
         }
-        print("[Runway] loadState complete: \(sessions.count) sessions visible")
     }
 
     // MARK: - New Session Request (from dialog)
