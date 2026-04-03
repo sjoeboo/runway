@@ -84,7 +84,7 @@ public struct PRDashboardView: View {
                 Divider()
 
                 // PR list
-                if filteredPRs.isEmpty && !isLoading {
+                if pullRequests.isEmpty && !isLoading {
                     Spacer()
                     VStack(spacing: 8) {
                         Image(systemName: "pull.request")
@@ -98,7 +98,7 @@ public struct PRDashboardView: View {
                     Spacer()
                 } else {
                     List(
-                        filteredPRs,
+                        pullRequests,
                         selection: Binding(
                             get: { selectedPRID },
                             set: { id in
@@ -132,12 +132,6 @@ public struct PRDashboardView: View {
             }
         }
         .onAppear { onRefresh() }
-    }
-
-    private var filteredPRs: [PullRequest] {
-        // All filtering is done server-side by PRManager (--author @me, --review-requested @me)
-        // Local filtering just passes through since each tab triggers a server re-fetch
-        pullRequests
     }
 
     private func tabButton(_ tab: PRTab) -> some View {

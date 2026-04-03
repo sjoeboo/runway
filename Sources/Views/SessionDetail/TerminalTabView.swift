@@ -157,10 +157,15 @@ public struct TerminalTabView: View {
         selectedTabID = mainTab.id
 
         // Discover surviving shell tmux sessions from a previous app launch
+        let capturedSessionID = session.id
         Task {
             let manager = TmuxSessionManager()
-            let shellPrefix = "runway-\(session.id)-shell"
+            let shellPrefix = "runway-\(capturedSessionID)-shell"
             let shellSessions = await manager.listSessions(prefix: shellPrefix)
+
+            // Guard against rapid session switching — if the user selected a
+            // different session while this Task was awaiting, don't append tabs.
+            guard session.id == capturedSessionID else { return }
 
             for tmuxSession in shellSessions.sorted(by: { $0.name < $1.name }) {
                 // Extract shell number from name (e.g., "runway-id-shell2" → "2")

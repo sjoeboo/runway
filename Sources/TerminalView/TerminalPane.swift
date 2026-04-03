@@ -48,7 +48,13 @@ public struct TerminalPane: NSViewRepresentable {
 
     public func updateNSView(_ nsView: NSView, context: Context) {
         if let terminal = context.coordinator.terminal {
-            applyTheme(terminal)
+            // Only reapply theme when it actually changes — avoids redundant
+            // installColors + needsDisplay on every unrelated state mutation.
+            let themeID = theme.id
+            if context.coordinator.lastThemeID != themeID {
+                context.coordinator.lastThemeID = themeID
+                applyTheme(terminal)
+            }
         }
     }
 
@@ -140,13 +146,15 @@ public struct TerminalPane: NSViewRepresentable {
         return env.map { "\($0.key)=\($0.value)" }
     }
 
-    private func shellEscape(_ path: String) -> String {
-        "'" + path.replacingOccurrences(of: "'", with: "'\\''") + "'"
-    }
-
     public class Coordinator {
         var terminal: LocalProcessTerminalView?
+        var lastThemeID: String?
     }
+}
+
+/// POSIX-safe shell escaping via single quotes.
+private func shellEscape(_ path: String) -> String {
+    "'" + path.replacingOccurrences(of: "'", with: "'\\''") + "'"
 }
 
 // MARK: - Container View
@@ -173,12 +181,7 @@ class TerminalContainerView: NSView {
         guard let items = sender.draggingPasteboard.readObjects(forClasses: [NSURL.self]) as? [URL] else {
             return false
         }
-        let paths = items.map { url -> String in
-            url.path.replacingOccurrences(of: " ", with: "\\ ")
-                .replacingOccurrences(of: "(", with: "\\(")
-                .replacingOccurrences(of: ")", with: "\\)")
-                .replacingOccurrences(of: "'", with: "\\'")
-        }
+        let paths = items.map { shellEscape($0.path) }
         terminalRef?.send(txt: paths.joined(separator: " "))
         return true
     }

@@ -522,7 +522,7 @@ public final class RunwayStore {
     func togglePRDraft(_ pr: PullRequest) async {
         let host = await prManager.hostFromURL(pr.url)
         do {
-            try await prManager.toggleDraft(repo: pr.repo, number: pr.number, isDraft: !pr.isDraft, host: host)
+            try await prManager.toggleDraft(repo: pr.repo, number: pr.number, makeDraft: !pr.isDraft, host: host)
             statusMessage = .success(pr.isDraft ? "Marked #\(pr.number) as ready" : "Converted #\(pr.number) to draft")
             await fetchPRs()
         } catch {
@@ -536,27 +536,6 @@ public final class RunwayStore {
         }
     }
 
-    /// Detect the GitHub "owner/repo" slug for a project by running `gh repo view`.
-    private func detectRepo(for project: Project) async -> String? {
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
-        process.arguments = ["gh", "repo", "view", "--json", "nameWithOwner", "-q", ".nameWithOwner"]
-        process.currentDirectoryURL = URL(fileURLWithPath: project.path)
-
-        let pipe = Pipe()
-        process.standardOutput = pipe
-        process.standardError = Pipe()
-
-        do {
-            try process.run()
-            process.waitUntilExit()
-            let data = pipe.fileHandleForReading.readDataToEndOfFile()
-            let output = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines)
-            return output?.isEmpty == false ? output : nil
-        } catch {
-            return nil
-        }
-    }
 }
 
 // MARK: - Status Message

@@ -3,9 +3,6 @@ import Models
 
 /// Manages GitHub PR operations by shelling out to the `gh` CLI.
 public actor PRManager {
-    private var cache: [String: CachedPR] = [:]
-    private let cacheTTL: TimeInterval = 60
-
     public init() {}
 
     /// Fetch PRs for a given category.
@@ -87,11 +84,6 @@ public actor PRManager {
         try await runGH(args: ["pr", "comment", "\(number)", "--repo", repo, "--body", body], host: host)
     }
 
-    /// Open PR in browser.
-    public func openInBrowser(repo: String, number: Int) async throws {
-        try await runGH(args: ["pr", "view", "\(number)", "--repo", repo, "--web"])
-    }
-
     /// Request changes on a PR.
     public func requestChanges(repo: String, number: Int, body: String, host: String? = nil) async throws {
         try await runGH(
@@ -109,9 +101,8 @@ public actor PRManager {
     }
 
     /// Toggle draft state. `gh pr ready` to mark ready; GraphQL mutation to convert to draft.
-    public func toggleDraft(repo: String, number: Int, isDraft: Bool, host: String? = nil) async throws {
-        if isDraft {
-            // Currently ready → convert to draft via GraphQL
+    public func toggleDraft(repo: String, number: Int, makeDraft: Bool, host: String? = nil) async throws {
+        if makeDraft {
             let nodeOutput = try await runGH(
                 args: ["pr", "view", "\(number)", "--repo", repo, "--json", "id", "-q", ".id"],
                 host: host
@@ -268,13 +259,6 @@ public enum GHError: Error, LocalizedError {
             "gh \(args.joined(separator: " ")) failed (exit \(exitCode)): \(stderr)"
         }
     }
-}
-
-// MARK: - Cache
-
-private struct CachedPR {
-    let pr: PullRequest
-    let fetchedAt: Date
 }
 
 // MARK: - GH JSON Models

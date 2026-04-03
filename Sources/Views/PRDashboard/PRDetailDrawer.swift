@@ -14,7 +14,8 @@ public struct PRDetailDrawer: View {
     let onToggleDraft: () -> Void
 
     @State private var selectedTab: PRDetailTab = .overview
-    @State private var commentText: String = ""
+    @State private var sheetCommentText: String = ""
+    @State private var inlineCommentText: String = ""
     @State private var showMergeConfirm: Bool = false
     @State private var selectedMergeStrategy: MergeStrategy = .squash
     @State private var showRequestChanges: Bool = false
@@ -193,19 +194,19 @@ public struct PRDetailDrawer: View {
                 VStack(spacing: 12) {
                     Text("Comment on #\(pr.number)")
                         .font(.headline)
-                    TextEditor(text: $commentText)
+                    TextEditor(text: $sheetCommentText)
                         .frame(minHeight: 100)
                         .border(Color.secondary.opacity(0.3))
                     HStack {
                         Button("Cancel") { showCommentSheet = false }
                         Spacer()
                         Button("Comment") {
-                            onComment(commentText)
-                            commentText = ""
+                            onComment(sheetCommentText)
+                            sheetCommentText = ""
                             showCommentSheet = false
                         }
                         .buttonStyle(.borderedProminent)
-                        .disabled(commentText.isEmpty)
+                        .disabled(sheetCommentText.isEmpty)
                     }
                 }
                 .padding()
@@ -400,7 +401,7 @@ public struct PRDetailDrawer: View {
                     Text("Add a comment")
                         .font(.caption)
                         .foregroundColor(theme.chrome.textDim)
-                    TextEditor(text: $commentText)
+                    TextEditor(text: $inlineCommentText)
                         .frame(height: 60)
                         .font(.body)
                         .overlay(
@@ -410,12 +411,12 @@ public struct PRDetailDrawer: View {
                     HStack {
                         Spacer()
                         Button("Comment") {
-                            guard !commentText.isEmpty else { return }
-                            onComment(commentText)
-                            commentText = ""
+                            guard !inlineCommentText.isEmpty else { return }
+                            onComment(inlineCommentText)
+                            inlineCommentText = ""
                         }
                         .controlSize(.small)
-                        .disabled(commentText.isEmpty)
+                        .disabled(inlineCommentText.isEmpty)
                     }
                 }
             }
