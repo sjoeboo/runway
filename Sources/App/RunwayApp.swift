@@ -247,6 +247,7 @@ struct ContentView: View {
                     },
                     onOpenIssue: { store.openIssueInBrowser($0) },
                     onSelectPR: { pr in Task { await store.selectPR(pr) } },
+                    onRefreshPRs: { Task { await store.refreshPRsIfStale() } },
                     onUpdateProject: { store.updateProjectSettings($0) },
                     onDetectRepo: { await store.detectGHRepo(for: project) },
                     onFetchLabels: { Task { await store.fetchLabels(forProject: projectID) } }

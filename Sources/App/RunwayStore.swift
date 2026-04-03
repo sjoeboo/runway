@@ -38,6 +38,7 @@ public final class RunwayStore {
     var projectIssues: [String: [GitHubIssue]] = [:]
     var isLoadingIssues: Bool = false
     var projectLabels: [String: [IssueLabel]] = [:]
+    var issueLastFetched: [String: Date] = [:]  // keyed by project ID
 
     // MARK: - Managers
     let themeManager: ThemeManager
@@ -593,10 +594,17 @@ public final class RunwayStore {
         do {
             let issues = try await issueManager.fetchIssues(repo: repo, host: project.ghHost)
             projectIssues[projectID] = issues
+            issueLastFetched[projectID] = Date()
             try? database?.cacheIssues(issues)
         } catch {
             statusMessage = .error("Failed to fetch issues: \(error.localizedDescription)")
         }
+    }
+
+    func refreshIssuesIfStale(forProject projectID: String) async {
+        let staleness: TimeInterval = 60
+        if let last = issueLastFetched[projectID], Date().timeIntervalSince(last) < staleness { return }
+        await fetchIssues(forProject: projectID)
     }
 
     func createIssue(forProject projectID: String, title: String, body: String, labels: [String]) async {

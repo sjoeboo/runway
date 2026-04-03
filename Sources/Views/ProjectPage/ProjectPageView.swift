@@ -22,6 +22,7 @@ public struct ProjectPageView: View {
     let onCreateIssue: (String, String, [String]) -> Void
     let onOpenIssue: (GitHubIssue) -> Void
     let onSelectPR: (PullRequest) -> Void
+    let onRefreshPRs: () -> Void
     let onUpdateProject: (Project) -> Void
     let onDetectRepo: () async -> (repo: String, host: String?)?
     let onFetchLabels: () -> Void
@@ -41,6 +42,7 @@ public struct ProjectPageView: View {
         onCreateIssue: @escaping (String, String, [String]) -> Void,
         onOpenIssue: @escaping (GitHubIssue) -> Void,
         onSelectPR: @escaping (PullRequest) -> Void,
+        onRefreshPRs: @escaping () -> Void,
         onUpdateProject: @escaping (Project) -> Void,
         onDetectRepo: @escaping () async -> (repo: String, host: String?)?,
         onFetchLabels: @escaping () -> Void
@@ -54,6 +56,7 @@ public struct ProjectPageView: View {
         self.onCreateIssue = onCreateIssue
         self.onOpenIssue = onOpenIssue
         self.onSelectPR = onSelectPR
+        self.onRefreshPRs = onRefreshPRs
         self.onUpdateProject = onUpdateProject
         self.onDetectRepo = onDetectRepo
         self.onFetchLabels = onFetchLabels
@@ -142,7 +145,8 @@ public struct ProjectPageView: View {
             case .prs:
                 ProjectPRsTab(
                     pullRequests: pullRequests,
-                    onSelectPR: onSelectPR
+                    onSelectPR: onSelectPR,
+                    onRefresh: onRefreshPRs
                 )
             }
         }
@@ -154,8 +158,9 @@ public struct ProjectPageView: View {
                 onDetectRepo: onDetectRepo
             )
         }
-        .onAppear {
+        .task(id: project.id) {
             if project.issuesEnabled {
+                // Auto-refresh uses staleness check; manual refresh button bypasses it
                 onRefreshIssues()
             }
         }

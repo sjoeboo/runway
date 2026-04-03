@@ -7,16 +7,19 @@ import Theme
 public struct ProjectPRsTab: View {
     let pullRequests: [PullRequest]
     let onSelectPR: (PullRequest) -> Void
+    let onRefresh: () -> Void
 
     @AppStorage("hideDrafts") private var hideDrafts: Bool = false
     @Environment(\.theme) private var theme
 
     public init(
         pullRequests: [PullRequest],
-        onSelectPR: @escaping (PullRequest) -> Void
+        onSelectPR: @escaping (PullRequest) -> Void,
+        onRefresh: @escaping () -> Void
     ) {
         self.pullRequests = pullRequests
         self.onSelectPR = onSelectPR
+        self.onRefresh = onRefresh
     }
 
     private var filteredPRs: [PullRequest] {
@@ -46,6 +49,15 @@ public struct ProjectPRsTab: View {
                 }
                 .buttonStyle(.plain)
                 .help(hideDrafts ? "Show drafts" : "Hide drafts")
+
+                Button {
+                    onRefresh()
+                } label: {
+                    Image(systemName: "arrow.clockwise")
+                        .font(.caption)
+                }
+                .buttonStyle(.plain)
+                .help("Refresh pull requests")
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
