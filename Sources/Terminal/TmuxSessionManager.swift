@@ -47,6 +47,11 @@ public actor TmuxSessionManager {
         // Hide tmux status bar — tmux is an implementation detail, not user-facing
         _ = try? await runTmux(args: ["set-option", "-t", name, "status", "off"])
 
+        // Enable mouse support — allows click-drag selection, scroll, and pane resize.
+        // Without this, mouse events are ignored by tmux and SwiftTerm's native
+        // selection doesn't work because tmux sits between the terminal and the PTY.
+        _ = try? await runTmux(args: ["set-option", "-t", name, "mouse", "on"])
+
         // Set environment variables
         for (key, value) in env {
             _ = try? await runTmux(args: ["set-environment", "-t", name, key, value])
