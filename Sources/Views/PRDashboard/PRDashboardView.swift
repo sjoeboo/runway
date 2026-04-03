@@ -44,7 +44,7 @@ public struct PRDashboardView: View {
     }
 
     public var body: some View {
-        HSplitView {
+        HStack(spacing: 0) {
             // Left: PR list
             VStack(spacing: 0) {
                 // Tab bar
@@ -102,10 +102,12 @@ public struct PRDashboardView: View {
                     }
                 }
             }
-            .frame(minWidth: 300, idealWidth: 400)
+            .frame(minWidth: 300)
+            .frame(maxWidth: selectedPR == nil ? .infinity : 480)
 
             // Right: PR detail drawer
             if let pr = selectedPR {
+                Divider()
                 PRDetailDrawer(
                     pr: pr,
                     detail: detail,
@@ -113,7 +115,7 @@ public struct PRDashboardView: View {
                     onApprove: { onApprove(pr) },
                     onComment: { body in onComment(pr, body) }
                 )
-                .frame(minWidth: 400, idealWidth: 500)
+                .frame(maxWidth: .infinity)
             }
         }
         .onAppear { onRefresh() }
