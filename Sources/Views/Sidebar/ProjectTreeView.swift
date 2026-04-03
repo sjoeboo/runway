@@ -321,14 +321,16 @@ struct SessionRowView: View {
                 if let pr = linkedPR {
                     HStack(spacing: 4) {
                         Button {
-                            onViewPR?(session.id)
+                            if let url = URL(string: pr.url) {
+                                NSWorkspace.shared.open(url)
+                            }
                         } label: {
                             Text("#\(pr.number)")
                                 .font(.caption2)
                                 .foregroundColor(theme.chrome.accent)
                         }
                         .buttonStyle(.plain)
-                        .help("View PR #\(pr.number)")
+                        .help("Open PR #\(pr.number) in browser")
                         if pr.checks.total > 0 {
                             if pr.checks.allPassed {
                                 Image(systemName: "checkmark.circle.fill")

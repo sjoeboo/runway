@@ -66,11 +66,19 @@ public struct SessionHeaderView: View {
 
                         if let pr = linkedPR {
                             HStack(spacing: 8) {
-                                // PR number
-                                Text("#\(pr.number)")
-                                    .font(.caption)
-                                    .fontWeight(.medium)
-                                    .foregroundColor(theme.chrome.purple)
+                                // PR number — opens in browser
+                                Button {
+                                    if let url = URL(string: pr.url) {
+                                        NSWorkspace.shared.open(url)
+                                    }
+                                } label: {
+                                    Text("#\(pr.number)")
+                                        .font(.caption)
+                                        .fontWeight(.medium)
+                                        .foregroundColor(theme.chrome.purple)
+                                }
+                                .buttonStyle(.plain)
+                                .help("Open PR in browser")
 
                                 // Check summary
                                 if pr.checks.total > 0 {
