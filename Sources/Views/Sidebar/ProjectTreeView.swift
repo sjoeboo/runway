@@ -320,9 +320,15 @@ struct SessionRowView: View {
                 // Linked PR info
                 if let pr = linkedPR {
                     HStack(spacing: 4) {
-                        Text("#\(pr.number)")
-                            .font(.caption2)
-                            .foregroundColor(theme.chrome.accent)
+                        Button {
+                            onViewPR?(session.id)
+                        } label: {
+                            Text("#\(pr.number)")
+                                .font(.caption2)
+                                .foregroundColor(theme.chrome.accent)
+                        }
+                        .buttonStyle(.plain)
+                        .help("View PR #\(pr.number)")
                         if pr.checks.total > 0 {
                             if pr.checks.allPassed {
                                 Image(systemName: "checkmark.circle.fill")
@@ -349,6 +355,20 @@ struct SessionRowView: View {
                             Image(systemName: "exclamationmark.triangle")
                                 .font(.system(size: 8))
                                 .foregroundColor(theme.chrome.orange)
+                        }
+                        if pr.additions > 0 || pr.deletions > 0 {
+                            HStack(spacing: 1) {
+                                Text("+\(pr.additions)")
+                                    .foregroundColor(theme.chrome.green)
+                                Text("-\(pr.deletions)")
+                                    .foregroundColor(theme.chrome.red)
+                            }
+                            .font(.caption2)
+                        }
+                        if pr.isDraft {
+                            Text("Draft")
+                                .font(.system(size: 8))
+                                .foregroundColor(theme.chrome.textDim)
                         }
                     }
                 }
