@@ -15,12 +15,23 @@ public final class ThemeManager {
     public var themeMode: ThemeMode = .manual
 
     /// The explicitly selected theme (used in manual mode, or as dark theme in system mode).
-    public var selectedThemeID: String
+    public var selectedThemeID: String {
+        didSet { UserDefaults.standard.set(selectedThemeID, forKey: "runway.selectedThemeID") }
+    }
 
     public init(defaultTheme: AppTheme = .tokyoNightStorm) {
-        self.currentTheme = defaultTheme
-        self.selectedThemeID = defaultTheme.id
         self.allThemes = AppTheme.builtIn
+
+        // Restore persisted theme selection
+        if let savedID = UserDefaults.standard.string(forKey: "runway.selectedThemeID"),
+           let saved = AppTheme.builtIn.first(where: { $0.id == savedID })
+        {
+            self.currentTheme = saved
+            self.selectedThemeID = savedID
+        } else {
+            self.currentTheme = defaultTheme
+            self.selectedThemeID = defaultTheme.id
+        }
     }
 
     public func selectTheme(_ theme: AppTheme) {

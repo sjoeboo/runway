@@ -101,8 +101,8 @@ struct ContentView: View {
             }
 
             // Status message toast
-            if let message = store.statusMessage {
-                statusToast(message)
+            if let msg = store.statusMessage {
+                statusToast(msg)
                     .onAppear {
                         DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
                             store.statusMessage = nil
@@ -128,17 +128,31 @@ struct ContentView: View {
 
     // MARK: - Status Toast
 
-    private func statusToast(_ message: String) -> some View {
-        Text(message)
-            .font(.caption)
-            .foregroundColor(.white)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 6)
-            .background(theme.chrome.red.opacity(0.9))
-            .cornerRadius(6)
-            .padding(.bottom, 8)
-            .transition(.move(edge: .bottom).combined(with: .opacity))
-            .animation(.easeInOut(duration: 0.3), value: message)
+    private func statusToast(_ msg: StatusMessage) -> some View {
+        HStack(spacing: 6) {
+            Image(systemName: msg.kind == .success ? "checkmark.circle.fill"
+                  : msg.kind == .info ? "info.circle.fill"
+                  : "exclamationmark.triangle.fill")
+                .font(.caption)
+            Text(msg.text)
+                .font(.caption)
+        }
+        .foregroundColor(.white)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 6)
+        .background(toastColor(for: msg.kind).opacity(0.9))
+        .cornerRadius(6)
+        .padding(.bottom, 8)
+        .transition(.move(edge: .bottom).combined(with: .opacity))
+        .animation(.easeInOut(duration: 0.3), value: msg)
+    }
+
+    private func toastColor(for kind: StatusMessage.Kind) -> Color {
+        switch kind {
+        case .success: theme.chrome.green
+        case .info: theme.chrome.accent
+        case .error: theme.chrome.red
+        }
     }
 
     // MARK: - Sidebar

@@ -17,7 +17,7 @@
 - [ ] **PR/diff info panel for session** — header/footer/sidebar showing worktree branch, diff summary (+/-), PR status, checks — visible while working in the terminal
 - [x] **Session restart** — ability to restart a stopped/exited session without creating a new one
 - [x] **Session delete** — right-click or keyboard shortcut to delete sessions and clean up worktrees
-- [ ] **Send text to session** — the SendTextBar component exists but isn't wired into the UI
+- ~~**Send text to session**~~ — Dropped; terminal input handles this directly
 
 ## Sidebar UX
 
@@ -32,7 +32,7 @@
 - [ ] **Fetch PRs on app launch** — RunwayStore should fetch PRs for all registered projects
 - [ ] **PR detail loading** — clicking a PR should fetch full detail (body, reviews, comments, files) via `gh pr view --json`
 - [ ] **PR actions** — approve, comment, request changes from the PR detail drawer
-- [ ] **Open PR in browser** — wire the "Open in Browser" button
+- [x] **Open PR in browser** — wire the "Open in Browser" button
 - [ ] **Session ↔ PR linking** — auto-detect PR for a session's worktree branch
 
 ## UI Polish
@@ -40,14 +40,14 @@
 - [ ] **Sidebar styling** — project/session list needs better visual hierarchy, hover states, context menus
 - [x] **Session context menu** — right-click for rename, delete, move, restart, open in editor
 - [ ] **Responsive layout** — sidebar width persistence, detail area minimum sizes
-- [ ] **Status toast improvements** — currently only shows errors; add success/info toasts
+- [x] **Status toast improvements** — currently only shows errors; add success/info toasts
 - [ ] **Empty states** — better empty states for PR and Todo tabs (with action buttons)
 - [x] **Window title** — show current session name in window title bar
 - [ ] **Drag and drop** — reorder sessions within projects, move between projects
 
 ## Theme / Appearance
 
-- [ ] **Theme persistence** — selected theme should persist across app restarts (currently resets to Tokyo Night)
+- [x] **Theme persistence** — selected theme should persist across app restarts (currently resets to Tokyo Night)
 - [ ] **Terminal color sync** — theme terminal palette should be applied to SwiftTerm (currently only fg/bg/selection, not ANSI 0-15)
 - [ ] **Custom theme import** — load JSON themes from ~/.runway/themes/
 - [ ] **Ghostty theme import** — parse .conf theme files into AppTheme

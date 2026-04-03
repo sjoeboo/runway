@@ -28,7 +28,7 @@ public final class RunwayStore {
     var showNewSessionDialog: Bool = false
     var showNewProjectDialog: Bool = false
     var newSessionProjectID: String?
-    var statusMessage: String?
+    var statusMessage: StatusMessage?
     var tmuxAvailable: Bool = false
 
     // MARK: - Managers
@@ -144,7 +144,7 @@ public final class RunwayStore {
                 worktreeBranch = branchName
             } catch {
                 print("[Runway] Worktree creation failed, using project path: \(error)")
-                statusMessage = "Worktree failed: \(error.localizedDescription)"
+                statusMessage = .error("Worktree failed: \(error.localizedDescription)")
             }
         }
 
@@ -184,7 +184,7 @@ public final class RunwayStore {
                 session.status = .running
             } catch {
                 print("[Runway] Failed to create tmux session: \(error)")
-                statusMessage = "tmux session failed: \(error.localizedDescription)"
+                statusMessage = .error("tmux session failed: \(error.localizedDescription)")
                 // Fall through — session still created, TerminalPane will use direct spawn fallback
             }
         }
@@ -357,7 +357,7 @@ public final class RunwayStore {
             prLastFetched = Date()
         } catch {
             print("[Runway] Failed to fetch PRs: \(error)")
-            statusMessage = "PR fetch failed: \(error.localizedDescription)"
+            statusMessage = .error("PR fetch failed: \(error.localizedDescription)")
         }
     }
 
@@ -382,10 +382,10 @@ public final class RunwayStore {
     func approvePR(_ pr: PullRequest) async {
         do {
             try await prManager.approve(repo: pr.repo, number: pr.number)
-            statusMessage = "Approved #\(pr.number)"
+            statusMessage = .success("Approved #\(pr.number)")
             await fetchPRs()
         } catch {
-            statusMessage = "Approve failed: \(error.localizedDescription)"
+            statusMessage = .error("Approve failed: \(error.localizedDescription)")
         }
     }
 
@@ -395,7 +395,7 @@ public final class RunwayStore {
             // Refresh detail to show new comment
             prDetail = try await prManager.fetchDetail(repo: pr.repo, number: pr.number)
         } catch {
-            statusMessage = "Comment failed: \(error.localizedDescription)"
+            statusMessage = .error("Comment failed: \(error.localizedDescription)")
         }
     }
 
@@ -426,4 +426,16 @@ public final class RunwayStore {
             return nil
         }
     }
+}
+
+// MARK: - Status Message
+
+struct StatusMessage: Equatable {
+    enum Kind { case success, info, error }
+    let text: String
+    let kind: Kind
+
+    static func success(_ text: String) -> StatusMessage { .init(text: text, kind: .success) }
+    static func info(_ text: String) -> StatusMessage { .init(text: text, kind: .info) }
+    static func error(_ text: String) -> StatusMessage { .init(text: text, kind: .error) }
 }
