@@ -180,17 +180,15 @@ private struct TabButton: View {
                         .font(.system(size: 13))
                         .foregroundColor(isActive ? theme.chrome.text : theme.chrome.textDim)
 
-                    if !isEmpty {
-                        Text("\(count)")
-                            .font(.caption2)
-                            .foregroundColor(isActive ? theme.chrome.text : theme.chrome.textDim)
-                            .padding(.horizontal, 5)
-                            .padding(.vertical, 1)
-                            .background(
-                                Capsule()
-                                    .fill(theme.chrome.surface.opacity(0.6))
-                            )
-                    }
+                    Text("\(count)")
+                        .font(.caption2)
+                        .foregroundColor(isActive ? theme.chrome.text : theme.chrome.textDim)
+                        .padding(.horizontal, 5)
+                        .padding(.vertical, 1)
+                        .background(
+                            Capsule()
+                                .fill(theme.chrome.surface.opacity(0.6))
+                        )
                 }
 
                 // Underline indicator
