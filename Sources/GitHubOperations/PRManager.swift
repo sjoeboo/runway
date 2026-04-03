@@ -10,7 +10,7 @@ public actor PRManager {
 
     /// Fetch PRs for a given category.
     ///
-    /// When `repo` is nil, uses `gh search prs` to find PRs across all repos.
+    /// When `repo` is nil, uses `gh search prs` across all authenticated hosts.
     /// When `repo` is provided, uses `gh pr list` scoped to that repo.
     public func fetchPRs(repo: String? = nil, filter: PRFilter = .mine) async throws -> [PullRequest] {
         if let repo {
@@ -18,10 +18,43 @@ public actor PRManager {
             let output = try await runGH(args: args)
             return try parsePRList(output)
         } else {
-            let args = buildSearchArgs(filter: filter)
-            let output = try await runGH(args: args)
-            return try parseSearchResults(output)
+            // Search all authenticated GitHub hosts
+            let hosts = await discoverHosts()
+            var allPRs: [PullRequest] = []
+
+            for host in hosts {
+                let args = buildSearchArgs(filter: filter)
+                if let output = try? await runGH(args: args, host: host) {
+                    let prs = (try? parseSearchResults(output)) ?? []
+                    allPRs.append(contentsOf: prs)
+                }
+            }
+
+            return allPRs
         }
+    }
+
+    /// Discover all hosts the user is authenticated with via `gh auth status`.
+    private func discoverHosts() async -> [String] {
+        // gh auth status prints to stderr; capture it directly
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
+        process.arguments = ["gh", "auth", "status"]
+
+        let errPipe = Pipe()
+        process.standardOutput = Pipe()
+        process.standardError = errPipe
+
+        do {
+            try process.run()
+            process.waitUntilExit()
+        } catch {
+            return ["github.com"]
+        }
+
+        let errData = errPipe.fileHandleForReading.readDataToEndOfFile()
+        let errOutput = String(data: errData, encoding: .utf8) ?? ""
+        return parseHosts(from: errOutput)
     }
 
     /// Fetch detailed PR information.
@@ -69,12 +102,15 @@ public actor PRManager {
     // MARK: - Private
 
     @discardableResult
-    private func runGH(args: [String], cwd: String? = nil) async throws -> String {
+    private func runGH(args: [String], cwd: String? = nil, host: String? = nil) async throws -> String {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
-        // Clear GH_HOST to avoid conflicts with enterprise instances
         var env = ProcessInfo.processInfo.environment
-        env.removeValue(forKey: "GH_HOST")
+        if let host {
+            env["GH_HOST"] = host
+        } else {
+            env.removeValue(forKey: "GH_HOST")
+        }
         process.environment = env
         process.arguments = ["gh"] + args
         if let cwd {
@@ -99,6 +135,20 @@ public actor PRManager {
         }
 
         return output
+    }
+
+    private func parseHosts(from output: String) -> [String] {
+        // Parse "Logged in to <host>" lines from gh auth status output
+        var hosts: [String] = []
+        for line in output.components(separatedBy: "\n") {
+            if let range = line.range(of: "Logged in to ") {
+                let rest = line[range.upperBound...]
+                if let spaceIdx = rest.firstIndex(of: " ") {
+                    hosts.append(String(rest[..<spaceIdx]))
+                }
+            }
+        }
+        return hosts.isEmpty ? ["github.com"] : hosts
     }
 
     private func buildSearchArgs(filter: PRFilter) -> [String] {
@@ -323,10 +373,10 @@ private struct GHPRDetailResponse: Decodable {
         PRDetail(
             body: body ?? "",
             reviews: (reviews ?? []).map {
-                PRReview(id: "\($0.id ?? 0)", author: $0.author?.login ?? "", state: $0.state ?? "")
+                PRReview(id: $0.id ?? "0", author: $0.author?.login ?? "", state: $0.state ?? "")
             },
             comments: (comments ?? []).map {
-                PRComment(id: "\($0.id ?? 0)", author: $0.author?.login ?? "", body: $0.body ?? "")
+                PRComment(id: $0.id ?? "0", author: $0.author?.login ?? "", body: $0.body ?? "")
             },
             files: (files ?? []).map {
                 PRFileChange(path: $0.path ?? "", additions: $0.additions ?? 0, deletions: $0.deletions ?? 0, patch: $0.patch)
@@ -336,16 +386,50 @@ private struct GHPRDetailResponse: Decodable {
 }
 
 private struct GHReview: Decodable {
-    let id: Int?
     let author: GHAuthor?
     let state: String?
     let body: String?
+
+    // id can be Int (github.com) or String (GHE) — decode flexibly
+    let id: String?
+
+    enum CodingKeys: String, CodingKey {
+        case id, author, state, body
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        author = try container.decodeIfPresent(GHAuthor.self, forKey: .author)
+        state = try container.decodeIfPresent(String.self, forKey: .state)
+        body = try container.decodeIfPresent(String.self, forKey: .body)
+        if let intID = try? container.decodeIfPresent(Int.self, forKey: .id) {
+            id = "\(intID)"
+        } else {
+            id = try container.decodeIfPresent(String.self, forKey: .id)
+        }
+    }
 }
 
 private struct GHComment: Decodable {
-    let id: Int?
     let author: GHAuthor?
     let body: String?
+
+    let id: String?
+
+    enum CodingKeys: String, CodingKey {
+        case id, author, body
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        author = try container.decodeIfPresent(GHAuthor.self, forKey: .author)
+        body = try container.decodeIfPresent(String.self, forKey: .body)
+        if let intID = try? container.decodeIfPresent(Int.self, forKey: .id) {
+            id = "\(intID)"
+        } else {
+            id = try container.decodeIfPresent(String.self, forKey: .id)
+        }
+    }
 }
 
 private struct GHFile: Decodable {
