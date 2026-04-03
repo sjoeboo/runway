@@ -187,7 +187,8 @@ struct ProjectSection: View {
                     onRestart: onRestart,
                     onDelete: onDelete,
                     onRenameSession: onRenameSession,
-                    onViewPR: onViewPR
+                    onViewPR: onViewPR,
+                    onSelectSession: onSelectSession
                 )
                 .tag(session.id)
             }
@@ -213,6 +214,9 @@ struct ProjectSection: View {
                     Text(project.name)
                         .font(.system(.title3, weight: .semibold))
                         .foregroundColor(theme.chrome.text)
+                        .onTapGesture {
+                            onSelectProject?(project.id)
+                        }
                 }
                 Spacer()
 
@@ -274,6 +278,7 @@ struct SessionRowView: View {
     var onDelete: ((String) -> Void)?
     var onRenameSession: ((String, String) -> Void)?
     var onViewPR: ((String) -> Void)?
+    var onSelectSession: ((String?) -> Void)?
     @State private var isHovered = false
     @State private var isRenaming = false
     @State private var editTitle: String = ""
@@ -378,6 +383,9 @@ struct SessionRowView: View {
             }
         }
         .padding(.vertical, 2)
+        .onTapGesture {
+            onSelectSession?(session.id)
+        }
         .onHover { hovering in
             isHovered = hovering
         }

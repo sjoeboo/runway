@@ -175,6 +175,10 @@ struct ContentView: View {
                     get: { store.selectedSessionID },
                     set: { store.selectedSessionID = $0 }
                 ),
+                selectedProjectID: Binding(
+                    get: { store.selectedProjectID },
+                    set: { store.selectedProjectID = $0 }
+                ),
                 onRestart: { id in Task { await store.restartSession(id: id) } },
                 onDelete: { id in store.deleteSession(id: id) },
                 onNewSession: { projectID in
@@ -187,7 +191,9 @@ struct ContentView: View {
                 },
                 onReorderProjects: { fromOffsets, toOffset in
                     store.reorderProjects(fromOffsets: fromOffsets, toOffset: toOffset)
-                }
+                },
+                onSelectProject: { store.selectProject($0) },
+                onSelectSession: { store.selectSession($0) }
             )
         }
         .frame(minWidth: 200)
