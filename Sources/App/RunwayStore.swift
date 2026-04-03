@@ -27,6 +27,7 @@ public final class RunwayStore {
     var currentView: AppView = .sessions
     var showNewSessionDialog: Bool = false
     var showNewProjectDialog: Bool = false
+    var newSessionProjectID: String?
     var statusMessage: String?
     var tmuxAvailable: Bool = false
 

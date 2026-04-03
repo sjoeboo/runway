@@ -36,6 +36,16 @@ struct RunwayApp: App {
                 Button("Pull Requests") { store.currentView = .prs }
                     .keyboardShortcut("2", modifiers: .command)
             }
+            CommandGroup(after: .newItem) {
+                Button("New Session") {
+                    store.newSessionProjectID = nil
+                    store.showNewSessionDialog = true
+                }
+                .keyboardShortcut("n", modifiers: .command)
+
+                Button("New Project") { store.showNewProjectDialog = true }
+                    .keyboardShortcut("p", modifiers: [.command, .shift])
+            }
         }
 
         Settings {
@@ -69,8 +79,12 @@ struct ContentView: View {
                     set: { store.showNewSessionDialog = $0 }
                 )
             ) {
-                NewSessionDialog(projects: store.projects) { request in
+                NewSessionDialog(
+                    projects: store.projects,
+                    initialProjectID: store.newSessionProjectID
+                ) { request in
                     Task { await store.handleNewSessionRequest(request) }
+                    store.newSessionProjectID = nil
                 }
                 .theme(theme)
             }
@@ -141,7 +155,12 @@ struct ContentView: View {
                     set: { store.selectedSessionID = $0 }
                 ),
                 onRestart: { id in Task { await store.restartSession(id: id) } },
-                onDelete: { id in store.deleteSession(id: id) }
+                onDelete: { id in store.deleteSession(id: id) },
+                onNewSession: { projectID in
+                    store.newSessionProjectID = projectID
+                    store.showNewSessionDialog = true
+                },
+                onNewProject: { store.showNewProjectDialog = true }
             )
         }
         .frame(minWidth: 240)
@@ -203,18 +222,10 @@ struct ContentView: View {
 
     @ToolbarContentBuilder
     private var toolbarContent: some ToolbarContent {
+        // Toolbar buttons removed — inline sidebar controls replace them.
+        // Keyboard shortcuts are preserved via the Commands block in RunwayApp.
         ToolbarItem(placement: .primaryAction) {
-            HStack(spacing: 8) {
-                Button(action: { store.showNewProjectDialog = true }) {
-                    Label("New Project", systemImage: "folder.badge.plus")
-                }
-                .keyboardShortcut("p", modifiers: [.command, .shift])
-
-                Button(action: { store.showNewSessionDialog = true }) {
-                    Label("New Session", systemImage: "plus")
-                }
-                .keyboardShortcut("n", modifiers: .command)
-            }
+            EmptyView()
         }
     }
 }
