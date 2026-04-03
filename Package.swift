@@ -65,7 +65,7 @@ let package = Package(
             dependencies: ["Models"],
             path: "Sources/Terminal",
             exclude: ["GhosttyVTTerminal.swift"],
-            sources: ["TerminalProvider.swift", "PTYProcess.swift", "NativePTYProvider.swift"]
+            sources: ["TerminalProvider.swift", "PTYProcess.swift", "NativePTYProvider.swift", "TmuxSessionManager.swift"]
         ),
 
         // MARK: - Terminal SwiftUI View (NSViewRepresentable)

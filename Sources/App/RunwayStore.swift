@@ -6,6 +6,7 @@ import Persistence
 import StatusDetection
 import SwiftUI
 import Terminal
+import TerminalView
 import Theme
 
 /// Root application state — the single source of truth for the Runway app.
@@ -26,7 +27,12 @@ public final class RunwayStore {
     var currentView: AppView = .sessions
     var showNewSessionDialog: Bool = false
     var showNewProjectDialog: Bool = false
-    var statusMessage: String?
+    var newSessionProjectID: String?
+    var statusMessage: StatusMessage?
+    var tmuxAvailable: Bool = false
+
+    /// Maps session ID → linked PullRequest (matched by worktree branch)
+    var sessionPRs: [String: PullRequest] = [:]
 
     // MARK: - Managers
     let themeManager: ThemeManager
@@ -36,6 +42,7 @@ public final class RunwayStore {
     let worktreeManager: WorktreeManager
     let prManager: PRManager
     let hookInjector: HookInjector
+    let tmuxManager: TmuxSessionManager
 
     // MARK: - Init
 
@@ -46,6 +53,7 @@ public final class RunwayStore {
         self.worktreeManager = WorktreeManager()
         self.prManager = PRManager()
         self.hookInjector = HookInjector()
+        self.tmuxManager = TmuxSessionManager()
 
         // Open database
         do {
@@ -55,14 +63,17 @@ public final class RunwayStore {
             self.database = nil
         }
 
-        // Load initial state
-        Task { await loadState() }
+        // Check tmux availability, then load state (reconciliation needs tmux status)
+        Task {
+            tmuxAvailable = await tmuxManager.isAvailable()
+            await loadState()
+        }
 
-        // Start hook server + inject Claude hooks
+        // Start hook server + inject Claude hooks (sequenced — inject needs the port)
         Task { await startHookServer() }
-        Task { try? hookInjector.inject() }
 
-        // Fetch PRs on launch
+        // Load cached PRs synchronously for instant display, then refresh in background
+        loadCachedPRs()
         Task { await fetchPRs() }
     }
 
@@ -80,6 +91,36 @@ public final class RunwayStore {
                 if projects[i].defaultBranch != detected {
                     projects[i].defaultBranch = detected
                     try? db.saveProject(projects[i])
+                }
+            }
+
+            // Reconcile DB sessions with live tmux sessions
+            if tmuxAvailable {
+                let liveTmux = await tmuxManager.listSessions()
+                let liveNames = Set(liveTmux.map(\.name))
+
+                for i in sessions.indices {
+                    let expectedName = "runway-\(sessions[i].id)"
+                    if sessions[i].status != .stopped {
+                        if liveNames.contains(expectedName) {
+                            // tmux session alive — mark as idle (hooks will update when reattached)
+                            sessions[i].status = .idle
+                        } else {
+                            // tmux session gone — mark as stopped
+                            sessions[i].status = .stopped
+                        }
+                        try? db.updateSessionStatus(id: sessions[i].id, status: sessions[i].status)
+                    }
+                }
+
+                // Clean up orphaned tmux sessions (exist in tmux but not in DB)
+                // Use prefix matching so shell tabs (runway-{id}-shell1) aren't killed
+                let dbPrefixes = sessions.map { "runway-\($0.id)" }
+                for tmuxSession in liveTmux {
+                    let isOwned = dbPrefixes.contains { tmuxSession.name.hasPrefix($0) }
+                    if !isOwned {
+                        try? await tmuxManager.killSession(name: tmuxSession.name)
+                    }
                 }
             }
         } catch {
@@ -106,29 +147,56 @@ public final class RunwayStore {
                 )
                 worktreeBranch = branchName
             } catch {
-                // Worktree failed — create session at project path instead
                 print("[Runway] Worktree creation failed, using project path: \(error)")
-                statusMessage = "Worktree failed: \(error.localizedDescription)"
-                // Don't return — still create the session
+                statusMessage = .error("Worktree failed: \(error.localizedDescription)")
             }
         }
 
-        let session = Session(
+        var session = Session(
             title: request.title,
             groupID: request.projectID,
             path: sessionPath,
             tool: request.tool,
-            status: .idle,
+            status: .starting,
             worktreeBranch: worktreeBranch,
             permissionMode: request.permissionMode
         )
 
+        // Create tmux session BEFORE adding to UI — TerminalPane needs it to exist
+        // when it tries to attach
+        if tmuxAvailable {
+            let tmuxName = "runway-\(session.id)"
+            let command: String?
+            if session.tool == .claude {
+                command = ([session.tool.command] + session.permissionMode.cliFlags).joined(separator: " ")
+            } else if session.tool != .shell {
+                command = session.tool.command
+            } else {
+                command = nil
+            }
+
+            do {
+                try await tmuxManager.createSession(
+                    name: tmuxName,
+                    workDir: sessionPath,
+                    command: command,
+                    env: [
+                        "RUNWAY_SESSION_ID": session.id,
+                        "RUNWAY_TITLE": session.title,
+                    ]
+                )
+                session.status = .running
+            } catch {
+                print("[Runway] Failed to create tmux session: \(error)")
+                statusMessage = .error("tmux session failed: \(error.localizedDescription)")
+                // Fall through — session still created, TerminalPane will use direct spawn fallback
+            }
+        }
+
+        // Now add to UI — tmux session is ready for TerminalPane to attach
         sessions.append(session)
         try? database?.saveSession(session)
         selectedSessionID = session.id
-
-        // Note: The terminal is managed by Ghostty's TerminalSurfaceView in the UI.
-        // We don't need to start a PTY here — the view handles it when displayed.
     }
 
     // MARK: - Session Lifecycle
@@ -140,11 +208,65 @@ public final class RunwayStore {
         try? database?.updateSessionStatus(id: id, status: status)
     }
 
+    func restartSession(id: String) async {
+        guard let idx = sessions.firstIndex(where: { $0.id == id }) else { return }
+        let session = sessions[idx]
+
+        // Kill existing tmux session
+        let tmuxName = "runway-\(id)"
+        if tmuxAvailable {
+            try? await tmuxManager.killSession(name: tmuxName)
+        }
+
+        // Clear cached terminal view so TerminalPane creates a fresh one
+        TerminalSessionCache.shared.removeAll(forSessionID: id)
+
+        // Recreate tmux session
+        if tmuxAvailable {
+            let command: String?
+            if session.tool == .claude {
+                command = ([session.tool.command] + session.permissionMode.cliFlags).joined(separator: " ")
+            } else if session.tool != .shell {
+                command = session.tool.command
+            } else {
+                command = nil
+            }
+
+            do {
+                try await tmuxManager.createSession(
+                    name: tmuxName,
+                    workDir: session.path,
+                    command: command,
+                    env: [
+                        "RUNWAY_SESSION_ID": session.id,
+                        "RUNWAY_TITLE": session.title,
+                    ]
+                )
+                sessions[idx].status = .running
+            } catch {
+                print("[Runway] Failed to restart tmux session: \(error)")
+                sessions[idx].status = .error
+            }
+        }
+
+        try? database?.updateSessionStatus(id: id, status: sessions[idx].status)
+        // Re-select to trigger view refresh
+        selectedSessionID = nil
+        selectedSessionID = id
+    }
+
     func deleteSession(id: String) {
         sessions.removeAll { $0.id == id }
         try? database?.deleteSession(id: id)
         if selectedSessionID == id {
             selectedSessionID = sessions.first?.id
+        }
+
+        // Clean up tmux session
+        if tmuxAvailable {
+            Task {
+                try? await tmuxManager.killSession(name: "runway-\(id)")
+            }
         }
     }
 
@@ -182,6 +304,13 @@ public final class RunwayStore {
 
         do {
             try await hookServer.start()
+
+            // Inject Claude hooks with the actual port
+            if let port = await hookServer.actualPort {
+                try hookInjector.inject(port: port)
+            } else {
+                print("[Runway] Hook server started but no port available")
+            }
         } catch {
             print("[Runway] Failed to start hook server: \(error)")
         }
@@ -207,32 +336,85 @@ public final class RunwayStore {
 
     // MARK: - Pull Requests
 
+    /// Load cached PRs from database for instant display on startup.
+    func loadCachedPRs() {
+        if let cached = try? database?.cachedPRs(maxAge: 3600), !cached.isEmpty {
+            pullRequests = cached
+        }
+    }
+
     func fetchPRs(filter: PRFilter? = nil) async {
         if let filter { prFilter = filter }
         isLoadingPRs = true
         defer { isLoadingPRs = false }
 
         do {
-            var allPRs: [PullRequest] = []
+            // Search across all repos — like Hangar, shows all user's PRs globally
+            let freshPRs = try await prManager.fetchPRs(filter: prFilter)
+            prLastFetched = Date()
 
-            if projects.isEmpty {
-                // No projects — fetch for current repo context
-                allPRs = try await prManager.fetchPRs(filter: prFilter)
-            } else {
-                // Fetch PRs for each project's repo
-                for project in projects {
-                    let repo = await detectRepo(for: project)
-                    guard let repo else { continue }
-                    let prs = try await prManager.fetchPRs(repo: repo, filter: prFilter)
-                    allPRs.append(contentsOf: prs)
-                }
+            // Merge: keep enriched data from cache/previous enrichment where available
+            let existingByID = Dictionary(pullRequests.map { ($0.id, $0) }, uniquingKeysWith: { _, new in new })
+            pullRequests = freshPRs.map { fresh in
+                guard var existing = existingByID[fresh.id] else { return fresh }
+                // Update fields that search refreshes (state, title, etc.)
+                existing.title = fresh.title
+                existing.state = fresh.state
+                existing.isDraft = fresh.isDraft
+                existing.author = fresh.author
+                return existing
             }
 
-            pullRequests = allPRs
-            prLastFetched = Date()
+            // Background: enrich any PRs that don't have detail data yet
+            Task { await enrichPRs() }
         } catch {
             print("[Runway] Failed to fetch PRs: \(error)")
-            statusMessage = "PR fetch failed: \(error.localizedDescription)"
+            statusMessage = .error("PR fetch failed: \(error.localizedDescription)")
+        }
+    }
+
+    /// Background-enrich PRs with detail data (checks, reviews, branches, diff counts).
+    /// Also links PRs to sessions by matching headBranch to session worktreeBranch.
+    private func enrichPRs() async {
+        for i in pullRequests.indices {
+            let pr = pullRequests[i]
+
+            // Skip if already enriched (has checks data from cache)
+            if pr.checks.total > 0 { continue }
+
+            let host = await prManager.hostFromURL(pr.url)
+
+            guard
+                let detail = try? await prManager.fetchDetail(
+                    repo: pr.repo, number: pr.number, host: host
+                )
+            else { continue }
+
+            // Enrich the list-level PR with detail data
+            if i < pullRequests.count, pullRequests[i].id == pr.id {
+                pullRequests[i].checks = detail.checks
+                pullRequests[i].reviewDecision = detail.reviewDecision
+                if !detail.headBranch.isEmpty {
+                    pullRequests[i].headBranch = detail.headBranch
+                    pullRequests[i].baseBranch = detail.baseBranch
+                }
+                pullRequests[i].additions = detail.additions
+                pullRequests[i].deletions = detail.deletions
+                pullRequests[i].changedFiles = detail.changedFiles
+            }
+
+        }
+
+        // Cache enriched PRs to database
+        try? database?.cachePRs(pullRequests)
+        try? database?.cleanPRCache()
+
+        // Link PRs to sessions by running gh pr view in each session's worktree directory
+        // (like Hangar — gh CLI auto-detects branch from the git checkout)
+        for session in sessions where session.worktreeBranch != nil {
+            if let pr = try? await prManager.fetchPRForWorktree(path: session.path) {
+                sessionPRs[session.id] = pr
+            }
         }
     }
 
@@ -248,29 +430,32 @@ public final class RunwayStore {
         guard let pr else { return }
 
         do {
-            prDetail = try await prManager.fetchDetail(repo: pr.repo, number: pr.number)
+            let host = await prManager.hostFromURL(pr.url)
+            prDetail = try await prManager.fetchDetail(repo: pr.repo, number: pr.number, host: host)
         } catch {
             print("[Runway] Failed to fetch PR detail: \(error)")
         }
     }
 
     func approvePR(_ pr: PullRequest) async {
+        let host = await prManager.hostFromURL(pr.url)
         do {
-            try await prManager.approve(repo: pr.repo, number: pr.number)
-            statusMessage = "Approved #\(pr.number)"
+            try await prManager.approve(repo: pr.repo, number: pr.number, host: host)
+            statusMessage = .success("Approved #\(pr.number)")
             await fetchPRs()
         } catch {
-            statusMessage = "Approve failed: \(error.localizedDescription)"
+            statusMessage = .error("Approve failed: \(error.localizedDescription)")
         }
     }
 
     func commentOnPR(_ pr: PullRequest, body: String) async {
+        let host = await prManager.hostFromURL(pr.url)
         do {
-            try await prManager.comment(repo: pr.repo, number: pr.number, body: body)
+            try await prManager.comment(repo: pr.repo, number: pr.number, body: body, host: host)
             // Refresh detail to show new comment
-            prDetail = try await prManager.fetchDetail(repo: pr.repo, number: pr.number)
+            prDetail = try await prManager.fetchDetail(repo: pr.repo, number: pr.number, host: host)
         } catch {
-            statusMessage = "Comment failed: \(error.localizedDescription)"
+            statusMessage = .error("Comment failed: \(error.localizedDescription)")
         }
     }
 
@@ -301,4 +486,16 @@ public final class RunwayStore {
             return nil
         }
     }
+}
+
+// MARK: - Status Message
+
+struct StatusMessage: Equatable {
+    enum Kind { case success, info, error }
+    let text: String
+    let kind: Kind
+
+    static func success(_ text: String) -> StatusMessage { .init(text: text, kind: .success) }
+    static func info(_ text: String) -> StatusMessage { .init(text: text, kind: .info) }
+    static func error(_ text: String) -> StatusMessage { .init(text: text, kind: .error) }
 }

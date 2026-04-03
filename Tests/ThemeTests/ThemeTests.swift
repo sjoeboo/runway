@@ -65,6 +65,8 @@ import Testing
 // MARK: - ThemeManager
 
 @Test @MainActor func themeManagerDefaultsToTokyoNight() {
+    // Clear any persisted theme to test default behavior
+    UserDefaults.standard.removeObject(forKey: "runway.selectedThemeID")
     let manager = ThemeManager()
     #expect(manager.currentTheme.id == "tokyo-night-storm")
     #expect(manager.selectedThemeID == "tokyo-night-storm")

@@ -62,17 +62,37 @@ public struct PRDetailDrawer: View {
                 .font(.title3)
                 .fontWeight(.semibold)
 
+            // Repo name
+            Text(pr.repo)
+                .font(.caption)
+                .foregroundColor(theme.chrome.cyan)
+
             HStack(spacing: 12) {
                 Label(pr.author, systemImage: "person")
-                Label("\(pr.headBranch) → \(pr.baseBranch)", systemImage: "arrow.triangle.branch")
-                Label("+\(pr.additions) -\(pr.deletions)", systemImage: "doc.text")
+                let head = (detail?.headBranch).flatMap { $0.isEmpty ? nil : $0 } ?? pr.headBranch
+                let base = (detail?.baseBranch).flatMap { $0.isEmpty ? nil : $0 } ?? pr.baseBranch
+                if !head.isEmpty {
+                    Label("\(head) → \(base)", systemImage: "arrow.triangle.branch")
+                }
+                let adds = detail?.additions ?? pr.additions
+                let dels = detail?.deletions ?? pr.deletions
+                if adds > 0 || dels > 0 {
+                    Label("+\(adds) -\(dels)", systemImage: "doc.text")
+                }
             }
             .font(.caption)
             .foregroundColor(theme.chrome.textDim)
 
-            // Checks summary
-            if pr.checks.total > 0 {
-                checksBar
+            // Checks summary (from detail if available, otherwise from PR)
+            let checks = detail?.checks ?? pr.checks
+            if checks.total > 0 {
+                detailChecksBar(checks)
+            }
+
+            // Review decision (from detail if available)
+            let reviewStatus = detail?.reviewDecision ?? pr.reviewDecision
+            if reviewStatus != .none {
+                detailReviewBadge(reviewStatus)
             }
 
             // Action buttons
@@ -93,19 +113,38 @@ public struct PRDetailDrawer: View {
         .padding(12)
     }
 
-    private var checksBar: some View {
+    private func detailChecksBar(_ checks: CheckSummary) -> some View {
         HStack(spacing: 8) {
-            if pr.checks.passed > 0 {
-                Label("\(pr.checks.passed) passed", systemImage: "checkmark.circle.fill")
+            if checks.passed > 0 {
+                Label("\(checks.passed) passed", systemImage: "checkmark.circle.fill")
                     .foregroundColor(theme.chrome.green)
             }
-            if pr.checks.pending > 0 {
-                Label("\(pr.checks.pending) pending", systemImage: "clock.fill")
+            if checks.pending > 0 {
+                Label("\(checks.pending) pending", systemImage: "clock.fill")
                     .foregroundColor(theme.chrome.yellow)
             }
-            if pr.checks.failed > 0 {
-                Label("\(pr.checks.failed) failed", systemImage: "xmark.circle.fill")
+            if checks.failed > 0 {
+                Label("\(checks.failed) failed", systemImage: "xmark.circle.fill")
                     .foregroundColor(theme.chrome.red)
+            }
+        }
+        .font(.caption)
+    }
+
+    private func detailReviewBadge(_ decision: ReviewDecision) -> some View {
+        HStack(spacing: 4) {
+            switch decision {
+            case .approved:
+                Label("Approved", systemImage: "checkmark.circle.fill")
+                    .foregroundColor(theme.chrome.green)
+            case .changesRequested:
+                Label("Changes requested", systemImage: "exclamationmark.triangle.fill")
+                    .foregroundColor(theme.chrome.orange)
+            case .pending:
+                Label("Review required", systemImage: "clock")
+                    .foregroundColor(theme.chrome.yellow)
+            case .none:
+                EmptyView()
             }
         }
         .font(.caption)
@@ -168,7 +207,7 @@ public struct PRDetailDrawer: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 12) {
                 if let body = detail?.body, !body.isEmpty {
-                    Text(body)
+                    Text(stripHTML(body))
                         .font(.body)
                         .foregroundColor(theme.chrome.text)
                         .textSelection(.enabled)
@@ -191,7 +230,7 @@ public struct PRDetailDrawer: View {
                     path: file.path,
                     additions: file.additions,
                     deletions: file.deletions,
-                    lines: file.patch.map { DiffFile.parse(patch: $0).first?.lines ?? [] } ?? []
+                    lines: file.patch.map { parsePatchLines($0) } ?? []
                 )
             }
             DiffView(files: diffFiles)
@@ -202,6 +241,41 @@ public struct PRDetailDrawer: View {
                 systemImage: "doc.text"
             )
         }
+    }
+
+    /// Parse a per-file patch (from gh --json files) into DiffLines.
+    /// Unlike full unified diffs, these don't have "diff --git" or "+++ b/" headers.
+    private func parsePatchLines(_ patch: String) -> [DiffLine] {
+        var lines: [DiffLine] = []
+        var oldLine = 0
+        var newLine = 0
+
+        for rawLine in patch.components(separatedBy: "\n") {
+            if rawLine.hasPrefix("@@") {
+                let parts = rawLine.components(separatedBy: " ")
+                if parts.count >= 3 {
+                    let newPart = parts[2]
+                    let nums = newPart.dropFirst().components(separatedBy: ",")
+                    newLine = Int(nums[0]) ?? 0
+                    let oldPart = parts[1]
+                    let oldNums = oldPart.dropFirst().components(separatedBy: ",")
+                    oldLine = Int(oldNums[0]) ?? 0
+                }
+                lines.append(DiffLine(type: .hunk, content: rawLine, oldLineNo: nil, newLineNo: nil))
+            } else if rawLine.hasPrefix("+") {
+                lines.append(DiffLine(type: .addition, content: String(rawLine.dropFirst()), oldLineNo: nil, newLineNo: newLine))
+                newLine += 1
+            } else if rawLine.hasPrefix("-") {
+                lines.append(DiffLine(type: .deletion, content: String(rawLine.dropFirst()), oldLineNo: oldLine, newLineNo: nil))
+                oldLine += 1
+            } else if rawLine.hasPrefix(" ") {
+                lines.append(DiffLine(type: .context, content: String(rawLine.dropFirst()), oldLineNo: oldLine, newLineNo: newLine))
+                oldLine += 1
+                newLine += 1
+            }
+        }
+
+        return lines
     }
 
     private var conversationTab: some View {
@@ -346,6 +420,17 @@ public struct PRDetailDrawer: View {
         case .none:
             EmptyView()
         }
+    }
+
+    private func stripHTML(_ html: String) -> String {
+        // Strip HTML tags for plain text display
+        html.replacingOccurrences(of: "<[^>]+>", with: "", options: .regularExpression)
+            .replacingOccurrences(of: "&amp;", with: "&")
+            .replacingOccurrences(of: "&lt;", with: "<")
+            .replacingOccurrences(of: "&gt;", with: ">")
+            .replacingOccurrences(of: "&quot;", with: "\"")
+            .replacingOccurrences(of: "&#39;", with: "'")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
     }
 }
 

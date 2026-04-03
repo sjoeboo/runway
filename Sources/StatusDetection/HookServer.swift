@@ -7,17 +7,20 @@ import Models
 
 /// Lightweight HTTP server that receives Claude Code lifecycle hook events.
 ///
-/// Listens on port 47437 (same as Hangar) for POST requests from Claude Code.
+/// Listens for POST requests from Claude Code.
 /// Events are decoded and dispatched to registered handlers.
 public actor HookServer {
     public typealias EventHandler = @Sendable (HookEvent) -> Void
 
-    private let port: UInt16
+    private let requestedPort: UInt16
     private var listener: NWListener?
     private var handlers: [EventHandler] = []
 
-    public init(port: UInt16 = 47437) {
-        self.port = port
+    /// The actual port the server is listening on (available after `start()` returns).
+    public private(set) var actualPort: UInt16?
+
+    public init(port: UInt16 = 0) {
+        self.requestedPort = port
     }
 
     /// Register a handler for incoming hook events.
@@ -26,10 +29,19 @@ public actor HookServer {
     }
 
     /// Start listening for hook events.
-    public func start() throws {
+    ///
+    /// Uses port 0 by default (OS assigns an available ephemeral port).
+    /// After this method returns, `actualPort` contains the assigned port.
+    public func start() async throws {
         let params = NWParameters.tcp
-        guard let nwPort = NWEndpoint.Port(rawValue: port) else {
-            throw HookServerError.invalidPort(port)
+        let nwPort: NWEndpoint.Port
+        if requestedPort == 0 {
+            nwPort = .any
+        } else {
+            guard let explicit = NWEndpoint.Port(rawValue: requestedPort) else {
+                throw HookServerError.invalidPort(requestedPort)
+            }
+            nwPort = explicit
         }
         let listener = try NWListener(using: params, on: nwPort)
         self.listener = listener
@@ -38,24 +50,30 @@ public actor HookServer {
             Task { await self?.handleConnection(connection) }
         }
 
-        listener.stateUpdateHandler = { state in
-            switch state {
-            case .ready:
-                break
-            case .failed(let error):
-                print("[HookServer] Failed: \(error)")
-            default:
-                break
+        // Use a continuation to bridge NWListener's callback into async/await.
+        let resolvedPort = try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<UInt16?, Error>) in
+            listener.stateUpdateHandler = { state in
+                switch state {
+                case .ready:
+                    continuation.resume(returning: listener.port?.rawValue)
+                case .failed(let error):
+                    continuation.resume(throwing: error)
+                default:
+                    break
+                }
             }
+            listener.start(queue: DispatchQueue(label: "runway.hookserver"))
         }
 
-        listener.start(queue: DispatchQueue(label: "runway.hookserver"))
+        // Set actualPort on the actor before returning to caller — no race
+        self.actualPort = resolvedPort
     }
 
     /// Stop the hook server.
     public func stop() {
         listener?.cancel()
         listener = nil
+        actualPort = nil
     }
 
     // MARK: - Private
@@ -78,8 +96,10 @@ public actor HookServer {
         if let bodyRange = findHTTPBody(in: data),
             var event = try? JSONDecoder().decode(HookEvent.self, from: data[bodyRange])
         {
-            // Use X-Runway-Session-Id header if present (bridges Claude's session ID to Runway's)
-            if let runwayID = extractHeader(named: "X-Runway-Session-Id", from: data), !runwayID.isEmpty {
+            // Use X-Runway-Session-Id header if present
+            if let runwayID = extractHeader(named: "X-Runway-Session-Id", from: data),
+                !runwayID.isEmpty
+            {
                 event.sessionID = runwayID
             }
             for handler in handlers {
@@ -98,9 +118,13 @@ public actor HookServer {
 
     private func extractHeader(named name: String, from data: Data) -> String? {
         guard let headerEnd = data.range(of: Data("\r\n\r\n".utf8)) else { return nil }
-        guard let headerStr = String(data: data[data.startIndex..<headerEnd.lowerBound], encoding: .utf8) else { return nil }
+        guard
+            let headerStr = String(
+                data: data[data.startIndex..<headerEnd.lowerBound], encoding: .utf8)
+        else { return nil }
         let needle = name.lowercased() + ":"
-        for line in headerStr.components(separatedBy: "\r\n") where line.lowercased().hasPrefix(needle) {
+        for line in headerStr.components(separatedBy: "\r\n")
+        where line.lowercased().hasPrefix(needle) {
             return String(line.dropFirst(needle.count)).trimmingCharacters(in: .whitespaces)
         }
         return nil

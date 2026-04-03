@@ -36,6 +36,16 @@ struct RunwayApp: App {
                 Button("Pull Requests") { store.currentView = .prs }
                     .keyboardShortcut("2", modifiers: .command)
             }
+            CommandGroup(after: .newItem) {
+                Button("New Session") {
+                    store.newSessionProjectID = nil
+                    store.showNewSessionDialog = true
+                }
+                .keyboardShortcut("n", modifiers: .command)
+
+                Button("New Project") { store.showNewProjectDialog = true }
+                    .keyboardShortcut("p", modifiers: [.command, .shift])
+            }
         }
 
         Settings {
@@ -69,8 +79,12 @@ struct ContentView: View {
                     set: { store.showNewSessionDialog = $0 }
                 )
             ) {
-                NewSessionDialog(projects: store.projects) { request in
+                NewSessionDialog(
+                    projects: store.projects,
+                    initialProjectID: store.newSessionProjectID
+                ) { request in
                     Task { await store.handleNewSessionRequest(request) }
+                    store.newSessionProjectID = nil
                 }
                 .theme(theme)
             }
@@ -87,8 +101,8 @@ struct ContentView: View {
             }
 
             // Status message toast
-            if let message = store.statusMessage {
-                statusToast(message)
+            if let msg = store.statusMessage {
+                statusToast(msg)
                     .onAppear {
                         DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
                             store.statusMessage = nil
@@ -97,24 +111,52 @@ struct ContentView: View {
             }
         }
         .background(theme.chrome.background)
+        .navigationTitle(windowTitle)
         .onChange(of: colorScheme) { _, newScheme in
             store.themeManager.updateForColorScheme(newScheme)
         }
     }
 
+    private var windowTitle: String {
+        if let id = store.selectedSessionID,
+            let session = store.sessions.first(where: { $0.id == id })
+        {
+            return "Runway — \(session.title)"
+        }
+        return "Runway"
+    }
+
     // MARK: - Status Toast
 
-    private func statusToast(_ message: String) -> some View {
-        Text(message)
+    private func statusToast(_ msg: StatusMessage) -> some View {
+        HStack(spacing: 6) {
+            Image(
+                systemName: msg.kind == .success
+                    ? "checkmark.circle.fill"
+                    : msg.kind == .info
+                        ? "info.circle.fill"
+                        : "exclamationmark.triangle.fill"
+            )
             .font(.caption)
-            .foregroundColor(.white)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 6)
-            .background(theme.chrome.red.opacity(0.9))
-            .cornerRadius(6)
-            .padding(.bottom, 8)
-            .transition(.move(edge: .bottom).combined(with: .opacity))
-            .animation(.easeInOut(duration: 0.3), value: message)
+            Text(msg.text)
+                .font(.caption)
+        }
+        .foregroundColor(.white)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 6)
+        .background(toastColor(for: msg.kind).opacity(0.9))
+        .cornerRadius(6)
+        .padding(.bottom, 8)
+        .transition(.move(edge: .bottom).combined(with: .opacity))
+        .animation(.easeInOut(duration: 0.3), value: msg)
+    }
+
+    private func toastColor(for kind: StatusMessage.Kind) -> Color {
+        switch kind {
+        case .success: theme.chrome.green
+        case .info: theme.chrome.accent
+        case .error: theme.chrome.red
+        }
     }
 
     // MARK: - Sidebar
@@ -126,10 +168,18 @@ struct ContentView: View {
             ProjectTreeView(
                 projects: store.projects,
                 sessions: store.sessions,
+                sessionPRs: store.sessionPRs,
                 selectedSessionID: Binding(
                     get: { store.selectedSessionID },
                     set: { store.selectedSessionID = $0 }
-                )
+                ),
+                onRestart: { id in Task { await store.restartSession(id: id) } },
+                onDelete: { id in store.deleteSession(id: id) },
+                onNewSession: { projectID in
+                    store.newSessionProjectID = projectID
+                    store.showNewSessionDialog = true
+                },
+                onNewProject: { store.showNewProjectDialog = true }
             )
         }
         .frame(minWidth: 240)
@@ -157,7 +207,7 @@ struct ContentView: View {
             if let sessionID = store.selectedSessionID,
                 let session = store.sessions.first(where: { $0.id == sessionID })
             {
-                SessionDetailView(session: session)
+                SessionDetailView(session: session, linkedPR: store.sessionPRs[sessionID])
             } else {
                 EmptyStateView(
                     title: "No Session Selected",
@@ -191,18 +241,10 @@ struct ContentView: View {
 
     @ToolbarContentBuilder
     private var toolbarContent: some ToolbarContent {
+        // Toolbar buttons removed — inline sidebar controls replace them.
+        // Keyboard shortcuts are preserved via the Commands block in RunwayApp.
         ToolbarItem(placement: .primaryAction) {
-            HStack(spacing: 8) {
-                Button(action: { store.showNewProjectDialog = true }) {
-                    Label("New Project", systemImage: "folder.badge.plus")
-                }
-                .keyboardShortcut("p", modifiers: [.command, .shift])
-
-                Button(action: { store.showNewSessionDialog = true }) {
-                    Label("New Session", systemImage: "plus")
-                }
-                .keyboardShortcut("n", modifiers: .command)
-            }
+            EmptyView()
         }
     }
 }

@@ -106,6 +106,45 @@ public final class Database: Sendable {
             }
         }
 
+        // Fix: sessions.groupID referenced "groups" table but code stores project IDs.
+        // GRDB enforces FK constraints by default, so saveSession() silently failed
+        // for any session assigned to a project. Recreate without the FK constraint.
+        migrator.registerMigration("v3_fix_session_groupid_fk") { db in
+            try db.create(table: "sessions_new") { t in
+                t.primaryKey("id", .text)
+                t.column("title", .text).notNull()
+                t.column("groupID", .text)  // No FK — stores project ID directly
+                t.column("path", .text).notNull()
+                t.column("tool", .text).notNull().defaults(to: "claude")
+                t.column("status", .text).notNull().defaults(to: "starting")
+                t.column("worktreeBranch", .text)
+                t.column("parentID", .text)
+                t.column("command", .text)
+                t.column("permissionMode", .text).notNull().defaults(to: "default")
+                t.column("createdAt", .datetime).notNull()
+                t.column("lastAccessedAt", .datetime).notNull()
+            }
+
+            try db.execute(
+                sql: """
+                    INSERT INTO sessions_new
+                    SELECT id, title, groupID, path, tool, status, worktreeBranch,
+                           parentID, command, permissionMode, createdAt, lastAccessedAt
+                    FROM sessions
+                    """)
+
+            try db.drop(table: "sessions")
+            try db.rename(table: "sessions_new", to: "sessions")
+        }
+
+        migrator.registerMigration("v4_pr_cache") { db in
+            try db.create(table: "pr_cache") { t in
+                t.primaryKey("id", .text)  // "owner/repo#number"
+                t.column("json", .text).notNull()  // Full PullRequest as JSON
+                t.column("fetchedAt", .datetime).notNull()
+            }
+        }
+
         try migrator.migrate(dbQueue)
     }
 
@@ -171,6 +210,60 @@ public final class Database: Sendable {
     public func deleteProject(id: String) throws {
         try dbQueue.write { db in
             _ = try ProjectRecord.deleteOne(db, key: id)
+        }
+    }
+
+    // MARK: - PR Cache
+
+    /// Load all cached PRs that haven't expired.
+    public func cachedPRs(maxAge: TimeInterval = 300) throws -> [PullRequest] {
+        let cutoff = Date().addingTimeInterval(-maxAge)
+        return try dbQueue.read { db in
+            let rows = try Row.fetchAll(
+                db,
+                sql: "SELECT json FROM pr_cache WHERE fetchedAt > ?",
+                arguments: [cutoff]
+            )
+            return rows.compactMap { row -> PullRequest? in
+                guard let jsonStr = row["json"] as? String,
+                    let data = jsonStr.data(using: .utf8)
+                else { return nil }
+                return try? JSONDecoder().decode(PullRequest.self, from: data)
+            }
+        }
+    }
+
+    /// Save or update a PR in the cache.
+    public func cachePR(_ pr: PullRequest) throws {
+        let data = try JSONEncoder().encode(pr)
+        let json = String(data: data, encoding: .utf8) ?? ""
+        try dbQueue.write { db in
+            try db.execute(
+                sql: "INSERT OR REPLACE INTO pr_cache (id, json, fetchedAt) VALUES (?, ?, ?)",
+                arguments: [pr.id, json, Date()]
+            )
+        }
+    }
+
+    /// Save multiple PRs to the cache.
+    public func cachePRs(_ prs: [PullRequest]) throws {
+        try dbQueue.write { db in
+            for pr in prs {
+                let data = try JSONEncoder().encode(pr)
+                let json = String(data: data, encoding: .utf8) ?? ""
+                try db.execute(
+                    sql: "INSERT OR REPLACE INTO pr_cache (id, json, fetchedAt) VALUES (?, ?, ?)",
+                    arguments: [pr.id, json, Date()]
+                )
+            }
+        }
+    }
+
+    /// Clear expired PR cache entries.
+    public func cleanPRCache(maxAge: TimeInterval = 3600) throws {
+        let cutoff = Date().addingTimeInterval(-maxAge)
+        try dbQueue.write { db in
+            try db.execute(sql: "DELETE FROM pr_cache WHERE fetchedAt < ?", arguments: [cutoff])
         }
     }
 

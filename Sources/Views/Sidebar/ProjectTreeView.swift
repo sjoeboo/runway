@@ -6,29 +6,45 @@ import Theme
 public struct ProjectTreeView: View {
     let projects: [Project]
     let sessions: [Session]
+    let sessionPRs: [String: PullRequest]
     @Binding var selectedSessionID: String?
+    var onRestart: ((String) -> Void)?
+    var onDelete: ((String) -> Void)?
+    var onNewSession: ((String?) -> Void)?
+    var onNewProject: (() -> Void)?
     @Environment(\.theme) private var theme
 
     public init(
         projects: [Project],
         sessions: [Session],
-        selectedSessionID: Binding<String?>
+        sessionPRs: [String: PullRequest] = [:],
+        selectedSessionID: Binding<String?>,
+        onRestart: ((String) -> Void)? = nil,
+        onDelete: ((String) -> Void)? = nil,
+        onNewSession: ((String?) -> Void)? = nil,
+        onNewProject: (() -> Void)? = nil
     ) {
         self.projects = projects
         self.sessions = sessions
+        self.sessionPRs = sessionPRs
         self._selectedSessionID = selectedSessionID
+        self.onRestart = onRestart
+        self.onDelete = onDelete
+        self.onNewSession = onNewSession
+        self.onNewProject = onNewProject
     }
 
     public var body: some View {
         List(selection: $selectedSessionID) {
             ForEach(projects) { project in
-                Section(project.name) {
-                    let projectSessions = sessions.filter { $0.groupID == project.id }
-                    ForEach(projectSessions) { session in
-                        SessionRowView(session: session)
-                            .tag(session.id)
-                    }
-                }
+                ProjectSection(
+                    project: project,
+                    sessions: sessions.filter { $0.groupID == project.id },
+                    sessionPRs: sessionPRs,
+                    onRestart: onRestart,
+                    onDelete: onDelete,
+                    onNewSession: { onNewSession?(project.id) }
+                )
             }
 
             // Ungrouped sessions
@@ -36,19 +52,110 @@ public struct ProjectTreeView: View {
             if !ungrouped.isEmpty {
                 Section("Sessions") {
                     ForEach(ungrouped) { session in
-                        SessionRowView(session: session)
-                            .tag(session.id)
+                        SessionRowView(
+                            session: session,
+                            linkedPR: sessionPRs[session.id],
+                            onRestart: onRestart,
+                            onDelete: onDelete
+                        )
+                        .tag(session.id)
                     }
                 }
+            }
+
+            // Add project button
+            Section {
+                Button {
+                    onNewProject?()
+                } label: {
+                    Label("Add Project", systemImage: "folder.badge.plus")
+                        .font(.system(.body))
+                        .foregroundColor(theme.chrome.textDim)
+                }
+                .buttonStyle(.plain)
             }
         }
         .listStyle(.sidebar)
     }
 }
 
-/// A single session row in the sidebar.
+// MARK: - Project Section (collapsible with inline "+")
+
+struct ProjectSection: View {
+    let project: Project
+    let sessions: [Session]
+    let sessionPRs: [String: PullRequest]
+    var onRestart: ((String) -> Void)?
+    var onDelete: ((String) -> Void)?
+    var onNewSession: (() -> Void)?
+    @AppStorage private var isExpanded: Bool
+    @State private var isHeaderHovered = false
+    @Environment(\.theme) private var theme
+
+    init(
+        project: Project,
+        sessions: [Session],
+        sessionPRs: [String: PullRequest],
+        onRestart: ((String) -> Void)?,
+        onDelete: ((String) -> Void)?,
+        onNewSession: (() -> Void)?
+    ) {
+        self.project = project
+        self.sessions = sessions
+        self.sessionPRs = sessionPRs
+        self.onRestart = onRestart
+        self.onDelete = onDelete
+        self.onNewSession = onNewSession
+        self._isExpanded = AppStorage(wrappedValue: true, "project.expanded.\(project.id)")
+    }
+
+    var body: some View {
+        DisclosureGroup(isExpanded: $isExpanded) {
+            ForEach(sessions) { session in
+                SessionRowView(
+                    session: session,
+                    linkedPR: sessionPRs[session.id],
+                    onRestart: onRestart,
+                    onDelete: onDelete
+                )
+                .tag(session.id)
+            }
+        } label: {
+            HStack(spacing: 4) {
+                Text(project.name)
+                    .font(.system(.title3, weight: .semibold))
+                    .foregroundColor(theme.chrome.text)
+                Spacer()
+
+                if isHeaderHovered {
+                    Button {
+                        onNewSession?()
+                    } label: {
+                        Image(systemName: "plus")
+                            .font(.system(size: 12))
+                            .foregroundColor(theme.chrome.textDim)
+                            .frame(width: 22, height: 22)
+                    }
+                    .buttonStyle(.plain)
+                    .help("New session in \(project.name)")
+                }
+            }
+            .onHover { hovering in
+                isHeaderHovered = hovering
+            }
+        }
+    }
+}
+
+// MARK: - Session Row
+
+/// A single session row in the sidebar with hover-revealed action buttons.
 struct SessionRowView: View {
     let session: Session
+    var linkedPR: PullRequest?
+    var onRestart: ((String) -> Void)?
+    var onDelete: ((String) -> Void)?
+    @State private var isHovered = false
     @Environment(\.theme) private var theme
 
     var body: some View {
@@ -63,9 +170,69 @@ struct SessionRowView: View {
                         .font(.caption)
                         .foregroundColor(theme.chrome.textDim)
                 }
+                // Linked PR info
+                if let pr = linkedPR {
+                    HStack(spacing: 4) {
+                        Text("#\(pr.number)")
+                            .font(.caption2)
+                            .foregroundColor(theme.chrome.accent)
+                        if pr.checks.total > 0 {
+                            if pr.checks.allPassed {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .font(.system(size: 8))
+                                    .foregroundColor(theme.chrome.green)
+                            } else if pr.checks.hasFailed {
+                                Image(systemName: "xmark.circle.fill")
+                                    .font(.system(size: 8))
+                                    .foregroundColor(theme.chrome.red)
+                            } else {
+                                Image(systemName: "clock.fill")
+                                    .font(.system(size: 8))
+                                    .foregroundColor(theme.chrome.yellow)
+                            }
+                            Text("\(pr.checks.passed)/\(pr.checks.total)")
+                                .font(.caption2)
+                                .foregroundColor(theme.chrome.textDim)
+                        }
+                        if pr.reviewDecision == .approved {
+                            Image(systemName: "checkmark")
+                                .font(.system(size: 8))
+                                .foregroundColor(theme.chrome.green)
+                        } else if pr.reviewDecision == .changesRequested {
+                            Image(systemName: "exclamationmark.triangle")
+                                .font(.system(size: 8))
+                                .foregroundColor(theme.chrome.orange)
+                        }
+                    }
+                }
             }
             Spacer()
-            if session.tool != .claude {
+
+            if isHovered {
+                HStack(spacing: 2) {
+                    Button {
+                        onRestart?(session.id)
+                    } label: {
+                        Image(systemName: "arrow.counterclockwise")
+                            .font(.system(size: 11))
+                            .foregroundColor(theme.chrome.textDim)
+                            .frame(width: 22, height: 22)
+                    }
+                    .buttonStyle(.plain)
+                    .help("Restart session")
+
+                    Button {
+                        onDelete?(session.id)
+                    } label: {
+                        Image(systemName: "trash")
+                            .font(.system(size: 11))
+                            .foregroundColor(theme.chrome.textDim)
+                            .frame(width: 22, height: 22)
+                    }
+                    .buttonStyle(.plain)
+                    .help("Delete session")
+                }
+            } else if session.tool != .claude {
                 Text(session.tool.displayName)
                     .font(.caption2)
                     .padding(.horizontal, 4)
@@ -75,6 +242,24 @@ struct SessionRowView: View {
             }
         }
         .padding(.vertical, 2)
+        .onHover { hovering in
+            isHovered = hovering
+        }
+        .contextMenu {
+            Button {
+                onRestart?(session.id)
+            } label: {
+                Label("Restart Session", systemImage: "arrow.counterclockwise")
+            }
+
+            Divider()
+
+            Button(role: .destructive) {
+                onDelete?(session.id)
+            } label: {
+                Label("Delete Session", systemImage: "trash")
+            }
+        }
     }
 
     @ViewBuilder

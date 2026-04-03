@@ -101,17 +101,38 @@ public struct PRDetail: Codable, Sendable {
     public var reviews: [PRReview]
     public var comments: [PRComment]
     public var files: [PRFileChange]
+    public var checks: CheckSummary
+    public var reviewDecision: ReviewDecision
+    public var headBranch: String
+    public var baseBranch: String
+    public var additions: Int
+    public var deletions: Int
+    public var changedFiles: Int
 
     public init(
         body: String = "",
         reviews: [PRReview] = [],
         comments: [PRComment] = [],
-        files: [PRFileChange] = []
+        files: [PRFileChange] = [],
+        checks: CheckSummary = CheckSummary(),
+        reviewDecision: ReviewDecision = .none,
+        headBranch: String = "",
+        baseBranch: String = "",
+        additions: Int = 0,
+        deletions: Int = 0,
+        changedFiles: Int = 0
     ) {
         self.body = body
         self.reviews = reviews
         self.comments = comments
         self.files = files
+        self.checks = checks
+        self.reviewDecision = reviewDecision
+        self.headBranch = headBranch
+        self.baseBranch = baseBranch
+        self.additions = additions
+        self.deletions = deletions
+        self.changedFiles = changedFiles
     }
 }
 

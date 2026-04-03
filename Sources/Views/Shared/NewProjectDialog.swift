@@ -1,3 +1,4 @@
+import GitOperations
 import Models
 import SwiftUI
 import Theme
@@ -11,6 +12,8 @@ public struct NewProjectDialog: View {
     @State private var path: String = ""
     @State private var defaultBranch: String = "main"
     @State private var validationError: String?
+    @State private var isDetectingBranch: Bool = false
+    @State private var pathDebounceTask: Task<Void, Never>?
 
     let onCreate: (String, String, String) -> Void
 
@@ -27,7 +30,14 @@ public struct NewProjectDialog: View {
             VStack(alignment: .leading, spacing: 12) {
                 field("Name", text: $name, placeholder: "my-project")
                 pathField
-                field("Default Branch", text: $defaultBranch, placeholder: "main")
+                HStack {
+                    field("Default Branch", text: $defaultBranch, placeholder: "main")
+                    if isDetectingBranch {
+                        ProgressView()
+                            .controlSize(.small)
+                            .padding(.top, 16)
+                    }
+                }
             }
 
             if let error = validationError {
@@ -47,6 +57,9 @@ public struct NewProjectDialog: View {
         }
         .padding(24)
         .frame(width: 420)
+        .onChange(of: path) { _, newPath in
+            detectBranch(at: newPath)
+        }
     }
 
     private var pathField: some View {
@@ -83,6 +96,31 @@ public struct NewProjectDialog: View {
             path = url.path
             if name.isEmpty {
                 name = url.lastPathComponent
+            }
+        }
+    }
+
+    private func detectBranch(at repoPath: String) {
+        // Cancel any pending detection
+        pathDebounceTask?.cancel()
+
+        let expanded = (repoPath as NSString).expandingTildeInPath
+
+        // Quick validation — must be a git repo
+        guard FileManager.default.fileExists(atPath: "\(expanded)/.git") else {
+            return
+        }
+
+        pathDebounceTask = Task {
+            isDetectingBranch = true
+            defer { isDetectingBranch = false }
+
+            let wm = WorktreeManager()
+            let detected = await wm.detectDefaultBranch(repoPath: expanded)
+
+            // Only update if task wasn't cancelled (user may have typed more)
+            if !Task.isCancelled {
+                defaultBranch = detected
             }
         }
     }

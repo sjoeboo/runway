@@ -68,27 +68,35 @@ public struct TerminalPane: NSViewRepresentable {
         // Colors
         applyTheme(terminal)
 
-        // Start process
-        let shell = ProcessInfo.processInfo.environment["SHELL"] ?? "/bin/zsh"
         let env = buildEnvironment()
 
-        terminal.startProcess(
-            executable: shell,
-            args: [],
-            environment: env,
-            execName: nil
-        )
+        if let tmuxName = config.tmuxSessionName {
+            // Attach to existing tmux session — tmux owns the process lifecycle
+            terminal.startProcess(
+                executable: "/usr/bin/env",
+                args: ["tmux", "attach-session", "-t", tmuxName],
+                environment: env,
+                execName: nil
+            )
+        } else {
+            // Fallback: direct spawn (no tmux, no persistence)
+            let shell = ProcessInfo.processInfo.environment["SHELL"] ?? "/bin/zsh"
+            terminal.startProcess(
+                executable: shell,
+                args: [],
+                environment: env,
+                execName: nil
+            )
 
-        // cd + optionally run command
-        if let cwd = config.workingDirectory {
-            if config.command != "/bin/zsh" && config.command != "/bin/bash"
-                && config.command != shell
-            {
-                // Build full command with arguments (e.g. "claude --dangerously-skip-permissions")
-                let fullCommand = ([config.command] + config.arguments).joined(separator: " ")
-                terminal.send(txt: "cd \(shellEscape(cwd)) && \(fullCommand)\r")
-            } else {
-                terminal.send(txt: "cd \(shellEscape(cwd)) && clear\r")
+            if let cwd = config.workingDirectory {
+                if config.command != "/bin/zsh" && config.command != "/bin/bash"
+                    && config.command != shell
+                {
+                    let fullCommand = ([config.command] + config.arguments).joined(separator: " ")
+                    terminal.send(txt: "cd \(shellEscape(cwd)) && \(fullCommand)\r")
+                } else {
+                    terminal.send(txt: "cd \(shellEscape(cwd)) && clear\r")
+                }
             }
         }
 
@@ -178,6 +186,7 @@ public struct TerminalConfig: Sendable {
     public let environment: [String: String]
     public let fontFamily: String?
     public let fontSize: Float?
+    public let tmuxSessionName: String?
 
     public init(
         command: String = "/bin/zsh",
@@ -185,7 +194,8 @@ public struct TerminalConfig: Sendable {
         workingDirectory: String? = nil,
         environment: [String: String] = [:],
         fontFamily: String? = nil,
-        fontSize: Float? = nil
+        fontSize: Float? = nil,
+        tmuxSessionName: String? = nil
     ) {
         self.command = command
         self.arguments = arguments
@@ -193,5 +203,6 @@ public struct TerminalConfig: Sendable {
         self.environment = environment
         self.fontFamily = fontFamily
         self.fontSize = fontSize
+        self.tmuxSessionName = tmuxSessionName
     }
 }

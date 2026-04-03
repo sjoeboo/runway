@@ -9,20 +9,55 @@ public actor PRManager {
     public init() {}
 
     /// Fetch PRs for a given category.
+    ///
+    /// When `repo` is nil, uses `gh search prs` across all authenticated hosts.
+    /// When `repo` is provided, uses `gh pr list` scoped to that repo.
     public func fetchPRs(repo: String? = nil, filter: PRFilter = .mine) async throws -> [PullRequest] {
-        let args = buildListArgs(repo: repo, filter: filter)
-        let output = try await runGH(args: args)
-        return try parsePRList(output)
+        if let repo {
+            let args = buildListArgs(repo: repo, filter: filter)
+            let output = try await runGH(args: args)
+            return try parsePRList(output)
+        } else {
+            // Search all authenticated GitHub hosts
+            let hosts = await discoverHosts()
+            var allPRs: [PullRequest] = []
+
+            for host in hosts {
+                let args = buildSearchArgs(filter: filter)
+                if let output = try? await runGH(args: args, host: host) {
+                    let prs = (try? parseSearchResults(output)) ?? []
+                    allPRs.append(contentsOf: prs)
+                }
+            }
+
+            return allPRs
+        }
+    }
+
+    /// Discover all hosts the user is authenticated with via `gh auth status`.
+    private func discoverHosts() async -> [String] {
+        guard let output = try? await runGH(args: ["auth", "status"]) else {
+            return ["github.com"]
+        }
+        return parseHosts(from: output)
     }
 
     /// Fetch detailed PR information.
-    public func fetchDetail(repo: String, number: Int) async throws -> PRDetail {
-        let output = try await runGH(args: [
-            "pr", "view", "\(number)",
-            "--repo", repo,
-            "--json", "body,reviews,comments,files",
-        ])
+    public func fetchDetail(repo: String, number: Int, host: String? = nil) async throws -> PRDetail {
+        let output = try await runGH(
+            args: [
+                "pr", "view", "\(number)",
+                "--repo", repo,
+                "--json",
+                "body,reviews,comments,files,statusCheckRollup,reviewDecision,headRefName,baseRefName,additions,deletions,changedFiles",
+            ], host: host)
         return try parsePRDetail(output)
+    }
+
+    /// Extract the GitHub host from a PR URL (e.g., "https://ghe.spotify.net/..." → "ghe.spotify.net").
+    public func hostFromURL(_ url: String) -> String? {
+        guard let parsed = URL(string: url), let host = parsed.host else { return nil }
+        return host == "github.com" ? nil : host  // nil means default (github.com)
     }
 
     /// Fetch PR for a specific worktree directory (by current branch).
@@ -39,17 +74,17 @@ public actor PRManager {
     }
 
     /// Approve a PR.
-    public func approve(repo: String, number: Int, body: String? = nil) async throws {
+    public func approve(repo: String, number: Int, body: String? = nil, host: String? = nil) async throws {
         var args = ["pr", "review", "\(number)", "--repo", repo, "--approve"]
         if let body {
             args += ["--body", body]
         }
-        try await runGH(args: args)
+        try await runGH(args: args, host: host)
     }
 
     /// Add a comment to a PR.
-    public func comment(repo: String, number: Int, body: String) async throws {
-        try await runGH(args: ["pr", "comment", "\(number)", "--repo", repo, "--body", body])
+    public func comment(repo: String, number: Int, body: String, host: String? = nil) async throws {
+        try await runGH(args: ["pr", "comment", "\(number)", "--repo", repo, "--body", body], host: host)
     }
 
     /// Open PR in browser.
@@ -60,12 +95,15 @@ public actor PRManager {
     // MARK: - Private
 
     @discardableResult
-    private func runGH(args: [String], cwd: String? = nil) async throws -> String {
+    private func runGH(args: [String], cwd: String? = nil, host: String? = nil) async throws -> String {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
-        // Clear GH_HOST to avoid conflicts with enterprise instances
         var env = ProcessInfo.processInfo.environment
-        env.removeValue(forKey: "GH_HOST")
+        if let host {
+            env["GH_HOST"] = host
+        } else {
+            env.removeValue(forKey: "GH_HOST")
+        }
         process.environment = env
         process.arguments = ["gh"] + args
         if let cwd {
@@ -92,15 +130,47 @@ public actor PRManager {
         return output
     }
 
-    private func buildListArgs(repo: String?, filter: PRFilter) -> [String] {
+    private func parseHosts(from output: String) -> [String] {
+        // Parse "Logged in to <host>" lines from gh auth status output
+        var hosts: [String] = []
+        for line in output.components(separatedBy: "\n") {
+            if let range = line.range(of: "Logged in to ") {
+                let rest = line[range.upperBound...]
+                if let spaceIdx = rest.firstIndex(of: " ") {
+                    hosts.append(String(rest[..<spaceIdx]))
+                }
+            }
+        }
+        return hosts.isEmpty ? ["github.com"] : hosts
+    }
+
+    private func buildSearchArgs(filter: PRFilter) -> [String] {
+        var args = [
+            "search", "prs",
+            "--state", "open",
+            "--archived=false",
+            "--json", "number,title,state,repository,url,isDraft,createdAt,updatedAt,author",
+            "--limit", "50",
+        ]
+
+        switch filter {
+        case .mine:
+            args += ["--author", "@me"]
+        case .reviewRequested:
+            args += ["--review-requested", "@me"]
+        case .all:
+            args += ["--author", "@me"]
+        }
+
+        return args
+    }
+
+    private func buildListArgs(repo: String, filter: PRFilter) -> [String] {
         var args = [
             "pr", "list", "--json",
             "number,title,state,headRefName,baseRefName,author,url,isDraft,additions,deletions,changedFiles,createdAt,updatedAt,reviewDecision",
+            "--repo", repo,
         ]
-
-        if let repo {
-            args += ["--repo", repo]
-        }
 
         switch filter {
         case .mine:
@@ -113,6 +183,12 @@ public actor PRManager {
 
         args += ["--limit", "50"]
         return args
+    }
+
+    private func parseSearchResults(_ json: String) throws -> [PullRequest] {
+        guard let data = json.data(using: .utf8) else { return [] }
+        let items = try JSONDecoder.gh.decode([GHSearchPRItem].self, from: data)
+        return items.map { $0.toPullRequest() }
     }
 
     private func parsePRList(_ json: String) throws -> [PullRequest] {
@@ -225,6 +301,58 @@ private struct GHPRItem: Decodable {
     }
 }
 
+// MARK: - GH Search JSON Models
+
+private struct GHSearchPRItem: Decodable {
+    let number: Int
+    let title: String
+    let state: String
+    let repository: GHRepository
+    let url: String?
+    let isDraft: Bool?
+    let createdAt: String?
+    let updatedAt: String?
+    let author: GHSearchAuthor?
+
+    func toPullRequest() -> PullRequest {
+        let prState: PRState
+        if isDraft == true {
+            prState = .draft
+        } else {
+            switch state.lowercased() {
+            case "merged": prState = .merged
+            case "closed": prState = .closed
+            default: prState = .open
+            }
+        }
+
+        return PullRequest(
+            number: number,
+            title: title,
+            state: prState,
+            headBranch: "",
+            baseBranch: "",
+            author: author?.login ?? "",
+            repo: repository.nameWithOwner,
+            url: url ?? "",
+            isDraft: isDraft ?? false,
+            reviewDecision: .none,
+            additions: 0,
+            deletions: 0,
+            changedFiles: 0
+        )
+    }
+}
+
+private struct GHRepository: Decodable {
+    let name: String
+    let nameWithOwner: String
+}
+
+private struct GHSearchAuthor: Decodable {
+    let login: String
+}
+
 private struct GHAuthor: Decodable {
     let login: String
 }
@@ -234,34 +362,131 @@ private struct GHPRDetailResponse: Decodable {
     let reviews: [GHReview]?
     let comments: [GHComment]?
     let files: [GHFile]?
+    let statusCheckRollup: [GHCheck]?
+    let reviewDecision: String?
+    let headRefName: String?
+    let baseRefName: String?
+    let additions: Int?
+    let deletions: Int?
+    let changedFiles: Int?
 
     func toPRDetail() -> PRDetail {
-        PRDetail(
+        let checks = parseChecks(statusCheckRollup ?? [])
+
+        let review: ReviewDecision
+        switch reviewDecision?.uppercased() {
+        case "APPROVED": review = .approved
+        case "CHANGES_REQUESTED": review = .changesRequested
+        case "REVIEW_REQUIRED": review = .pending
+        default: review = .none
+        }
+
+        let mappedReviews: [PRReview] = (reviews ?? []).map { r in
+            PRReview(id: r.id ?? "0", author: r.author?.login ?? "", state: r.state ?? "", body: r.body ?? "")
+        }
+        let mappedComments: [PRComment] = (comments ?? []).map { comment in
+            PRComment(id: comment.id ?? "0", author: comment.author?.login ?? "", body: comment.body ?? "")
+        }
+        let mappedFiles: [PRFileChange] = (files ?? []).map { file in
+            PRFileChange(path: file.path ?? "", additions: file.additions ?? 0, deletions: file.deletions ?? 0, patch: file.patch)
+        }
+
+        return PRDetail(
             body: body ?? "",
-            reviews: (reviews ?? []).map {
-                PRReview(id: "\($0.id ?? 0)", author: $0.author?.login ?? "", state: $0.state ?? "")
-            },
-            comments: (comments ?? []).map {
-                PRComment(id: "\($0.id ?? 0)", author: $0.author?.login ?? "", body: $0.body ?? "")
-            },
-            files: (files ?? []).map {
-                PRFileChange(path: $0.path ?? "", additions: $0.additions ?? 0, deletions: $0.deletions ?? 0, patch: $0.patch)
-            }
+            reviews: mappedReviews,
+            comments: mappedComments,
+            files: mappedFiles,
+            checks: checks,
+            reviewDecision: review,
+            headBranch: headRefName ?? "",
+            baseBranch: baseRefName ?? "",
+            additions: additions ?? 0,
+            deletions: deletions ?? 0,
+            changedFiles: changedFiles ?? 0
         )
+    }
+
+    private func parseChecks(_ checks: [GHCheck]) -> CheckSummary {
+        var passed = 0
+        var failed = 0
+        var pending = 0
+        for check in checks {
+            let status = check.status?.uppercased() ?? ""
+            let conclusion = check.conclusion?.uppercased() ?? ""
+            let state = check.state?.uppercased() ?? ""
+
+            if status == "COMPLETED" {
+                if conclusion == "SUCCESS" || conclusion == "NEUTRAL" || conclusion == "SKIPPED" {
+                    passed += 1
+                } else if conclusion == "FAILURE" || conclusion == "TIMED_OUT" || conclusion == "CANCELLED" {
+                    failed += 1
+                } else {
+                    pending += 1
+                }
+            } else if state == "SUCCESS" {
+                passed += 1
+            } else if state == "FAILURE" || state == "ERROR" {
+                failed += 1
+            } else {
+                pending += 1
+            }
+        }
+        return CheckSummary(passed: passed, failed: failed, pending: pending)
     }
 }
 
+private struct GHCheck: Decodable {
+    let name: String?
+    let status: String?
+    let conclusion: String?
+    let state: String?  // For StatusContext type checks
+}
+
 private struct GHReview: Decodable {
-    let id: Int?
     let author: GHAuthor?
     let state: String?
     let body: String?
+
+    // id can be Int (github.com) or String (GHE) — decode flexibly
+    let id: String?
+
+    enum CodingKeys: String, CodingKey {
+        case id, author, state, body
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        author = try container.decodeIfPresent(GHAuthor.self, forKey: .author)
+        state = try container.decodeIfPresent(String.self, forKey: .state)
+        body = try container.decodeIfPresent(String.self, forKey: .body)
+        if let intID = try? container.decodeIfPresent(Int.self, forKey: .id) {
+            id = "\(intID)"
+        } else {
+            id = try container.decodeIfPresent(String.self, forKey: .id)
+        }
+    }
 }
 
 private struct GHComment: Decodable {
-    let id: Int?
     let author: GHAuthor?
     let body: String?
+
+    let id: String?
+
+    enum CodingKeys: String, CodingKey {
+        case id, author, body
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        author = try container.decodeIfPresent(GHAuthor.self, forKey: .author)
+        body = try container.decodeIfPresent(String.self, forKey: .body)
+        if let intID = try? container.decodeIfPresent(Int.self, forKey: .id) {
+            id = "\(intID)"
+        } else {
+            id = try container.decodeIfPresent(String.self, forKey: .id)
+        }
+    }
 }
 
 private struct GHFile: Decodable {

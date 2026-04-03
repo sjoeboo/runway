@@ -5,10 +5,12 @@ import Theme
 /// Main content area showing the selected session's terminal and status.
 public struct SessionDetailView: View {
     let session: Session
+    var linkedPR: PullRequest?
     @Environment(\.theme) private var theme
 
-    public init(session: Session) {
+    public init(session: Session, linkedPR: PullRequest? = nil) {
         self.session = session
+        self.linkedPR = linkedPR
     }
 
     public var body: some View {
@@ -43,6 +45,45 @@ public struct SessionDetailView: View {
                         .font(.caption)
                 }
                 .foregroundColor(theme.chrome.textDim)
+            }
+
+            // Linked PR info
+            if let pr = linkedPR {
+                Divider().frame(height: 12)
+                HStack(spacing: 4) {
+                    Text("PR #\(pr.number)")
+                        .font(.caption)
+                        .foregroundColor(theme.chrome.accent)
+                    if pr.checks.total > 0 {
+                        if pr.checks.allPassed {
+                            Image(systemName: "checkmark.circle.fill")
+                                .foregroundColor(theme.chrome.green)
+                        } else if pr.checks.hasFailed {
+                            Image(systemName: "xmark.circle.fill")
+                                .foregroundColor(theme.chrome.red)
+                        } else {
+                            Image(systemName: "clock.fill")
+                                .foregroundColor(theme.chrome.yellow)
+                        }
+                        Text("\(pr.checks.passed)/\(pr.checks.total)")
+                            .foregroundColor(theme.chrome.textDim)
+                    }
+                    if pr.reviewDecision == .approved {
+                        Text("Approved")
+                            .foregroundColor(theme.chrome.green)
+                    } else if pr.reviewDecision == .changesRequested {
+                        Text("Changes")
+                            .foregroundColor(theme.chrome.orange)
+                    } else if pr.reviewDecision == .pending {
+                        Text("Review needed")
+                            .foregroundColor(theme.chrome.yellow)
+                    }
+                    if pr.additions > 0 || pr.deletions > 0 {
+                        Text("+\(pr.additions) -\(pr.deletions)")
+                            .foregroundColor(theme.chrome.textDim)
+                    }
+                }
+                .font(.caption)
             }
 
             Spacer()

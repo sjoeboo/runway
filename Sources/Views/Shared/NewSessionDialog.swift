@@ -17,11 +17,18 @@ public struct NewSessionDialog: View {
     @State private var validationError: String?
 
     let projects: [Project]
+    let initialProjectID: String?
     let onCreate: (NewSessionRequest) -> Void
 
-    public init(projects: [Project], onCreate: @escaping (NewSessionRequest) -> Void) {
+    public init(
+        projects: [Project],
+        initialProjectID: String? = nil,
+        onCreate: @escaping (NewSessionRequest) -> Void
+    ) {
         self.projects = projects
+        self.initialProjectID = initialProjectID
         self.onCreate = onCreate
+        self._selectedProjectID = State(initialValue: initialProjectID)
     }
 
     public var body: some View {

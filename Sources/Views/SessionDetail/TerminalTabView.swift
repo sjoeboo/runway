@@ -1,5 +1,6 @@
 import Models
 import SwiftUI
+import Terminal
 import TerminalView
 import Theme
 
@@ -33,10 +34,8 @@ public struct TerminalTabView: View {
 
     public var body: some View {
         VStack(spacing: 0) {
-            if tabs.count > 1 {
-                tabBar
-                Divider()
-            }
+            tabBar
+            Divider()
 
             // Terminal for selected tab
             if let tab = selectedTab {
@@ -116,6 +115,7 @@ public struct TerminalTabView: View {
         guard tabs.isEmpty else { return }
 
         let mainTabID = "\(session.id)_main"
+        let tmuxName = "runway-\(session.id)"
 
         // For Claude sessions, build the command with permission flags
         let command: String
@@ -140,37 +140,94 @@ public struct TerminalTabView: View {
                     "RUNWAY_TITLE": session.title,
                 ],
                 fontFamily: fontFamily,
-                fontSize: Float(fontSize)
+                fontSize: Float(fontSize),
+                tmuxSessionName: tmuxName
             ),
             isMain: true
         )
 
         tabs = [mainTab]
         selectedTabID = mainTab.id
+
+        // Discover surviving shell tmux sessions from a previous app launch
+        Task {
+            let manager = TmuxSessionManager()
+            let shellPrefix = "runway-\(session.id)-shell"
+            let shellSessions = await manager.listSessions(prefix: shellPrefix)
+
+            for tmuxSession in shellSessions.sorted(by: { $0.name < $1.name }) {
+                // Extract shell number from name (e.g., "runway-id-shell2" → "2")
+                let suffix = tmuxSession.name.dropFirst(shellPrefix.count)
+                let shellNum = Int(suffix) ?? (tabs.filter { !$0.isMain }.count + 1)
+                let tabID = "\(session.id)_shell\(shellNum)"
+
+                let tab = TerminalTab(
+                    id: tabID,
+                    title: "Shell \(shellNum)",
+                    config: TerminalConfig(
+                        command: ProcessInfo.processInfo.environment["SHELL"] ?? "/bin/zsh",
+                        workingDirectory: session.path,
+                        environment: [
+                            "RUNWAY_SESSION_ID": session.id
+                        ],
+                        fontFamily: fontFamily,
+                        fontSize: Float(fontSize),
+                        tmuxSessionName: tmuxSession.name
+                    )
+                )
+
+                tabs.append(tab)
+            }
+        }
     }
 
     private func addShellTab() {
         let shellCount = tabs.filter { !$0.isMain }.count + 1
         let tabID = "\(session.id)_shell\(shellCount)"
-        let tab = TerminalTab(
-            id: tabID,
-            title: "Shell \(shellCount)",
-            config: TerminalConfig(
-                command: ProcessInfo.processInfo.environment["SHELL"] ?? "/bin/zsh",
-                workingDirectory: session.path,
-                environment: [
-                    "RUNWAY_SESSION_ID": session.id
-                ],
-                fontFamily: fontFamily,
-                fontSize: Float(fontSize)
-            )
-        )
+        let tmuxName = "runway-\(session.id)-shell\(shellCount)"
 
-        tabs.append(tab)
-        selectedTabID = tab.id
+        // Create tmux session BEFORE adding the tab — TerminalPane needs it to exist
+        Task {
+            let manager = TmuxSessionManager()
+            try? await manager.createSession(
+                name: tmuxName,
+                workDir: session.path,
+                command: nil,
+                env: ["RUNWAY_SESSION_ID": session.id]
+            )
+
+            // Add tab after tmux session is ready
+            let tab = TerminalTab(
+                id: tabID,
+                title: "Shell \(shellCount)",
+                config: TerminalConfig(
+                    command: ProcessInfo.processInfo.environment["SHELL"] ?? "/bin/zsh",
+                    workingDirectory: session.path,
+                    environment: [
+                        "RUNWAY_SESSION_ID": session.id
+                    ],
+                    fontFamily: fontFamily,
+                    fontSize: Float(fontSize),
+                    tmuxSessionName: tmuxName
+                )
+            )
+
+            tabs.append(tab)
+            selectedTabID = tab.id
+        }
     }
 
     private func closeTab(_ id: String) {
+        // Kill tmux session for this tab
+        if let tab = tabs.first(where: { $0.id == id }),
+            let tmuxName = tab.config.tmuxSessionName
+        {
+            Task {
+                let manager = TmuxSessionManager()
+                try? await manager.killSession(name: tmuxName)
+            }
+        }
+
         tabs.removeAll { $0.id == id }
         if selectedTabID == id {
             selectedTabID = tabs.first?.id

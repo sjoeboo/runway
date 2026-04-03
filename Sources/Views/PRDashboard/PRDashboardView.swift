@@ -44,7 +44,7 @@ public struct PRDashboardView: View {
     }
 
     public var body: some View {
-        HSplitView {
+        HStack(spacing: 0) {
             // Left: PR list
             VStack(spacing: 0) {
                 // Tab bar
@@ -102,9 +102,12 @@ public struct PRDashboardView: View {
                     }
                 }
             }
+            .frame(minWidth: 300)
+            .frame(maxWidth: selectedPR == nil ? .infinity : 480)
 
             // Right: PR detail drawer
             if let pr = selectedPR {
+                Divider()
                 PRDetailDrawer(
                     pr: pr,
                     detail: detail,
@@ -112,27 +115,16 @@ public struct PRDashboardView: View {
                     onApprove: { onApprove(pr) },
                     onComment: { body in onComment(pr, body) }
                 )
-                .frame(minWidth: 400)
+                .frame(maxWidth: .infinity)
             }
         }
         .onAppear { onRefresh() }
     }
 
     private var filteredPRs: [PullRequest] {
-        switch selectedTab {
-        case .all:
-            pullRequests
-        case .mine:
-            pullRequests.filter { $0.author == currentUser }
-        case .reviewRequested:
-            pullRequests  // Filtered server-side by PRManager when filter is .reviewRequested
-        }
-    }
-
-    private var currentUser: String {
-        // When filter is .mine, PRManager already filters server-side via --author @me
-        // So for local filtering, we show all when tab is .mine
-        ""
+        // All filtering is done server-side by PRManager (--author @me, --review-requested @me)
+        // Local filtering just passes through since each tab triggers a server re-fetch
+        pullRequests
     }
 
     private func tabButton(_ tab: PRTab) -> some View {
@@ -180,12 +172,17 @@ struct PRRowView: View {
                 }
 
                 HStack(spacing: 8) {
+                    Text(pr.repo)
+                        .font(.caption)
+                        .foregroundColor(theme.chrome.cyan)
                     Text(pr.author)
                         .font(.caption)
                         .foregroundColor(theme.chrome.textDim)
-                    Text(pr.headBranch)
-                        .font(.caption)
-                        .foregroundColor(theme.chrome.accent)
+                    if !pr.headBranch.isEmpty {
+                        Text(pr.headBranch)
+                            .font(.caption)
+                            .foregroundColor(theme.chrome.accent)
+                    }
                     checksSummary
                     reviewBadge
                 }
@@ -193,11 +190,14 @@ struct PRRowView: View {
 
             Spacer()
 
-            Text("+\(pr.additions) -\(pr.deletions)")
-                .font(.caption)
-                .foregroundColor(theme.chrome.textDim)
+            if pr.additions > 0 || pr.deletions > 0 {
+                Text("+\(pr.additions) -\(pr.deletions)")
+                    .font(.caption)
+                    .foregroundColor(theme.chrome.textDim)
+            }
         }
         .padding(.vertical, 4)
+        .opacity(pr.isDraft ? 0.5 : 1.0)
     }
 
     @ViewBuilder
