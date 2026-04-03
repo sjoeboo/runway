@@ -139,7 +139,9 @@ struct ContentView: View {
                 selectedSessionID: Binding(
                     get: { store.selectedSessionID },
                     set: { store.selectedSessionID = $0 }
-                )
+                ),
+                onRestart: { id in Task { await store.restartSession(id: id) } },
+                onDelete: { id in store.deleteSession(id: id) }
             )
         }
         .frame(minWidth: 240)

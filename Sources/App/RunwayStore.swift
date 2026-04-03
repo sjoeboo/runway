@@ -6,6 +6,7 @@ import Persistence
 import StatusDetection
 import SwiftUI
 import Terminal
+import TerminalView
 import Theme
 
 /// Root application state — the single source of truth for the Runway app.
@@ -196,6 +197,53 @@ public final class RunwayStore {
             sessions[idx].status = status
         }
         try? database?.updateSessionStatus(id: id, status: status)
+    }
+
+    func restartSession(id: String) async {
+        guard let idx = sessions.firstIndex(where: { $0.id == id }) else { return }
+        let session = sessions[idx]
+
+        // Kill existing tmux session
+        let tmuxName = "runway-\(id)"
+        if tmuxAvailable {
+            try? await tmuxManager.killSession(name: tmuxName)
+        }
+
+        // Clear cached terminal view so TerminalPane creates a fresh one
+        TerminalSessionCache.shared.removeAll(forSessionID: id)
+
+        // Recreate tmux session
+        if tmuxAvailable {
+            let command: String?
+            if session.tool == .claude {
+                command = ([session.tool.command] + session.permissionMode.cliFlags).joined(separator: " ")
+            } else if session.tool != .shell {
+                command = session.tool.command
+            } else {
+                command = nil
+            }
+
+            do {
+                try await tmuxManager.createSession(
+                    name: tmuxName,
+                    workDir: session.path,
+                    command: command,
+                    env: [
+                        "RUNWAY_SESSION_ID": session.id,
+                        "RUNWAY_TITLE": session.title,
+                    ]
+                )
+                sessions[idx].status = .running
+            } catch {
+                print("[Runway] Failed to restart tmux session: \(error)")
+                sessions[idx].status = .error
+            }
+        }
+
+        try? database?.updateSessionStatus(id: id, status: sessions[idx].status)
+        // Re-select to trigger view refresh
+        selectedSessionID = nil
+        selectedSessionID = id
     }
 
     func deleteSession(id: String) {

@@ -7,16 +7,22 @@ public struct ProjectTreeView: View {
     let projects: [Project]
     let sessions: [Session]
     @Binding var selectedSessionID: String?
+    var onRestart: ((String) -> Void)?
+    var onDelete: ((String) -> Void)?
     @Environment(\.theme) private var theme
 
     public init(
         projects: [Project],
         sessions: [Session],
-        selectedSessionID: Binding<String?>
+        selectedSessionID: Binding<String?>,
+        onRestart: ((String) -> Void)? = nil,
+        onDelete: ((String) -> Void)? = nil
     ) {
         self.projects = projects
         self.sessions = sessions
         self._selectedSessionID = selectedSessionID
+        self.onRestart = onRestart
+        self.onDelete = onDelete
     }
 
     public var body: some View {
@@ -27,6 +33,7 @@ public struct ProjectTreeView: View {
                     ForEach(projectSessions) { session in
                         SessionRowView(session: session)
                             .tag(session.id)
+                            .contextMenu { sessionContextMenu(session) }
                     }
                 } header: {
                     Text(project.name)
@@ -42,11 +49,29 @@ public struct ProjectTreeView: View {
                     ForEach(ungrouped) { session in
                         SessionRowView(session: session)
                             .tag(session.id)
+                            .contextMenu { sessionContextMenu(session) }
                     }
                 }
             }
         }
         .listStyle(.sidebar)
+    }
+
+    @ViewBuilder
+    private func sessionContextMenu(_ session: Session) -> some View {
+        Button {
+            onRestart?(session.id)
+        } label: {
+            Label("Restart Session", systemImage: "arrow.counterclockwise")
+        }
+
+        Divider()
+
+        Button(role: .destructive) {
+            onDelete?(session.id)
+        } label: {
+            Label("Delete Session", systemImage: "trash")
+        }
     }
 }
 
