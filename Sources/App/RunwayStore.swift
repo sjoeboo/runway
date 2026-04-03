@@ -293,6 +293,43 @@ public final class RunwayStore {
         try? database?.deleteProject(id: id)
     }
 
+    // MARK: - Renaming
+
+    func renameSession(id: String, title: String) {
+        if let idx = sessions.firstIndex(where: { $0.id == id }) {
+            sessions[idx].title = title
+            try? database?.saveSession(sessions[idx])
+        }
+    }
+
+    func renameProject(id: String, name: String) {
+        if let idx = projects.firstIndex(where: { $0.id == id }) {
+            projects[idx].name = name
+            try? database?.saveProject(projects[idx])
+        }
+    }
+
+    // MARK: - Reordering
+
+    func reorderSessions(in projectID: String?, fromOffsets: IndexSet, toOffset: Int) {
+        var subset = sessions.filter { $0.groupID == projectID }
+        subset.move(fromOffsets: fromOffsets, toOffset: toOffset)
+        for (i, session) in subset.enumerated() {
+            if let idx = sessions.firstIndex(where: { $0.id == session.id }) {
+                sessions[idx].sortOrder = i
+                try? database?.updateSessionSortOrder(id: session.id, sortOrder: i)
+            }
+        }
+    }
+
+    func reorderProjects(fromOffsets: IndexSet, toOffset: Int) {
+        projects.move(fromOffsets: fromOffsets, toOffset: toOffset)
+        for i in projects.indices {
+            projects[i].sortOrder = i
+            try? database?.updateProjectSortOrder(id: projects[i].id, sortOrder: i)
+        }
+    }
+
     // MARK: - Hook Server
 
     private func startHookServer() async {
@@ -456,6 +493,40 @@ public final class RunwayStore {
             prDetail = try await prManager.fetchDetail(repo: pr.repo, number: pr.number, host: host)
         } catch {
             statusMessage = .error("Comment failed: \(error.localizedDescription)")
+        }
+    }
+
+    func requestChangesOnPR(_ pr: PullRequest, body: String) async {
+        let host = await prManager.hostFromURL(pr.url)
+        do {
+            try await prManager.requestChanges(repo: pr.repo, number: pr.number, body: body, host: host)
+            statusMessage = .success("Requested changes on #\(pr.number)")
+            prDetail = try await prManager.fetchDetail(repo: pr.repo, number: pr.number, host: host)
+            await fetchPRs()
+        } catch {
+            statusMessage = .error("Request changes failed: \(error.localizedDescription)")
+        }
+    }
+
+    func mergePR(_ pr: PullRequest, strategy: MergeStrategy = .squash) async {
+        let host = await prManager.hostFromURL(pr.url)
+        do {
+            try await prManager.merge(repo: pr.repo, number: pr.number, strategy: strategy, host: host)
+            statusMessage = .success("Merged #\(pr.number)")
+            await fetchPRs()
+        } catch {
+            statusMessage = .error("Merge failed: \(error.localizedDescription)")
+        }
+    }
+
+    func togglePRDraft(_ pr: PullRequest) async {
+        let host = await prManager.hostFromURL(pr.url)
+        do {
+            try await prManager.toggleDraft(repo: pr.repo, number: pr.number, isDraft: !pr.isDraft, host: host)
+            statusMessage = .success(pr.isDraft ? "Marked #\(pr.number) as ready" : "Converted #\(pr.number) to draft")
+            await fetchPRs()
+        } catch {
+            statusMessage = .error("Draft toggle failed: \(error.localizedDescription)")
         }
     }
 
