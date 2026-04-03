@@ -9,15 +9,62 @@ import Testing
     let event = HookEvent(sessionID: "session-1", event: .sessionStart)
     #expect(event.sessionID == "session-1")
     #expect(event.event == .sessionStart)
-    #expect(event.payload == nil)
+    #expect(event.toolName == nil)
 }
 
-@Test func hookEventWithPayload() {
-    let payload = HookPayload(toolName: "Read", message: "Reading file", status: "running")
-    let event = HookEvent(sessionID: "s1", event: .permissionRequest, payload: payload)
-    #expect(event.payload?.toolName == "Read")
-    #expect(event.payload?.message == "Reading file")
-    #expect(event.payload?.status == "running")
+@Test func hookEventWithFields() {
+    let event = HookEvent(
+        sessionID: "s1", event: .permissionRequest,
+        toolName: "Read", message: "Reading file"
+    )
+    #expect(event.toolName == "Read")
+    #expect(event.message == "Reading file")
+}
+
+@Test func hookEventDecodesClaudeCodeJSON() throws {
+    let json = """
+        {
+            "session_id": "abc123",
+            "hook_event_name": "UserPromptSubmit",
+            "cwd": "/Users/test/code",
+            "transcript_path": "/Users/test/.claude/transcript.jsonl",
+            "prompt": "fix the bug"
+        }
+        """
+    let event = try JSONDecoder().decode(HookEvent.self, from: Data(json.utf8))
+    #expect(event.sessionID == "abc123")
+    #expect(event.event == .userPromptSubmit)
+    #expect(event.cwd == "/Users/test/code")
+    #expect(event.prompt == "fix the bug")
+}
+
+@Test func hookEventDecodesPermissionRequest() throws {
+    let json = """
+        {
+            "session_id": "abc123",
+            "hook_event_name": "PermissionRequest",
+            "cwd": "/Users/test/code",
+            "tool_name": "Bash"
+        }
+        """
+    let event = try JSONDecoder().decode(HookEvent.self, from: Data(json.utf8))
+    #expect(event.event == .permissionRequest)
+    #expect(event.toolName == "Bash")
+}
+
+@Test func hookEventDecodesNotification() throws {
+    let json = """
+        {
+            "session_id": "abc123",
+            "hook_event_name": "Notification",
+            "message": "Permission needed",
+            "notification_type": "permission_prompt"
+        }
+        """
+    let event = try JSONDecoder().decode(HookEvent.self, from: Data(json.utf8))
+    #expect(event.event == .notification)
+    #expect(event.message == "Permission needed")
+    #expect(event.notificationType == "permission_prompt")
 }
 
 // MARK: - HookEventType
@@ -29,15 +76,6 @@ import Testing
     #expect(HookEventType.userPromptSubmit.rawValue == "UserPromptSubmit")
     #expect(HookEventType.permissionRequest.rawValue == "PermissionRequest")
     #expect(HookEventType.notification.rawValue == "Notification")
-}
-
-// MARK: - HookPayload
-
-@Test func hookPayloadDefaults() {
-    let payload = HookPayload()
-    #expect(payload.toolName == nil)
-    #expect(payload.message == nil)
-    #expect(payload.status == nil)
 }
 
 // MARK: - PermissionMode

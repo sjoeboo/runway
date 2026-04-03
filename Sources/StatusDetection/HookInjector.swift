@@ -56,6 +56,7 @@ public struct HookInjector: Sendable {
             "type": "http",
             "url": hookURL,
             "headers": ["X-Runway-Session-Id": "$RUNWAY_SESSION_ID"],
+            "allowedEnvVars": ["RUNWAY_SESSION_ID"],
             "timeout": 5,
         ]
 
@@ -168,8 +169,16 @@ public struct HookInjector: Sendable {
 
     private func isRunwayHook(_ hook: [String: Any]) -> Bool {
         guard let type = hook["type"] as? String else { return false }
-        if type == "http", let url = hook["url"] as? String {
-            return url.hasPrefix(Self.hookURLPrefix) && url.hasSuffix(Self.hookURLSuffix)
+        if type == "http", let url = hook["url"] as? String,
+            url.hasPrefix(Self.hookURLPrefix) && url.hasSuffix(Self.hookURLSuffix)
+        {
+            // Only match hooks with Runway's header, not Hangar's
+            if let headers = hook["headers"] as? [String: String],
+                headers["X-Runway-Session-Id"] != nil
+            {
+                return true
+            }
+            return false
         }
         // Also match legacy Hangar command hooks for cleanup
         if type == "command", let cmd = hook["command"] as? String {
