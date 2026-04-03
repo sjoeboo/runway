@@ -31,9 +31,12 @@ public struct ProjectTreeView: View {
                 Section {
                     let projectSessions = sessions.filter { $0.groupID == project.id }
                     ForEach(projectSessions) { session in
-                        SessionRowView(session: session)
-                            .tag(session.id)
-                            .contextMenu { sessionContextMenu(session) }
+                        SessionRowView(
+                            session: session,
+                            onRestart: onRestart,
+                            onDelete: onDelete
+                        )
+                        .tag(session.id)
                     }
                 } header: {
                     Text(project.name)
@@ -47,37 +50,26 @@ public struct ProjectTreeView: View {
             if !ungrouped.isEmpty {
                 Section("Sessions") {
                     ForEach(ungrouped) { session in
-                        SessionRowView(session: session)
-                            .tag(session.id)
-                            .contextMenu { sessionContextMenu(session) }
+                        SessionRowView(
+                            session: session,
+                            onRestart: onRestart,
+                            onDelete: onDelete
+                        )
+                        .tag(session.id)
                     }
                 }
             }
         }
         .listStyle(.sidebar)
     }
-
-    @ViewBuilder
-    private func sessionContextMenu(_ session: Session) -> some View {
-        Button {
-            onRestart?(session.id)
-        } label: {
-            Label("Restart Session", systemImage: "arrow.counterclockwise")
-        }
-
-        Divider()
-
-        Button(role: .destructive) {
-            onDelete?(session.id)
-        } label: {
-            Label("Delete Session", systemImage: "trash")
-        }
-    }
 }
 
-/// A single session row in the sidebar.
+/// A single session row in the sidebar with hover-revealed action buttons.
 struct SessionRowView: View {
     let session: Session
+    var onRestart: ((String) -> Void)?
+    var onDelete: ((String) -> Void)?
+    @State private var isHovered = false
     @Environment(\.theme) private var theme
 
     var body: some View {
@@ -94,7 +86,32 @@ struct SessionRowView: View {
                 }
             }
             Spacer()
-            if session.tool != .claude {
+
+            if isHovered {
+                HStack(spacing: 2) {
+                    Button {
+                        onRestart?(session.id)
+                    } label: {
+                        Image(systemName: "arrow.counterclockwise")
+                            .font(.system(size: 11))
+                            .foregroundColor(theme.chrome.textDim)
+                            .frame(width: 22, height: 22)
+                    }
+                    .buttonStyle(.plain)
+                    .help("Restart session")
+
+                    Button {
+                        onDelete?(session.id)
+                    } label: {
+                        Image(systemName: "trash")
+                            .font(.system(size: 11))
+                            .foregroundColor(theme.chrome.textDim)
+                            .frame(width: 22, height: 22)
+                    }
+                    .buttonStyle(.plain)
+                    .help("Delete session")
+                }
+            } else if session.tool != .claude {
                 Text(session.tool.displayName)
                     .font(.caption2)
                     .padding(.horizontal, 4)
@@ -104,6 +121,24 @@ struct SessionRowView: View {
             }
         }
         .padding(.vertical, 2)
+        .onHover { hovering in
+            isHovered = hovering
+        }
+        .contextMenu {
+            Button {
+                onRestart?(session.id)
+            } label: {
+                Label("Restart Session", systemImage: "arrow.counterclockwise")
+            }
+
+            Divider()
+
+            Button(role: .destructive) {
+                onDelete?(session.id)
+            } label: {
+                Label("Delete Session", systemImage: "trash")
+            }
+        }
     }
 
     @ViewBuilder
