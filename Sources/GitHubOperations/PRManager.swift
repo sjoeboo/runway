@@ -382,11 +382,11 @@ private struct GHPRDetailResponse: Decodable {
         let mappedReviews: [PRReview] = (reviews ?? []).map { r in
             PRReview(id: r.id ?? "0", author: r.author?.login ?? "", state: r.state ?? "", body: r.body ?? "")
         }
-        let mappedComments: [PRComment] = (comments ?? []).map { c in
-            PRComment(id: c.id ?? "0", author: c.author?.login ?? "", body: c.body ?? "")
+        let mappedComments: [PRComment] = (comments ?? []).map { comment in
+            PRComment(id: comment.id ?? "0", author: comment.author?.login ?? "", body: comment.body ?? "")
         }
-        let mappedFiles: [PRFileChange] = (files ?? []).map { f in
-            PRFileChange(path: f.path ?? "", additions: f.additions ?? 0, deletions: f.deletions ?? 0, patch: f.patch)
+        let mappedFiles: [PRFileChange] = (files ?? []).map { file in
+            PRFileChange(path: file.path ?? "", additions: file.additions ?? 0, deletions: file.deletions ?? 0, patch: file.patch)
         }
 
         return PRDetail(

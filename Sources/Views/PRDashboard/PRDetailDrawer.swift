@@ -69,8 +69,8 @@ public struct PRDetailDrawer: View {
 
             HStack(spacing: 12) {
                 Label(pr.author, systemImage: "person")
-                let head = detail?.headBranch.isEmpty == false ? detail!.headBranch : pr.headBranch
-                let base = detail?.baseBranch.isEmpty == false ? detail!.baseBranch : pr.baseBranch
+                let head = (detail?.headBranch).flatMap { $0.isEmpty ? nil : $0 } ?? pr.headBranch
+                let base = (detail?.baseBranch).flatMap { $0.isEmpty ? nil : $0 } ?? pr.baseBranch
                 if !head.isEmpty {
                     Label("\(head) → \(base)", systemImage: "arrow.triangle.branch")
                 }

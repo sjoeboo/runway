@@ -20,7 +20,7 @@ import Testing
     let portValue = try #require(await server.actualPort)
 
     // Send a minimal HTTP POST to the server
-    let url = URL(string: "http://127.0.0.1:\(portValue)/hooks")!
+    let url = try #require(URL(string: "http://127.0.0.1:\(portValue)/hooks"))
     var request = URLRequest(url: url)
     request.httpMethod = "POST"
     request.setValue("application/json", forHTTPHeaderField: "Content-Type")

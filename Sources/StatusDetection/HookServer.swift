@@ -51,8 +51,7 @@ public actor HookServer {
         }
 
         // Use a continuation to bridge NWListener's callback into async/await.
-        let resolvedPort = try await withCheckedThrowingContinuation {
-            (continuation: CheckedContinuation<UInt16?, Error>) in
+        let resolvedPort = try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<UInt16?, Error>) in
             listener.stateUpdateHandler = { state in
                 switch state {
                 case .ready:
@@ -82,8 +81,7 @@ public actor HookServer {
     private func handleConnection(_ connection: NWConnection) {
         connection.start(queue: DispatchQueue(label: "runway.hookserver.conn"))
 
-        connection.receive(minimumIncompleteLength: 1, maximumLength: 65536) {
-            [weak self] data, _, _, error in
+        connection.receive(minimumIncompleteLength: 1, maximumLength: 65536) { [weak self] data, _, _, error in
             guard let data, error == nil else {
                 connection.cancel()
                 return
