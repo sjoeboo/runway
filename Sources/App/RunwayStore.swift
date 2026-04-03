@@ -72,7 +72,8 @@ public final class RunwayStore {
         // Start hook server + inject Claude hooks (sequenced — inject needs the port)
         Task { await startHookServer() }
 
-        // Fetch PRs on launch
+        // Load cached PRs synchronously for instant display, then refresh in background
+        loadCachedPRs()
         Task { await fetchPRs() }
     }
 
@@ -335,15 +336,17 @@ public final class RunwayStore {
 
     // MARK: - Pull Requests
 
+    /// Load cached PRs from database for instant display on startup.
+    func loadCachedPRs() {
+        if let cached = try? database?.cachedPRs(maxAge: 3600), !cached.isEmpty {
+            pullRequests = cached
+        }
+    }
+
     func fetchPRs(filter: PRFilter? = nil) async {
         if let filter { prFilter = filter }
         isLoadingPRs = true
         defer { isLoadingPRs = false }
-
-        // Show cached PRs immediately while fetching fresh data
-        if pullRequests.isEmpty, let cached = try? database?.cachedPRs() {
-            pullRequests = cached
-        }
 
         do {
             // Search across all repos — like Hangar, shows all user's PRs globally
