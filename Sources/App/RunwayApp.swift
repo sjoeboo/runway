@@ -164,6 +164,7 @@ struct ContentView: View {
             ProjectTreeView(
                 projects: store.projects,
                 sessions: store.sessions,
+                sessionPRs: store.sessionPRs,
                 selectedSessionID: Binding(
                     get: { store.selectedSessionID },
                     set: { store.selectedSessionID = $0 }
@@ -202,7 +203,7 @@ struct ContentView: View {
             if let sessionID = store.selectedSessionID,
                 let session = store.sessions.first(where: { $0.id == sessionID })
             {
-                SessionDetailView(session: session)
+                SessionDetailView(session: session, linkedPR: store.sessionPRs[sessionID])
             } else {
                 EmptyStateView(
                     title: "No Session Selected",

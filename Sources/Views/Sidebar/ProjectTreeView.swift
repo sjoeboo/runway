@@ -6,6 +6,7 @@ import Theme
 public struct ProjectTreeView: View {
     let projects: [Project]
     let sessions: [Session]
+    let sessionPRs: [String: PullRequest]
     @Binding var selectedSessionID: String?
     var onRestart: ((String) -> Void)?
     var onDelete: ((String) -> Void)?
@@ -16,6 +17,7 @@ public struct ProjectTreeView: View {
     public init(
         projects: [Project],
         sessions: [Session],
+        sessionPRs: [String: PullRequest] = [:],
         selectedSessionID: Binding<String?>,
         onRestart: ((String) -> Void)? = nil,
         onDelete: ((String) -> Void)? = nil,
@@ -24,6 +26,7 @@ public struct ProjectTreeView: View {
     ) {
         self.projects = projects
         self.sessions = sessions
+        self.sessionPRs = sessionPRs
         self._selectedSessionID = selectedSessionID
         self.onRestart = onRestart
         self.onDelete = onDelete
@@ -37,6 +40,7 @@ public struct ProjectTreeView: View {
                 ProjectSection(
                     project: project,
                     sessions: sessions.filter { $0.groupID == project.id },
+                    sessionPRs: sessionPRs,
                     onRestart: onRestart,
                     onDelete: onDelete,
                     onNewSession: { onNewSession?(project.id) }
@@ -50,6 +54,7 @@ public struct ProjectTreeView: View {
                     ForEach(ungrouped) { session in
                         SessionRowView(
                             session: session,
+                            linkedPR: sessionPRs[session.id],
                             onRestart: onRestart,
                             onDelete: onDelete
                         )
@@ -79,6 +84,7 @@ public struct ProjectTreeView: View {
 struct ProjectSection: View {
     let project: Project
     let sessions: [Session]
+    let sessionPRs: [String: PullRequest]
     var onRestart: ((String) -> Void)?
     var onDelete: ((String) -> Void)?
     var onNewSession: (() -> Void)?
@@ -89,16 +95,17 @@ struct ProjectSection: View {
     init(
         project: Project,
         sessions: [Session],
+        sessionPRs: [String: PullRequest],
         onRestart: ((String) -> Void)?,
         onDelete: ((String) -> Void)?,
         onNewSession: (() -> Void)?
     ) {
         self.project = project
         self.sessions = sessions
+        self.sessionPRs = sessionPRs
         self.onRestart = onRestart
         self.onDelete = onDelete
         self.onNewSession = onNewSession
-        // Per-project expansion state persisted via AppStorage
         self._isExpanded = AppStorage(wrappedValue: true, "project.expanded.\(project.id)")
     }
 
@@ -107,6 +114,7 @@ struct ProjectSection: View {
             ForEach(sessions) { session in
                 SessionRowView(
                     session: session,
+                    linkedPR: sessionPRs[session.id],
                     onRestart: onRestart,
                     onDelete: onDelete
                 )
@@ -144,6 +152,7 @@ struct ProjectSection: View {
 /// A single session row in the sidebar with hover-revealed action buttons.
 struct SessionRowView: View {
     let session: Session
+    var linkedPR: PullRequest?
     var onRestart: ((String) -> Void)?
     var onDelete: ((String) -> Void)?
     @State private var isHovered = false
@@ -160,6 +169,41 @@ struct SessionRowView: View {
                     Text(branch)
                         .font(.caption)
                         .foregroundColor(theme.chrome.textDim)
+                }
+                // Linked PR info
+                if let pr = linkedPR {
+                    HStack(spacing: 4) {
+                        Text("#\(pr.number)")
+                            .font(.caption2)
+                            .foregroundColor(theme.chrome.accent)
+                        if pr.checks.total > 0 {
+                            if pr.checks.allPassed {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .font(.system(size: 8))
+                                    .foregroundColor(theme.chrome.green)
+                            } else if pr.checks.hasFailed {
+                                Image(systemName: "xmark.circle.fill")
+                                    .font(.system(size: 8))
+                                    .foregroundColor(theme.chrome.red)
+                            } else {
+                                Image(systemName: "clock.fill")
+                                    .font(.system(size: 8))
+                                    .foregroundColor(theme.chrome.yellow)
+                            }
+                            Text("\(pr.checks.passed)/\(pr.checks.total)")
+                                .font(.caption2)
+                                .foregroundColor(theme.chrome.textDim)
+                        }
+                        if pr.reviewDecision == .approved {
+                            Image(systemName: "checkmark")
+                                .font(.system(size: 8))
+                                .foregroundColor(theme.chrome.green)
+                        } else if pr.reviewDecision == .changesRequested {
+                            Image(systemName: "exclamationmark.triangle")
+                                .font(.system(size: 8))
+                                .foregroundColor(theme.chrome.orange)
+                        }
+                    }
                 }
             }
             Spacer()

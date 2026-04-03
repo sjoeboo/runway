@@ -31,6 +31,9 @@ public final class RunwayStore {
     var statusMessage: StatusMessage?
     var tmuxAvailable: Bool = false
 
+    /// Maps session ID → linked PullRequest (matched by worktree branch)
+    var sessionPRs: [String: PullRequest] = [:]
+
     // MARK: - Managers
     let themeManager: ThemeManager
     let database: Database?
@@ -341,9 +344,49 @@ public final class RunwayStore {
             // Search across all repos — like Hangar, shows all user's PRs globally
             pullRequests = try await prManager.fetchPRs(filter: prFilter)
             prLastFetched = Date()
+
+            // Background: enrich each PR with detail (checks, review, branches, diff counts)
+            Task { await enrichPRs() }
         } catch {
             print("[Runway] Failed to fetch PRs: \(error)")
             statusMessage = .error("PR fetch failed: \(error.localizedDescription)")
+        }
+    }
+
+    /// Background-enrich PRs with detail data (checks, reviews, branches, diff counts).
+    /// Also links PRs to sessions by matching headBranch to session worktreeBranch.
+    private func enrichPRs() async {
+        for i in pullRequests.indices {
+            let pr = pullRequests[i]
+            let host = await prManager.hostFromURL(pr.url)
+
+            guard let detail = try? await prManager.fetchDetail(
+                repo: pr.repo, number: pr.number, host: host
+            ) else { continue }
+
+            // Enrich the list-level PR with detail data
+            if i < pullRequests.count, pullRequests[i].id == pr.id {
+                pullRequests[i].checks = detail.checks
+                pullRequests[i].reviewDecision = detail.reviewDecision
+                if !detail.headBranch.isEmpty {
+                    pullRequests[i].headBranch = detail.headBranch
+                    pullRequests[i].baseBranch = detail.baseBranch
+                }
+                pullRequests[i].additions = detail.additions
+                pullRequests[i].deletions = detail.deletions
+                pullRequests[i].changedFiles = detail.changedFiles
+            }
+
+            // Link PR to session by matching headBranch to worktreeBranch
+            if !detail.headBranch.isEmpty {
+                for session in sessions {
+                    if let branch = session.worktreeBranch,
+                       branch == detail.headBranch || branch.hasSuffix("/\(detail.headBranch)")
+                    {
+                        sessionPRs[session.id] = pullRequests[i]
+                    }
+                }
+            }
         }
     }
 
