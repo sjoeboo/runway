@@ -34,6 +34,11 @@ public final class RunwayStore {
     /// Maps session ID → linked PullRequest (matched by worktree branch)
     var sessionPRs: [String: PullRequest] = [:]
 
+    var selectedProjectID: String?
+    var projectIssues: [String: [GitHubIssue]] = [:]
+    var isLoadingIssues: Bool = false
+    var projectLabels: [String: [IssueLabel]] = [:]
+
     // MARK: - Managers
     let themeManager: ThemeManager
     let database: Database?
@@ -43,6 +48,7 @@ public final class RunwayStore {
     let prManager: PRManager
     let hookInjector: HookInjector
     let tmuxManager: TmuxSessionManager
+    let issueManager: IssueManager
 
     // MARK: - Init
 
@@ -54,6 +60,7 @@ public final class RunwayStore {
         self.prManager = PRManager()
         self.hookInjector = HookInjector()
         self.tmuxManager = TmuxSessionManager()
+        self.issueManager = IssueManager()
 
         // Open database
         do {
@@ -152,6 +159,15 @@ public final class RunwayStore {
             }
         }
 
+        // Resolve permission mode: request > project override > default
+        var resolvedMode = request.permissionMode
+        if resolvedMode == .default, let projectID = request.projectID,
+            let project = projects.first(where: { $0.id == projectID }),
+            let projectMode = project.permissionMode
+        {
+            resolvedMode = projectMode
+        }
+
         var session = Session(
             title: request.title,
             groupID: request.projectID,
@@ -159,7 +175,7 @@ public final class RunwayStore {
             tool: request.tool,
             status: .starting,
             worktreeBranch: worktreeBranch,
-            permissionMode: request.permissionMode
+            permissionMode: resolvedMode
         )
 
         // Create tmux session BEFORE adding to UI — TerminalPane needs it to exist
@@ -291,6 +307,34 @@ public final class RunwayStore {
     func deleteProject(id: String) {
         projects.removeAll { $0.id == id }
         try? database?.deleteProject(id: id)
+    }
+
+    // MARK: - Navigation
+
+    func selectProject(_ projectID: String?) {
+        selectedProjectID = projectID
+        selectedSessionID = nil
+    }
+
+    func selectSession(_ sessionID: String?) {
+        selectedSessionID = sessionID
+        selectedProjectID = nil
+        if currentView == .prs {
+            currentView = .sessions
+        }
+    }
+
+    // MARK: - Project Settings
+
+    func updateProjectSettings(_ project: Project) {
+        if let index = projects.firstIndex(where: { $0.id == project.id }) {
+            projects[index] = project
+            try? database?.updateProject(project)
+        }
+    }
+
+    func detectGHRepo(for project: Project) async -> (repo: String, host: String?)? {
+        await issueManager.detectRepo(path: project.path)
     }
 
     // MARK: - Renaming
@@ -532,6 +576,58 @@ public final class RunwayStore {
 
     func openPRInBrowser(_ pr: PullRequest) {
         if let url = URL(string: pr.url) {
+            NSWorkspace.shared.open(url)
+        }
+    }
+
+    // MARK: - Issues
+
+    func fetchIssues(forProject projectID: String) async {
+        guard let project = projects.first(where: { $0.id == projectID }),
+            let repo = project.ghRepo, project.issuesEnabled
+        else { return }
+
+        isLoadingIssues = true
+        defer { isLoadingIssues = false }
+
+        do {
+            let issues = try await issueManager.fetchIssues(repo: repo, host: project.ghHost)
+            projectIssues[projectID] = issues
+            try? database?.cacheIssues(issues)
+        } catch {
+            statusMessage = .error("Failed to fetch issues: \(error.localizedDescription)")
+        }
+    }
+
+    func createIssue(forProject projectID: String, title: String, body: String, labels: [String]) async {
+        guard let project = projects.first(where: { $0.id == projectID }),
+            let repo = project.ghRepo
+        else { return }
+
+        do {
+            try await issueManager.createIssue(repo: repo, host: project.ghHost, title: title, body: body, labels: labels)
+            statusMessage = .success("Issue created")
+            await fetchIssues(forProject: projectID)
+        } catch {
+            statusMessage = .error("Failed to create issue: \(error.localizedDescription)")
+        }
+    }
+
+    func fetchLabels(forProject projectID: String) async {
+        guard let project = projects.first(where: { $0.id == projectID }),
+            let repo = project.ghRepo
+        else { return }
+
+        do {
+            let labels = try await issueManager.fetchLabels(repo: repo, host: project.ghHost)
+            projectLabels[projectID] = labels
+        } catch {
+            // Labels are optional — don't show error
+        }
+    }
+
+    func openIssueInBrowser(_ issue: GitHubIssue) {
+        if let url = URL(string: issue.url) {
             NSWorkspace.shared.open(url)
         }
     }
