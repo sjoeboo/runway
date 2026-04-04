@@ -45,6 +45,15 @@ struct RunwayApp: App {
 
                 Button("New Project") { store.showNewProjectDialog = true }
                     .keyboardShortcut("p", modifiers: [.command, .shift])
+
+                Button("Send to Session") { store.showSendBar.toggle() }
+                    .keyboardShortcut("x", modifiers: [.command, .shift])
+
+                Button("Find in Terminal") { store.showTerminalSearch.toggle() }
+                    .keyboardShortcut("f", modifiers: .command)
+
+                Button("Search Sessions") { store.focusSidebarSearch = true }
+                    .keyboardShortcut("k", modifiers: .command)
             }
         }
 
@@ -103,10 +112,11 @@ struct ContentView: View {
                 .theme(theme)
             }
 
-            // Status message toast — .task(id:) auto-cancels on message change
+            // Status message toast — errors persist until dismissed, others auto-dismiss
             if let msg = store.statusMessage {
                 statusToast(msg)
                     .task(id: msg) {
+                        guard msg.kind != .error else { return }
                         try? await Task.sleep(for: .seconds(3))
                         store.statusMessage = nil
                     }
@@ -142,6 +152,17 @@ struct ContentView: View {
             .font(.caption)
             Text(msg.text)
                 .font(.caption)
+                .textSelection(.enabled)
+
+            if msg.kind == .error {
+                Button {
+                    store.statusMessage = nil
+                } label: {
+                    Image(systemName: "xmark")
+                        .font(.caption2)
+                }
+                .buttonStyle(.plain)
+            }
         }
         .foregroundColor(.white)
         .padding(.horizontal, 12)
@@ -164,38 +185,16 @@ struct ContentView: View {
     // MARK: - Sidebar
 
     private var sidebar: some View {
-        VStack(spacing: 0) {
-            viewPicker
-            Divider()
-            ProjectTreeView(
-                projects: store.projects,
-                sessions: store.sessions,
-                sessionPRs: store.sessionPRs,
-                selectedSessionID: Binding(
-                    get: { store.selectedSessionID },
-                    set: { store.selectedSessionID = $0 }
-                ),
-                selectedProjectID: Binding(
-                    get: { store.selectedProjectID },
-                    set: { store.selectedProjectID = $0 }
-                ),
-                onRestart: { id in Task { await store.restartSession(id: id) } },
-                onDelete: { id in store.deleteSession(id: id) },
-                onNewSession: { projectID in
-                    store.newSessionProjectID = projectID
-                    store.showNewSessionDialog = true
-                },
-                onNewProject: { store.showNewProjectDialog = true },
-                onReorderSessions: { projectID, fromOffsets, toOffset in
-                    store.reorderSessions(in: projectID, fromOffsets: fromOffsets, toOffset: toOffset)
-                },
-                onReorderProjects: { fromOffsets, toOffset in
-                    store.reorderProjects(fromOffsets: fromOffsets, toOffset: toOffset)
-                },
-                onSelectProject: { store.selectProject($0) },
-                onSelectSession: { store.selectSession($0) }
-            )
-        }
+        @Bindable var store = store
+        return ProjectTreeView(
+            projects: store.projects,
+            sessions: store.sessions,
+            sessionPRs: store.sessionPRs,
+            selectedSessionID: $store.selectedSessionID,
+            searchQuery: $store.sidebarSearchQuery,
+            focusSearch: $store.focusSidebarSearch,
+            actions: store
+        )
         .frame(minWidth: 200)
         .background(
             GeometryReader { geo in
@@ -218,8 +217,7 @@ struct ContentView: View {
             EmptyView()
         }
         .pickerStyle(.segmented)
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
+        .frame(width: 180)
     }
 
     // MARK: - Detail
@@ -231,7 +229,18 @@ struct ContentView: View {
             if let sessionID = store.selectedSessionID,
                 let session = store.sessions.first(where: { $0.id == sessionID })
             {
-                SessionDetailView(session: session, linkedPR: store.sessionPRs[sessionID])
+                SessionDetailView(
+                    session: session,
+                    linkedPR: store.sessionPRs[sessionID],
+                    showSendBar: Binding(
+                        get: { store.showSendBar },
+                        set: { store.showSendBar = $0 }
+                    ),
+                    showTerminalSearch: Binding(
+                        get: { store.showTerminalSearch },
+                        set: { store.showTerminalSearch = $0 }
+                    )
+                )
             } else if let projectID = store.selectedProjectID,
                 let project = store.projects.first(where: { $0.id == projectID })
             {
@@ -279,7 +288,14 @@ struct ContentView: View {
                 onComment: { pr, body in Task { await store.commentOnPR(pr, body: body) } },
                 onRequestChanges: { pr, body in Task { await store.requestChangesOnPR(pr, body: body) } },
                 onMerge: { pr, strategy in Task { await store.mergePR(pr, strategy: strategy) } },
-                onToggleDraft: { pr in Task { await store.togglePRDraft(pr) } }
+                onToggleDraft: { pr in Task { await store.togglePRDraft(pr) } },
+                onSendToSession: { pr, _ in
+                    // Find session linked to this PR and switch to it with send bar open
+                    if let sessionID = store.sessionPRs.first(where: { $0.value.id == pr.id })?.key {
+                        store.selectSession(sessionID)
+                        store.showSendBar = true
+                    }
+                }
             )
         }
     }
@@ -288,10 +304,8 @@ struct ContentView: View {
 
     @ToolbarContentBuilder
     private var toolbarContent: some ToolbarContent {
-        // Toolbar buttons removed — inline sidebar controls replace them.
-        // Keyboard shortcuts are preserved via the Commands block in RunwayApp.
-        ToolbarItem(placement: .primaryAction) {
-            EmptyView()
+        ToolbarItem(placement: .navigation) {
+            viewPicker
         }
     }
 }

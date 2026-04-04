@@ -64,6 +64,21 @@ public final class TerminalSessionCache {
         views["\(sessionID)_\(tabID)"] != nil
     }
 
+    /// Get an existing terminal view by its full cache key, without creating one.
+    public func existingView(forKey key: String) -> LocalProcessTerminalView? {
+        views[key]
+    }
+
+    /// Get the terminal view for a session's main tab (if cached).
+    public func mainTerminal(forSessionID id: String) -> LocalProcessTerminalView? {
+        views["\(id)_\(id)_main"]
+    }
+
+    /// Get a cached terminal view by session ID and tab ID, without creating one.
+    public func existing(sessionID: String, tabID: String) -> LocalProcessTerminalView? {
+        views["\(sessionID)_\(tabID)"]
+    }
+
     // MARK: - LRU Eviction
 
     /// Evict the least-recently-accessed entry if the cache exceeds `maxSize`.

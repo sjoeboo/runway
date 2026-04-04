@@ -16,6 +16,7 @@ public struct ProjectSettingsSheet: View {
     @State private var ghRepo: String?
     @State private var ghHost: String?
     @State private var isDetecting: Bool = false
+    @State private var branchPrefix: String = ""
 
     public init(
         project: Binding<Project>,
@@ -61,6 +62,10 @@ public struct ProjectSettingsSheet: View {
                             Text(mode.displayName).tag(PermissionMode?.some(mode))
                         }
                     }
+
+                    TextField("Branch Prefix", text: $branchPrefix, prompt: Text("feature/"))
+                        .textFieldStyle(.roundedBorder)
+                        .help("Prefix for auto-generated branch names (e.g. feature/, fix/, your-name/)")
                 }
 
                 Section("GitHub Issues") {
@@ -124,6 +129,7 @@ public struct ProjectSettingsSheet: View {
             issuesEnabled = project.issuesEnabled
             ghRepo = project.ghRepo
             ghHost = project.ghHost
+            branchPrefix = project.branchPrefix ?? ""
         }
     }
 
@@ -145,6 +151,7 @@ public struct ProjectSettingsSheet: View {
         updated.issuesEnabled = issuesEnabled
         updated.ghRepo = ghRepo
         updated.ghHost = ghHost
+        updated.branchPrefix = branchPrefix.isEmpty ? nil : branchPrefix
         onSave(updated)
         dismiss()
     }

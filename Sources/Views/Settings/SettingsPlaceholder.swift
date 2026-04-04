@@ -94,13 +94,30 @@ public struct SettingsView: View {
     // MARK: - Font
 
     private var fontSettings: some View {
-        Form {
+        let fonts = groupedFonts()
+        return Form {
             Section("Terminal Font") {
                 Picker("Font Family", selection: $fontFamily) {
-                    ForEach(availableFonts(), id: \.self) { name in
-                        Text(name)
-                            .font(.system(size: 12, design: .monospaced))
-                            .tag(name)
+                    if !fonts.nerd.isEmpty {
+                        Section("Nerd Fonts") {
+                            ForEach(fonts.nerd, id: \.self) { name in
+                                Text(name).font(.system(size: 12, design: .monospaced)).tag(name)
+                            }
+                        }
+                    }
+                    if !fonts.mono.isEmpty {
+                        Section("Monospaced") {
+                            ForEach(fonts.mono, id: \.self) { name in
+                                Text(name).font(.system(size: 12, design: .monospaced)).tag(name)
+                            }
+                        }
+                    }
+                    if !fonts.other.isEmpty {
+                        Section("All Fonts") {
+                            ForEach(fonts.other, id: \.self) { name in
+                                Text(name).font(.system(size: 12, design: .monospaced)).tag(name)
+                            }
+                        }
                     }
                 }
 
@@ -131,8 +148,8 @@ public struct SettingsView: View {
         .padding()
     }
 
-    /// List fonts available on the system, grouped: Nerd Fonts → Monospaced → All others.
-    private func availableFonts() -> [String] {
+    /// Fonts available on the system, grouped: Nerd Fonts → Monospaced → All others.
+    private func groupedFonts() -> (nerd: [String], mono: [String], other: [String]) {
         let allFamilies = NSFontManager.shared.availableFontFamilies
 
         var nerdFonts: [String] = []
@@ -149,12 +166,7 @@ public struct SettingsView: View {
             }
         }
 
-        var result = nerdFonts
-        if !nerdFonts.isEmpty && !monoFonts.isEmpty { result.append("── Monospaced ──") }
-        result += monoFonts
-        if !otherFonts.isEmpty { result.append("── All Fonts ──") }
-        result += otherFonts
-        return result
+        return (nerdFonts, monoFonts, otherFonts)
     }
 
     private func isMonospaced(_ family: String) -> Bool {

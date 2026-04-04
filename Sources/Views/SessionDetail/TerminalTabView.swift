@@ -23,6 +23,7 @@ struct TerminalTab: Identifiable {
 public struct TerminalTabView: View {
     let session: Session
     let tmuxManager: TmuxSessionManager
+    @Binding var showSearch: Bool
     @State private var tabs: [TerminalTab] = []
     @State private var selectedTabID: String?
     @State private var shellCounter: Int = 0
@@ -30,9 +31,10 @@ public struct TerminalTabView: View {
     @AppStorage("terminalFontFamily") private var fontFamily: String = "MesloLGS Nerd Font"
     @AppStorage("terminalFontSize") private var fontSize: Double = 13
 
-    public init(session: Session, tmuxManager: TmuxSessionManager = TmuxSessionManager()) {
+    public init(session: Session, tmuxManager: TmuxSessionManager = TmuxSessionManager(), showSearch: Binding<Bool>) {
         self.session = session
         self.tmuxManager = tmuxManager
+        self._showSearch = showSearch
     }
 
     public var body: some View {
@@ -41,14 +43,39 @@ public struct TerminalTabView: View {
             Divider()
 
             // Terminal for selected tab
-            if let tab = selectedTab {
-                TerminalPane(
-                    config: tab.config,
-                    sessionID: session.id,
-                    tabID: tab.id
-                )
-                .id("\(session.id)_\(tab.id)")
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            if tabs.isEmpty {
+                Spacer()
+                ProgressView("Connecting to session\u{2026}")
+                    .font(.caption)
+                Spacer()
+            } else if let tab = selectedTab {
+                ZStack(alignment: .topTrailing) {
+                    TerminalPane(
+                        config: tab.config,
+                        sessionID: session.id,
+                        tabID: tab.id
+                    )
+                    .id("\(session.id)_\(tab.id)")
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+                    TerminalSearchBar(
+                        isVisible: $showSearch,
+                        onFindNext: { term in
+                            guard !term.isEmpty else { return }
+                            TerminalSessionCache.shared.existing(sessionID: session.id, tabID: tab.id)?
+                                .findNext(term)
+                        },
+                        onFindPrevious: { term in
+                            guard !term.isEmpty else { return }
+                            TerminalSessionCache.shared.existing(sessionID: session.id, tabID: tab.id)?
+                                .findPrevious(term)
+                        },
+                        onDismiss: {
+                            TerminalSessionCache.shared.existing(sessionID: session.id, tabID: tab.id)?
+                                .clearSearch()
+                        }
+                    )
+                }
             }
         }
         .onAppear { initializeTabs() }

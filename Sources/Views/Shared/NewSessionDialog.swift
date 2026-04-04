@@ -148,12 +148,13 @@ public struct NewSessionDialog: View {
 
     private func autobranchName(from title: String) -> String {
         // Strip all git-illegal characters: ~, ^, :, ?, *, [, \, control chars, spaces, ..
-        var sanitized = title.lowercased()
+        let sanitized = title.lowercased()
             .replacing(/[^a-z0-9\-]/, with: "-")
             .replacing(/--+/, with: "-")
             .trimmingCharacters(in: CharacterSet(charactersIn: "-."))
         if sanitized.isEmpty { return "" }
-        return "feature/\(sanitized)"
+        let prefix = projects.first(where: { $0.id == selectedProjectID })?.branchPrefix ?? "feature/"
+        return "\(prefix)\(sanitized)"
     }
 
     private func create() {

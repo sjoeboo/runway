@@ -3,25 +3,37 @@ import Models
 import SwiftUI
 import Theme
 
+// MARK: - Sidebar Action Protocol
+
+/// Consolidates all sidebar actions into a single protocol, replacing 11 separate callback closures.
+/// The `App` target provides the concrete implementation backed by `RunwayStore`.
+@MainActor
+public protocol SidebarActions {
+    func restartSession(id: String) async
+    func deleteSession(id: String, deleteWorktree: Bool)
+    func newSession(projectID: String?)
+    func newProject()
+    func renameSession(id: String, title: String)
+    func renameProject(id: String, name: String)
+    func deleteProject(id: String)
+    func reorderSessions(in projectID: String?, fromOffsets: IndexSet, toOffset: Int)
+    func reorderProjects(fromOffsets: IndexSet, toOffset: Int)
+    func selectProject(_ id: String?)
+    func selectSession(_ id: String?)
+}
+
 /// Sidebar view showing the hierarchical project tree with sessions.
+///
+/// Takes 4 data parameters + 1 actions object, replacing the previous 14-parameter init.
 public struct ProjectTreeView: View {
     let projects: [Project]
     let sessions: [Session]
     let sessionPRs: [String: PullRequest]
+    let actions: SidebarActions
     @Binding var selectedSessionID: String?
-    @Binding var selectedProjectID: String?
-    var onRestart: ((String) -> Void)?
-    var onDelete: ((String) -> Void)?
-    var onNewSession: ((String?) -> Void)?
-    var onNewProject: (() -> Void)?
-    var onRenameSession: ((String, String) -> Void)?
-    var onRenameProject: ((String, String) -> Void)?
-    var onDeleteProject: ((String) -> Void)?
-    var onViewPR: ((String) -> Void)?
-    var onReorderSessions: ((String?, IndexSet, Int) -> Void)?
-    var onReorderProjects: ((IndexSet, Int) -> Void)?
-    var onSelectProject: ((String?) -> Void)?
-    var onSelectSession: ((String?) -> Void)?
+    @Binding var searchQuery: String
+    @Binding var focusSearch: Bool
+    @FocusState private var isSearchFocused: Bool
     @Environment(\.theme) private var theme
 
     public init(
@@ -29,99 +41,117 @@ public struct ProjectTreeView: View {
         sessions: [Session],
         sessionPRs: [String: PullRequest] = [:],
         selectedSessionID: Binding<String?>,
-        selectedProjectID: Binding<String?> = .constant(nil),
-        onRestart: ((String) -> Void)? = nil,
-        onDelete: ((String) -> Void)? = nil,
-        onNewSession: ((String?) -> Void)? = nil,
-        onNewProject: (() -> Void)? = nil,
-        onRenameSession: ((String, String) -> Void)? = nil,
-        onRenameProject: ((String, String) -> Void)? = nil,
-        onDeleteProject: ((String) -> Void)? = nil,
-        onViewPR: ((String) -> Void)? = nil,
-        onReorderSessions: ((String?, IndexSet, Int) -> Void)? = nil,
-        onReorderProjects: ((IndexSet, Int) -> Void)? = nil,
-        onSelectProject: ((String?) -> Void)? = nil,
-        onSelectSession: ((String?) -> Void)? = nil
+        searchQuery: Binding<String>,
+        focusSearch: Binding<Bool> = .constant(false),
+        actions: SidebarActions
     ) {
         self.projects = projects
         self.sessions = sessions
         self.sessionPRs = sessionPRs
         self._selectedSessionID = selectedSessionID
-        self._selectedProjectID = selectedProjectID
-        self.onRestart = onRestart
-        self.onDelete = onDelete
-        self.onNewSession = onNewSession
-        self.onNewProject = onNewProject
-        self.onRenameSession = onRenameSession
-        self.onRenameProject = onRenameProject
-        self.onDeleteProject = onDeleteProject
-        self.onViewPR = onViewPR
-        self.onReorderSessions = onReorderSessions
-        self.onReorderProjects = onReorderProjects
-        self.onSelectProject = onSelectProject
-        self.onSelectSession = onSelectSession
+        self._searchQuery = searchQuery
+        self._focusSearch = focusSearch
+        self.actions = actions
+    }
+
+    private var filteredSessions: [Session] {
+        guard !searchQuery.isEmpty else { return sessions }
+        let query = searchQuery.lowercased()
+        return sessions.filter {
+            $0.title.lowercased().contains(query)
+                || ($0.worktreeBranch?.lowercased().contains(query) ?? false)
+        }
+    }
+
+    private var filteredProjects: [Project] {
+        guard !searchQuery.isEmpty else { return projects }
+        let query = searchQuery.lowercased()
+        let matchedProjectIDs = Set(filteredSessions.compactMap(\.projectID))
+        return projects.filter {
+            $0.name.lowercased().contains(query) || matchedProjectIDs.contains($0.id)
+        }
     }
 
     public var body: some View {
+        let sessionsByProject = Dictionary(grouping: filteredSessions) { $0.projectID ?? "" }
         List(selection: $selectedSessionID) {
-            ForEach(projects) { project in
+            ForEach(filteredProjects) { project in
                 ProjectSection(
                     project: project,
-                    sessions: sessions.filter { $0.groupID == project.id },
+                    sessions: sessionsByProject[project.id] ?? [],
                     sessionPRs: sessionPRs,
-                    onRestart: onRestart,
-                    onDelete: onDelete,
-                    onNewSession: { onNewSession?(project.id) },
-                    onRenameSession: onRenameSession,
-                    onRenameProject: onRenameProject,
-                    onDeleteProject: onDeleteProject,
-                    onViewPR: onViewPR,
-                    onReorderSessions: { fromOffsets, toOffset in
-                        onReorderSessions?(project.id, fromOffsets, toOffset)
-                    },
-                    onSelectProject: onSelectProject,
-                    onSelectSession: onSelectSession
+                    actions: actions
                 )
             }
             .onMove { fromOffsets, toOffset in
-                onReorderProjects?(fromOffsets, toOffset)
+                actions.reorderProjects(fromOffsets: fromOffsets, toOffset: toOffset)
             }
 
             // Ungrouped sessions
-            let ungrouped = sessions.filter { $0.groupID == nil }
+            let ungrouped = sessionsByProject[""] ?? []
             if !ungrouped.isEmpty {
                 Section("Sessions") {
                     ForEach(ungrouped) { session in
                         SessionRowView(
                             session: session,
                             linkedPR: sessionPRs[session.id],
-                            onRestart: onRestart,
-                            onDelete: onDelete,
-                            onRenameSession: onRenameSession,
-                            onViewPR: onViewPR,
-                            onSelectSession: onSelectSession
+                            actions: actions
                         )
                         .tag(session.id)
                     }
                     .onMove { fromOffsets, toOffset in
-                        onReorderSessions?(nil, fromOffsets, toOffset)
+                        actions.reorderSessions(in: nil, fromOffsets: fromOffsets, toOffset: toOffset)
                     }
                 }
             }
-
-            // Add project button
-            Section {
+        }
+        .listStyle(.sidebar)
+        .safeAreaInset(edge: .top) {
+            HStack(spacing: 6) {
+                Image(systemName: "magnifyingglass")
+                    .font(.caption)
+                    .foregroundColor(theme.chrome.textDim)
+                TextField("Search sessions…", text: $searchQuery)
+                    .textFieldStyle(.plain)
+                    .font(.caption)
+                    .focused($isSearchFocused)
+                if !searchQuery.isEmpty {
+                    Button {
+                        searchQuery = ""
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.caption2)
+                            .foregroundColor(theme.chrome.textDim)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 6)
+            .background(theme.chrome.surface)
+        }
+        .onChange(of: focusSearch) { _, focused in
+            if focused {
+                isSearchFocused = true
+                focusSearch = false
+            }
+        }
+        .safeAreaInset(edge: .bottom) {
+            HStack {
                 Button {
-                    onNewProject?()
+                    actions.newProject()
                 } label: {
                     Label("Add Project", systemImage: "folder.badge.plus")
-                        .font(.system(.body))
+                        .font(.caption)
                         .foregroundColor(theme.chrome.textDim)
                 }
                 .buttonStyle(.plain)
+                Spacer()
             }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 8)
+            .background(theme.chrome.surface)
         }
-        .listStyle(.sidebar)
     }
 }
 
@@ -131,16 +161,7 @@ struct ProjectSection: View {
     let project: Project
     let sessions: [Session]
     let sessionPRs: [String: PullRequest]
-    var onRestart: ((String) -> Void)?
-    var onDelete: ((String) -> Void)?
-    var onNewSession: (() -> Void)?
-    var onRenameSession: ((String, String) -> Void)?
-    var onRenameProject: ((String, String) -> Void)?
-    var onDeleteProject: ((String) -> Void)?
-    var onViewPR: ((String) -> Void)?
-    var onReorderSessions: ((IndexSet, Int) -> Void)?
-    var onSelectProject: ((String?) -> Void)?
-    var onSelectSession: ((String?) -> Void)?
+    let actions: SidebarActions
     @AppStorage private var isExpanded: Bool
     @State private var isHeaderHovered = false
     @State private var isRenaming = false
@@ -151,30 +172,12 @@ struct ProjectSection: View {
         project: Project,
         sessions: [Session],
         sessionPRs: [String: PullRequest],
-        onRestart: ((String) -> Void)?,
-        onDelete: ((String) -> Void)?,
-        onNewSession: (() -> Void)?,
-        onRenameSession: ((String, String) -> Void)? = nil,
-        onRenameProject: ((String, String) -> Void)? = nil,
-        onDeleteProject: ((String) -> Void)? = nil,
-        onViewPR: ((String) -> Void)? = nil,
-        onReorderSessions: ((IndexSet, Int) -> Void)? = nil,
-        onSelectProject: ((String?) -> Void)? = nil,
-        onSelectSession: ((String?) -> Void)? = nil
+        actions: SidebarActions
     ) {
         self.project = project
         self.sessions = sessions
         self.sessionPRs = sessionPRs
-        self.onRestart = onRestart
-        self.onDelete = onDelete
-        self.onNewSession = onNewSession
-        self.onRenameSession = onRenameSession
-        self.onRenameProject = onRenameProject
-        self.onDeleteProject = onDeleteProject
-        self.onViewPR = onViewPR
-        self.onReorderSessions = onReorderSessions
-        self.onSelectProject = onSelectProject
-        self.onSelectSession = onSelectSession
+        self.actions = actions
         self._isExpanded = AppStorage(wrappedValue: true, "project.expanded.\(project.id)")
     }
 
@@ -184,16 +187,12 @@ struct ProjectSection: View {
                 SessionRowView(
                     session: session,
                     linkedPR: sessionPRs[session.id],
-                    onRestart: onRestart,
-                    onDelete: onDelete,
-                    onRenameSession: onRenameSession,
-                    onViewPR: onViewPR,
-                    onSelectSession: onSelectSession
+                    actions: actions
                 )
                 .tag(session.id)
             }
             .onMove { fromOffsets, toOffset in
-                onReorderSessions?(fromOffsets, toOffset)
+                actions.reorderSessions(in: project.id, fromOffsets: fromOffsets, toOffset: toOffset)
             }
         } label: {
             HStack(spacing: 4) {
@@ -201,7 +200,7 @@ struct ProjectSection: View {
                     TextField("Project name", text: $editName)
                         .onSubmit {
                             if !editName.isEmpty {
-                                onRenameProject?(project.id, editName)
+                                actions.renameProject(id: project.id, name: editName)
                             }
                             isRenaming = false
                         }
@@ -213,14 +212,14 @@ struct ProjectSection: View {
                         .font(.system(.title3, weight: .semibold))
                         .foregroundColor(theme.chrome.text)
                         .onTapGesture {
-                            onSelectProject?(project.id)
+                            actions.selectProject(project.id)
                         }
                 }
                 Spacer()
 
                 if isHeaderHovered && !isRenaming {
                     Button {
-                        onNewSession?()
+                        actions.newSession(projectID: project.id)
                     } label: {
                         Image(systemName: "plus")
                             .font(.system(size: 12))
@@ -256,7 +255,7 @@ struct ProjectSection: View {
             }
 
             Button {
-                onSelectProject?(project.id)
+                actions.selectProject(project.id)
             } label: {
                 Label("Project Settings\u{2026}", systemImage: "gear")
             }
@@ -264,7 +263,7 @@ struct ProjectSection: View {
             Divider()
 
             Button(role: .destructive) {
-                onDeleteProject?(project.id)
+                actions.deleteProject(id: project.id)
             } label: {
                 Label("Remove Project", systemImage: "folder.badge.minus")
             }
@@ -278,11 +277,7 @@ struct ProjectSection: View {
 struct SessionRowView: View {
     let session: Session
     var linkedPR: PullRequest?
-    var onRestart: ((String) -> Void)?
-    var onDelete: ((String) -> Void)?
-    var onRenameSession: ((String, String) -> Void)?
-    var onViewPR: ((String) -> Void)?
-    var onSelectSession: ((String?) -> Void)?
+    let actions: SidebarActions
     @State private var isHovered = false
     @State private var isRenaming = false
     @State private var editTitle: String = ""
@@ -297,7 +292,7 @@ struct SessionRowView: View {
                     TextField("Session name", text: $editTitle)
                         .onSubmit {
                             if !editTitle.isEmpty {
-                                onRenameSession?(session.id, editTitle)
+                                actions.renameSession(id: session.id, title: editTitle)
                             }
                             isRenaming = false
                         }
@@ -352,7 +347,7 @@ struct SessionRowView: View {
             if isHovered {
                 HStack(spacing: 2) {
                     Button {
-                        onRestart?(session.id)
+                        Task { await actions.restartSession(id: session.id) }
                     } label: {
                         Image(systemName: "arrow.counterclockwise")
                             .font(.system(size: 11))
@@ -379,12 +374,12 @@ struct SessionRowView: View {
                     .padding(.horizontal, 4)
                     .padding(.vertical, 1)
                     .background(theme.chrome.surface)
-                    .cornerRadius(3)
+                    .cornerRadius(4)
             }
         }
         .padding(.vertical, 2)
         .onTapGesture {
-            onSelectSession?(session.id)
+            actions.selectSession(session.id)
         }
         .onHover { hovering in
             isHovered = hovering
@@ -432,12 +427,6 @@ struct SessionRowView: View {
             if linkedPR != nil {
                 Divider()
 
-                Button {
-                    onViewPR?(session.id)
-                } label: {
-                    Label("View PR", systemImage: "arrow.triangle.pull")
-                }
-
                 if let prURL = linkedPR?.url, let url = URL(string: prURL) {
                     Button {
                         NSWorkspace.shared.open(url)
@@ -450,7 +439,7 @@ struct SessionRowView: View {
             Divider()
 
             Button {
-                onRestart?(session.id)
+                Task { await actions.restartSession(id: session.id) }
             } label: {
                 Label("Restart Session", systemImage: "arrow.counterclockwise")
             }
@@ -466,11 +455,20 @@ struct SessionRowView: View {
             isPresented: $showDeleteConfirmation,
             titleVisibility: .visible
         ) {
-            Button("Delete", role: .destructive) {
-                onDelete?(session.id)
+            Button("Delete Session Only") {
+                actions.deleteSession(id: session.id, deleteWorktree: false)
+            }
+            if session.worktreeBranch != nil {
+                Button("Delete Session & Worktree", role: .destructive) {
+                    actions.deleteSession(id: session.id, deleteWorktree: true)
+                }
             }
         } message: {
-            Text("This will stop the session and remove it from Runway. The worktree will remain on disk.")
+            if session.worktreeBranch != nil {
+                Text("This will stop the session and remove it from Runway. You can also delete the worktree and branch.")
+            } else {
+                Text("This will stop the session and remove it from Runway.")
+            }
         }
     }
 

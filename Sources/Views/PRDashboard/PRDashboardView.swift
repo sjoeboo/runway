@@ -16,6 +16,7 @@ public struct PRDashboardView: View {
     var onRequestChanges: ((PullRequest, String) -> Void)?
     var onMerge: ((PullRequest, MergeStrategy) -> Void)?
     var onToggleDraft: ((PullRequest) -> Void)?
+    var onSendToSession: ((PullRequest, String) -> Void)?
 
     @State private var selectedTab: PRTab = .mine
     @AppStorage("prListWidth") private var prListWidth: Double = 380
@@ -34,7 +35,8 @@ public struct PRDashboardView: View {
         onComment: @escaping (PullRequest, String) -> Void = { _, _ in },
         onRequestChanges: ((PullRequest, String) -> Void)? = nil,
         onMerge: ((PullRequest, MergeStrategy) -> Void)? = nil,
-        onToggleDraft: ((PullRequest) -> Void)? = nil
+        onToggleDraft: ((PullRequest) -> Void)? = nil,
+        onSendToSession: ((PullRequest, String) -> Void)? = nil
     ) {
         self.pullRequests = pullRequests
         self.selectedPRID = selectedPRID
@@ -48,6 +50,7 @@ public struct PRDashboardView: View {
         self.onRequestChanges = onRequestChanges
         self.onMerge = onMerge
         self.onToggleDraft = onToggleDraft
+        self.onSendToSession = onSendToSession
     }
 
     private var selectedPR: PullRequest? {
@@ -141,7 +144,10 @@ public struct PRDashboardView: View {
                     onComment: { body in onComment(pr, body) },
                     onRequestChanges: { body in onRequestChanges?(pr, body) },
                     onMerge: { strategy in onMerge?(pr, strategy) },
-                    onToggleDraft: { onToggleDraft?(pr) }
+                    onToggleDraft: { onToggleDraft?(pr) },
+                    onSendToSession: onSendToSession.map { callback in
+                        { context in callback(pr, context) }
+                    }
                 )
                 .frame(maxWidth: .infinity)
             }
@@ -216,6 +222,12 @@ struct PRRowView: View {
                 Text("+\(pr.additions) -\(pr.deletions)")
                     .font(.caption)
                     .foregroundColor(theme.chrome.textDim)
+                    .frame(minWidth: 60, alignment: .trailing)
+            } else if pr.checks.total == 0 {
+                // Unenriched — reserve space with loading indicator
+                ProgressView()
+                    .controlSize(.mini)
+                    .frame(minWidth: 60, alignment: .trailing)
             }
         }
         .padding(.vertical, 4)

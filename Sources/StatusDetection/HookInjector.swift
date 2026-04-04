@@ -32,7 +32,7 @@ public struct HookInjector: Sendable {
     ///   - configDir: Path to Claude Code config directory (default: ~/.claude)
     /// - Returns: `true` if hooks were newly installed or upgraded
     @discardableResult
-    public func inject(port: UInt16 = 47437, configDir: String? = nil) throws -> Bool {
+    public func inject(port: UInt16 = 47437, configDir: String? = nil, force: Bool = false) throws -> Bool {
         let dir = configDir ?? defaultClaudeConfigDir()
         let settingsPath = "\(dir)/settings.json"
 
@@ -42,9 +42,9 @@ public struct HookInjector: Sendable {
         // Parse existing hooks section
         var hooks = (rawSettings["hooks"] as? [String: Any]) ?? [:]
 
-        // Check if HTTP hooks are already installed at this port
+        // Check if HTTP hooks are already installed at this port (skip if force)
         let hookURL = String(format: Self.hookURLTemplate, Int(port))
-        if httpHooksInstalled(in: hooks, url: hookURL) {
+        if !force && httpHooksInstalled(in: hooks, url: hookURL) {
             return false
         }
 
@@ -138,15 +138,15 @@ public struct HookInjector: Sendable {
     }
 
     private func httpHooksInstalled(in hooks: [String: Any], url: String?) -> Bool {
-        // Check if at least one event has our HTTP hook
+        // Check if all events have our HTTP hook at the expected URL
         for config in Self.hookEvents {
             guard let eventData = hooks[config.event] else { return false }
-            if !eventContainsRunwayHook(eventData) { return false }
+            if !eventContainsRunwayHook(eventData, expectedURL: url) { return false }
         }
         return true
     }
 
-    private func eventContainsRunwayHook(_ eventData: Any) -> Bool {
+    private func eventContainsRunwayHook(_ eventData: Any, expectedURL: String? = nil) -> Bool {
         // Event can be a single matcher block or array of matcher blocks
         let blocks: [[String: Any]]
         if let single = eventData as? [String: Any] {
@@ -160,7 +160,12 @@ public struct HookInjector: Sendable {
         for block in blocks {
             if let hookList = block["hooks"] as? [[String: Any]] {
                 for hook in hookList where isRunwayHook(hook) {
-                    return true
+                    // If a specific URL is expected, verify the port matches
+                    if let expectedURL, let hookURL = hook["url"] as? String {
+                        if hookURL == expectedURL { return true }
+                    } else {
+                        return true
+                    }
                 }
             }
         }

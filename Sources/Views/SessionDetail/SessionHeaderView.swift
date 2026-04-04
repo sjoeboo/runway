@@ -34,10 +34,10 @@ public struct SessionHeaderView: View {
                     // Tool + permission mode badge
                     Text("\(session.tool.displayName.lowercased()) · \(session.permissionMode.badgeLabel)")
                         .font(.caption2)
-                        .foregroundColor(theme.chrome.textDim)
+                        .foregroundColor(session.permissionMode.badgeForeground(chrome: theme.chrome))
                         .padding(.horizontal, 7)
                         .padding(.vertical, 3)
-                        .background(theme.chrome.surface.opacity(0.6))
+                        .background(session.permissionMode.badgeBackground(chrome: theme.chrome))
                         .clipShape(Capsule())
                 }
 
@@ -124,6 +124,22 @@ extension PermissionMode {
         case .default: "default"
         case .acceptEdits: "accept-edits"
         case .bypassAll: "bypass-all"
+        }
+    }
+
+    fileprivate func badgeForeground(chrome: ChromePalette) -> Color {
+        switch self {
+        case .default: chrome.textDim
+        case .acceptEdits: chrome.orange
+        case .bypassAll: chrome.red
+        }
+    }
+
+    fileprivate func badgeBackground(chrome: ChromePalette) -> Color {
+        switch self {
+        case .default: chrome.surface.opacity(0.6)
+        case .acceptEdits: chrome.orange.opacity(0.15)
+        case .bypassAll: chrome.red.opacity(0.15)
         }
     }
 }

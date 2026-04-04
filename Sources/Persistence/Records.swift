@@ -9,7 +9,7 @@ struct SessionRecord: Codable, FetchableRecord, MutablePersistableRecord {
 
     var id: String
     var title: String
-    var groupID: String?
+    var projectID: String?
     var path: String
     var tool: String
     var status: String
@@ -24,7 +24,7 @@ struct SessionRecord: Codable, FetchableRecord, MutablePersistableRecord {
     init(_ session: Session) {
         self.id = session.id
         self.title = session.title
-        self.groupID = session.groupID
+        self.projectID = session.projectID
         self.path = session.path
         self.tool = Self.encodeTool(session.tool)
         self.status = session.status.rawValue
@@ -41,7 +41,7 @@ struct SessionRecord: Codable, FetchableRecord, MutablePersistableRecord {
         Session(
             id: id,
             title: title,
-            groupID: groupID,
+            projectID: projectID,
             path: path,
             tool: Self.decodeTool(tool),
             status: SessionStatus(rawValue: status) ?? .stopped,
@@ -88,6 +88,7 @@ struct ProjectRecord: Codable, FetchableRecord, MutablePersistableRecord {
     var ghRepo: String?
     var ghHost: String?
     var issuesEnabled: Bool
+    var branchPrefix: String?
 
     init(_ project: Project) {
         self.id = project.id
@@ -101,6 +102,7 @@ struct ProjectRecord: Codable, FetchableRecord, MutablePersistableRecord {
         self.ghRepo = project.ghRepo
         self.ghHost = project.ghHost
         self.issuesEnabled = project.issuesEnabled
+        self.branchPrefix = project.branchPrefix
     }
 
     func toProject() -> Project {
@@ -115,7 +117,8 @@ struct ProjectRecord: Codable, FetchableRecord, MutablePersistableRecord {
             permissionMode: permissionMode.flatMap { PermissionMode(rawValue: $0) },
             ghRepo: ghRepo,
             ghHost: ghHost,
-            issuesEnabled: issuesEnabled
+            issuesEnabled: issuesEnabled,
+            branchPrefix: branchPrefix
         )
     }
 }
