@@ -18,9 +18,15 @@ public struct PRDetailDrawer: View {
     @State private var inlineCommentText: String = ""
     @State private var showMergeConfirm: Bool = false
     @State private var selectedMergeStrategy: MergeStrategy = .squash
-    @State private var showRequestChanges: Bool = false
     @State private var requestChangesText: String = ""
-    @State private var showCommentSheet: Bool = false
+    @State private var activeSheet: ActiveSheet?
+
+    enum ActiveSheet: Identifiable {
+        case comment
+        case requestChanges
+
+        var id: String { String(describing: self) }
+    }
     @Environment(\.theme) private var theme
 
     public init(
@@ -117,10 +123,10 @@ public struct PRDetailDrawer: View {
                     .tint(theme.chrome.green)
                     .controlSize(.small)
 
-                Button("Request Changes") { showRequestChanges = true }
+                Button("Request Changes") { activeSheet = .requestChanges }
                     .controlSize(.small)
 
-                Button("Comment") { showCommentSheet = true }
+                Button("Comment") { activeSheet = .comment }
                     .controlSize(.small)
 
                 Spacer()
@@ -167,50 +173,52 @@ public struct PRDetailDrawer: View {
             } message: {
                 Text("This will \(selectedMergeStrategy.displayName.lowercased()) #\(pr.number) into \(pr.baseBranch).")
             }
-            .sheet(isPresented: $showRequestChanges) {
-                VStack(spacing: 12) {
-                    Text("Request Changes on #\(pr.number)")
-                        .font(.headline)
-                    TextEditor(text: $requestChangesText)
-                        .frame(minHeight: 100)
-                        .border(Color.secondary.opacity(0.3))
-                    HStack {
-                        Button("Cancel") { showRequestChanges = false }
-                        Spacer()
-                        Button("Submit") {
-                            onRequestChanges(requestChangesText)
-                            requestChangesText = ""
-                            showRequestChanges = false
+            .sheet(item: $activeSheet) { sheet in
+                switch sheet {
+                case .requestChanges:
+                    VStack(spacing: 12) {
+                        Text("Request Changes on #\(pr.number)")
+                            .font(.headline)
+                        TextEditor(text: $requestChangesText)
+                            .frame(minHeight: 100)
+                            .border(Color.secondary.opacity(0.3))
+                        HStack {
+                            Button("Cancel") { activeSheet = nil }
+                            Spacer()
+                            Button("Submit") {
+                                onRequestChanges(requestChangesText)
+                                requestChangesText = ""
+                                activeSheet = nil
+                            }
+                            .buttonStyle(.borderedProminent)
+                            .tint(theme.chrome.orange)
+                            .disabled(requestChangesText.isEmpty)
                         }
-                        .buttonStyle(.borderedProminent)
-                        .tint(theme.chrome.orange)
-                        .disabled(requestChangesText.isEmpty)
                     }
-                }
-                .padding()
-                .frame(width: 400)
-            }
-            .sheet(isPresented: $showCommentSheet) {
-                VStack(spacing: 12) {
-                    Text("Comment on #\(pr.number)")
-                        .font(.headline)
-                    TextEditor(text: $sheetCommentText)
-                        .frame(minHeight: 100)
-                        .border(Color.secondary.opacity(0.3))
-                    HStack {
-                        Button("Cancel") { showCommentSheet = false }
-                        Spacer()
-                        Button("Comment") {
-                            onComment(sheetCommentText)
-                            sheetCommentText = ""
-                            showCommentSheet = false
+                    .padding()
+                    .frame(width: 400)
+                case .comment:
+                    VStack(spacing: 12) {
+                        Text("Comment on #\(pr.number)")
+                            .font(.headline)
+                        TextEditor(text: $sheetCommentText)
+                            .frame(minHeight: 100)
+                            .border(Color.secondary.opacity(0.3))
+                        HStack {
+                            Button("Cancel") { activeSheet = nil }
+                            Spacer()
+                            Button("Comment") {
+                                onComment(sheetCommentText)
+                                sheetCommentText = ""
+                                activeSheet = nil
+                            }
+                            .buttonStyle(.borderedProminent)
+                            .disabled(sheetCommentText.isEmpty)
                         }
-                        .buttonStyle(.borderedProminent)
-                        .disabled(sheetCommentText.isEmpty)
                     }
+                    .padding()
+                    .frame(width: 400)
                 }
-                .padding()
-                .frame(width: 400)
             }
         }
         .padding(12)
@@ -405,7 +413,7 @@ public struct PRDetailDrawer: View {
                         .frame(height: 60)
                         .font(.body)
                         .overlay(
-                            RoundedRectangle(cornerRadius: 4)
+                            RoundedRectangle(cornerRadius: 6)
                                 .stroke(theme.chrome.border, lineWidth: 1)
                         )
                     HStack {

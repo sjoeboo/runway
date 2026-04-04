@@ -231,14 +231,9 @@ private struct LabelPill: View {
             .font(.caption2)
             .padding(.horizontal, 6)
             .padding(.vertical, 2)
-            .background(
-                RoundedRectangle(cornerRadius: 8)
-                    .fill(pillColor.opacity(0.15))
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 8)
-                    .strokeBorder(pillColor.opacity(0.5), lineWidth: 0.5)
-            )
+            .background(pillColor.opacity(0.15))
+            .overlay(Capsule().strokeBorder(pillColor.opacity(0.5), lineWidth: 0.5))
+            .clipShape(Capsule())
             .foregroundColor(pillColor)
     }
 }

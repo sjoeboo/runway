@@ -43,7 +43,12 @@ public struct TerminalTabView: View {
             Divider()
 
             // Terminal for selected tab
-            if let tab = selectedTab {
+            if tabs.isEmpty {
+                Spacer()
+                ProgressView("Connecting to session\u{2026}")
+                    .font(.caption)
+                Spacer()
+            } else if let tab = selectedTab {
                 ZStack(alignment: .topTrailing) {
                     TerminalPane(
                         config: tab.config,

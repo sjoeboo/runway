@@ -216,6 +216,12 @@ struct PRRowView: View {
                 Text("+\(pr.additions) -\(pr.deletions)")
                     .font(.caption)
                     .foregroundColor(theme.chrome.textDim)
+                    .frame(minWidth: 60, alignment: .trailing)
+            } else if pr.checks.total == 0 {
+                // Unenriched — reserve space with loading indicator
+                ProgressView()
+                    .controlSize(.mini)
+                    .frame(minWidth: 60, alignment: .trailing)
             }
         }
         .padding(.vertical, 4)

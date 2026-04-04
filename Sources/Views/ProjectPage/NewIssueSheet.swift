@@ -91,14 +91,9 @@ private struct LabelChip: View {
                 .fontWeight(isSelected ? .semibold : .regular)
                 .padding(.horizontal, 8)
                 .padding(.vertical, 4)
-                .background(
-                    RoundedRectangle(cornerRadius: 12)
-                        .fill(chipColor.opacity(isSelected ? 0.25 : 0.1))
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: 12)
-                        .strokeBorder(chipColor, lineWidth: isSelected ? 1.5 : 0.5)
-                )
+                .background(chipColor.opacity(isSelected ? 0.25 : 0.1))
+                .overlay(Capsule().strokeBorder(chipColor, lineWidth: isSelected ? 1.5 : 0.5))
+                .clipShape(Capsule())
                 .foregroundColor(chipColor)
         }
         .buttonStyle(.plain)

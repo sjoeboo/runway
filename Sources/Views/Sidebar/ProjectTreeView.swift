@@ -110,19 +110,24 @@ public struct ProjectTreeView: View {
                 }
             }
 
-            // Add project button
-            Section {
+        }
+        .listStyle(.sidebar)
+        .safeAreaInset(edge: .bottom) {
+            HStack {
                 Button {
                     onNewProject?()
                 } label: {
                     Label("Add Project", systemImage: "folder.badge.plus")
-                        .font(.system(.body))
+                        .font(.caption)
                         .foregroundColor(theme.chrome.textDim)
                 }
                 .buttonStyle(.plain)
+                Spacer()
             }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 8)
+            .background(theme.chrome.surface)
         }
-        .listStyle(.sidebar)
     }
 }
 
@@ -380,7 +385,7 @@ struct SessionRowView: View {
                     .padding(.horizontal, 4)
                     .padding(.vertical, 1)
                     .background(theme.chrome.surface)
-                    .cornerRadius(3)
+                    .cornerRadius(4)
             }
         }
         .padding(.vertical, 2)

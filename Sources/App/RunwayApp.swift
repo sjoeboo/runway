@@ -109,10 +109,11 @@ struct ContentView: View {
                 .theme(theme)
             }
 
-            // Status message toast — .task(id:) auto-cancels on message change
+            // Status message toast — errors persist until dismissed, others auto-dismiss
             if let msg = store.statusMessage {
                 statusToast(msg)
                     .task(id: msg) {
+                        guard msg.kind != .error else { return }
                         try? await Task.sleep(for: .seconds(3))
                         store.statusMessage = nil
                     }
@@ -148,6 +149,17 @@ struct ContentView: View {
             .font(.caption)
             Text(msg.text)
                 .font(.caption)
+                .textSelection(.enabled)
+
+            if msg.kind == .error {
+                Button {
+                    store.statusMessage = nil
+                } label: {
+                    Image(systemName: "xmark")
+                        .font(.caption2)
+                }
+                .buttonStyle(.plain)
+            }
         }
         .foregroundColor(.white)
         .padding(.horizontal, 12)
@@ -171,8 +183,6 @@ struct ContentView: View {
 
     private var sidebar: some View {
         VStack(spacing: 0) {
-            viewPicker
-            Divider()
             ProjectTreeView(
                 projects: store.projects,
                 sessions: store.sessions,
@@ -224,8 +234,7 @@ struct ContentView: View {
             EmptyView()
         }
         .pickerStyle(.segmented)
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
+        .frame(width: 180)
     }
 
     // MARK: - Detail
@@ -305,10 +314,8 @@ struct ContentView: View {
 
     @ToolbarContentBuilder
     private var toolbarContent: some ToolbarContent {
-        // Toolbar buttons removed — inline sidebar controls replace them.
-        // Keyboard shortcuts are preserved via the Commands block in RunwayApp.
-        ToolbarItem(placement: .primaryAction) {
-            EmptyView()
+        ToolbarItem(placement: .navigation) {
+            viewPicker
         }
     }
 }
