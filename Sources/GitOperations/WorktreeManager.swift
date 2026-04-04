@@ -98,33 +98,7 @@ public actor WorktreeManager {
 
     @discardableResult
     private func runGit(in directory: String, args: [String]) async throws -> String {
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/git")
-        process.arguments = args
-        process.currentDirectoryURL = URL(fileURLWithPath: directory)
-
-        let pipe = Pipe()
-        let errPipe = Pipe()
-        process.standardOutput = pipe
-        process.standardError = errPipe
-
-        try process.run()
-        process.waitUntilExit()
-
-        let data = pipe.fileHandleForReading.readDataToEndOfFile()
-        let output = String(data: data, encoding: .utf8) ?? ""
-
-        if process.terminationStatus != 0 {
-            let errData = errPipe.fileHandleForReading.readDataToEndOfFile()
-            let errOutput = String(data: errData, encoding: .utf8) ?? ""
-            throw GitError.commandFailed(
-                args: args,
-                exitCode: process.terminationStatus,
-                stderr: errOutput
-            )
-        }
-
-        return output
+        try await ShellRunner.runGit(in: directory, args: args)
     }
 
     private func sanitizeBranchName(_ name: String) -> String {

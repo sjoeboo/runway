@@ -1,4 +1,5 @@
 import Foundation
+import Models
 
 /// Represents a live tmux session discovered via `tmux list-sessions`.
 public struct TmuxSession: Sendable {
@@ -41,23 +42,27 @@ public actor TmuxSessionManager {
         command: String?,
         env: [String: String]
     ) async throws {
-        // Create detached session with working directory
-        try await runTmux(args: ["new-session", "-d", "-s", name, "-c", workDir])
+        // Build a single tmux command chain using \; separators to minimize subprocess spawns.
+        // Previously this was 4-6 sequential process calls; now it's 1 (+ optional send-keys).
+        var args = [
+            "new-session", "-d", "-s", name, "-c", workDir,
+        ]
 
-        // Hide tmux status bar — tmux is an implementation detail, not user-facing
-        _ = try? await runTmux(args: ["set-option", "-t", name, "status", "off"])
-
-        // Enable mouse support — allows click-drag selection, scroll, and pane resize.
-        // Without this, mouse events are ignored by tmux and SwiftTerm's native
-        // selection doesn't work because tmux sits between the terminal and the PTY.
-        _ = try? await runTmux(args: ["set-option", "-t", name, "mouse", "on"])
-
-        // Set environment variables
+        // Pass environment variables directly via -e flags (tmux 3.2+)
         for (key, value) in env {
-            _ = try? await runTmux(args: ["set-environment", "-t", name, key, value])
+            args += ["-e", "\(key)=\(value)"]
         }
 
-        // Send initial command if provided
+        // Chain option settings via \; separator
+        args += [
+            ";", "set-option", "-t", name, "status", "off",
+            ";", "set-option", "-t", name, "mouse", "on",
+        ]
+
+        try await runTmux(args: args)
+
+        // Send initial command if provided (separate call since send-keys
+        // with \; can be fragile if the command itself contains semicolons)
         if let command, !command.isEmpty {
             _ = try? await runTmux(args: ["send-keys", "-t", name, command, "Enter"])
         }
@@ -119,32 +124,7 @@ public actor TmuxSessionManager {
 
     @discardableResult
     private func runTmux(args: [String]) async throws -> String {
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
-        process.arguments = ["tmux"] + args
-
-        let pipe = Pipe()
-        let errPipe = Pipe()
-        process.standardOutput = pipe
-        process.standardError = errPipe
-
-        try process.run()
-        process.waitUntilExit()
-
-        let data = pipe.fileHandleForReading.readDataToEndOfFile()
-        let output = String(data: data, encoding: .utf8) ?? ""
-
-        if process.terminationStatus != 0 {
-            let errData = errPipe.fileHandleForReading.readDataToEndOfFile()
-            let errOutput = String(data: errData, encoding: .utf8) ?? ""
-            throw TmuxError.commandFailed(
-                args: args,
-                exitCode: process.terminationStatus,
-                stderr: errOutput
-            )
-        }
-
-        return output
+        try await ShellRunner.runTmux(args: args)
     }
 }
 

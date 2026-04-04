@@ -1,9 +1,8 @@
 import AppKit
-import GhosttyKit
 import SwiftUI
 
 /// Monitors keyboard events at the application level and forwards them
-/// directly to the Ghostty AppTerminalView, bypassing SwiftUI's event
+/// directly to the terminal view, bypassing SwiftUI's event
 /// interception layer.
 ///
 /// SwiftUI's NavigationSplitView intercepts key events before they reach
@@ -65,8 +64,10 @@ public final class TerminalKeyEventMonitor {
         let fr = window.firstResponder
         let frClass = fr.map { String(describing: type(of: $0)) } ?? "nil"
 
-        // Don't steal from text fields (dialog inputs)
-        if frClass.contains("TextField") || frClass.contains("FieldEditor") {
+        // Don't steal from text fields, text views, or editors (dialog inputs, sheets, etc.)
+        if frClass.contains("TextField") || frClass.contains("FieldEditor")
+            || frClass.contains("NSTextView") || frClass.contains("TextEditor")
+        {
             return false
         }
 
@@ -107,66 +108,6 @@ public final class TerminalKeyEventMonitor {
             return true
         default:
             return false
-        }
-    }
-
-    /// Send text directly to the Ghostty surface by finding the ghostty_surface_t
-    /// pointer through Objective-C runtime introspection and calling the C API.
-    private static func sendDirectText(_ text: String, to terminal: NSView) {
-        // The AppTerminalView stores the surface pointer deep in its coordinator.
-        // We use Mirror to traverse: terminal.core.surface.rawValue (ghostty_surface_t?)
-        let termMirror = Mirror(reflecting: terminal)
-        guard let core = termMirror.children.first(where: { $0.label == "core" })?.value else {
-            print("[KeyMonitor] Could not find 'core' on terminal view")
-            return
-        }
-        let coreMirror = Mirror(reflecting: core)
-        guard let surfaceObj = coreMirror.children.first(where: { $0.label == "surface" })?.value else {
-            print("[KeyMonitor] Could not find 'surface' on core")
-            return
-        }
-        // surfaceObj is Optional<TerminalSurface>, unwrap it
-        let surfMirror = Mirror(reflecting: surfaceObj)
-        if surfMirror.displayStyle == .optional {
-            guard let unwrapped = surfMirror.children.first?.value else {
-                print("[KeyMonitor] Surface is nil")
-                return
-            }
-            let innerMirror = Mirror(reflecting: unwrapped)
-            if let rawPtr = innerMirror.children.first(where: { $0.label == "surface" })?.value {
-                // rawPtr should be ghostty_surface_t? (which is an OpaquePointer?)
-                if let surfacePtr = rawPtr as? UnsafeMutableRawPointer {
-                    text.withCString { cStr in
-                        ghostty_surface_text(surfacePtr, cStr, UInt(text.utf8.count))
-                    }
-                    return
-                }
-                // Try OpaquePointer as fallback
-                if let opaquePtr = rawPtr as? OpaquePointer {
-                    let ptr = UnsafeMutableRawPointer(opaquePtr)
-                    text.withCString { cStr in
-                        ghostty_surface_text(ptr, cStr, UInt(text.utf8.count))
-                    }
-                    return
-                }
-            }
-        }
-        print("[KeyMonitor] Failed to extract ghostty_surface_t pointer")
-    }
-
-    /// Map special keys to their terminal escape sequences.
-    private static func specialKeySequence(_ event: NSEvent) -> String? {
-        switch event.keyCode {
-        case 36: return "\r"  // Return/Enter
-        case 76: return "\r"  // Numpad Enter
-        case 53: return "\u{1B}"  // Escape
-        case 48: return "\t"  // Tab
-        case 51: return "\u{7F}"  // Backspace (DEL)
-        case 123: return "\u{1B}[D"  // Left arrow
-        case 124: return "\u{1B}[C"  // Right arrow
-        case 125: return "\u{1B}[B"  // Down arrow
-        case 126: return "\u{1B}[A"  // Up arrow
-        default: return nil
         }
     }
 

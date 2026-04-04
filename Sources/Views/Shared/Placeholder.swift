@@ -8,7 +8,7 @@ public struct EmptyStateView: View {
     let systemImage: String
     @Environment(\.theme) private var theme
 
-    public init(title: String, subtitle: String, systemImage: String = "airplane") {
+    public init(title: String, subtitle: String, systemImage: String = "terminal") {
         self.title = title
         self.subtitle = subtitle
         self.systemImage = systemImage

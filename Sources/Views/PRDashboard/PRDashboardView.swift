@@ -205,8 +205,8 @@ struct PRRowView: View {
                             .font(.caption)
                             .foregroundColor(theme.chrome.accent)
                     }
-                    checksSummary
-                    reviewBadge
+                    CheckSummaryBadge(checks: pr.checks)
+                    ReviewDecisionBadge(decision: pr.reviewDecision)
                 }
             }
 
@@ -236,43 +236,4 @@ struct PRRowView: View {
         }
     }
 
-    @ViewBuilder
-    private var checksSummary: some View {
-        if pr.checks.total > 0 {
-            HStack(spacing: 2) {
-                if pr.checks.allPassed {
-                    Image(systemName: "checkmark.circle.fill")
-                        .foregroundColor(theme.chrome.green)
-                } else if pr.checks.hasFailed {
-                    Image(systemName: "xmark.circle.fill")
-                        .foregroundColor(theme.chrome.red)
-                } else {
-                    Image(systemName: "circle.fill")
-                        .foregroundColor(theme.chrome.yellow)
-                }
-                Text("\(pr.checks.passed)/\(pr.checks.total)")
-            }
-            .font(.caption2)
-        }
-    }
-
-    @ViewBuilder
-    private var reviewBadge: some View {
-        switch pr.reviewDecision {
-        case .approved:
-            Label("Approved", systemImage: "checkmark")
-                .font(.caption2)
-                .foregroundColor(theme.chrome.green)
-        case .changesRequested:
-            Label("Changes", systemImage: "exclamationmark.triangle")
-                .font(.caption2)
-                .foregroundColor(theme.chrome.orange)
-        case .pending:
-            Label("Review", systemImage: "clock")
-                .font(.caption2)
-                .foregroundColor(theme.chrome.yellow)
-        case .none:
-            EmptyView()
-        }
-    }
 }

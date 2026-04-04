@@ -15,6 +15,7 @@ public actor HookServer {
     private let requestedPort: UInt16
     private var listener: NWListener?
     private var handlers: [EventHandler] = []
+    private let connectionQueue = DispatchQueue(label: "runway.hookserver.conn")
 
     /// The actual port the server is listening on (available after `start()` returns).
     public private(set) var actualPort: UInt16?
@@ -52,11 +53,13 @@ public actor HookServer {
 
         // Use a continuation to bridge NWListener's callback into async/await.
         let resolvedPort = try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<UInt16?, Error>) in
-            listener.stateUpdateHandler = { state in
+            listener.stateUpdateHandler = { [weak listener] state in
                 switch state {
                 case .ready:
-                    continuation.resume(returning: listener.port?.rawValue)
+                    listener?.stateUpdateHandler = nil  // prevent double-resume
+                    continuation.resume(returning: listener?.port?.rawValue)
                 case .failed(let error):
+                    listener?.stateUpdateHandler = nil  // prevent double-resume
                     continuation.resume(throwing: error)
                 default:
                     break
@@ -79,15 +82,45 @@ public actor HookServer {
     // MARK: - Private
 
     private func handleConnection(_ connection: NWConnection) {
-        connection.start(queue: DispatchQueue(label: "runway.hookserver.conn"))
+        connection.start(queue: connectionQueue)
+        accumulateRequest(connection: connection, buffer: Data())
+    }
 
+    /// Accumulate HTTP request data until we have the full body (Content-Length aware).
+    /// Calls processRequest once the full payload is received.
+    nonisolated private func accumulateRequest(connection: NWConnection, buffer: Data) {
         connection.receive(minimumIncompleteLength: 1, maximumLength: 65536) { [weak self] data, _, _, error in
             guard let data, error == nil else {
                 connection.cancel()
                 return
             }
 
-            Task { await self?.processRequest(data: data, connection: connection) }
+            var accumulated = buffer
+            accumulated.append(data)
+
+            // Check if we have the full HTTP request
+            let separator = Data("\r\n\r\n".utf8)
+            if let headerEnd = accumulated.range(of: separator) {
+                // Parse Content-Length from headers
+                let headerData = accumulated[accumulated.startIndex..<headerEnd.lowerBound]
+                let headerStr = String(data: headerData, encoding: .utf8) ?? ""
+                let contentLength =
+                    headerStr.components(separatedBy: "\r\n")
+                    .first(where: { $0.lowercased().hasPrefix("content-length:") })
+                    .flatMap { Int($0.dropFirst("content-length:".count).trimmingCharacters(in: .whitespaces)) }
+                    ?? 0
+
+                let bodyStart = headerEnd.upperBound
+                let receivedBody = accumulated.count - bodyStart
+                if receivedBody >= contentLength {
+                    // Full request received
+                    Task { await self?.processRequest(data: accumulated, connection: connection) }
+                    return
+                }
+            }
+
+            // Need more data — keep reading
+            self?.accumulateRequest(connection: connection, buffer: accumulated)
         }
     }
 

@@ -88,7 +88,7 @@ public struct DiffView: View {
             // Diff content (when expanded)
             if expandedFiles.contains(file.path) {
                 VStack(alignment: .leading, spacing: 0) {
-                    ForEach(Array(file.lines.enumerated()), id: \.offset) { _, line in
+                    ForEach(file.lines) { line in
                         diffLine(line)
                     }
                 }
@@ -221,11 +221,20 @@ public struct DiffFile: Identifiable, Sendable {
     }
 }
 
-public struct DiffLine: Sendable {
+public struct DiffLine: Identifiable, Sendable {
+    public let id: String
     public let type: DiffLineType
     public let content: String
     public let oldLineNo: Int?
     public let newLineNo: Int?
+
+    public init(type: DiffLineType, content: String, oldLineNo: Int?, newLineNo: Int?) {
+        self.id = "\(type)-\(oldLineNo ?? -1)-\(newLineNo ?? -1)-\(content.hashValue)"
+        self.type = type
+        self.content = content
+        self.oldLineNo = oldLineNo
+        self.newLineNo = newLineNo
+    }
 }
 
 public enum DiffLineType: Sendable {

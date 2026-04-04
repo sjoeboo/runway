@@ -12,7 +12,6 @@ let package = Package(
     dependencies: [
         .package(url: "https://github.com/groue/GRDB.swift.git", from: "7.4.0"),
         .package(url: "https://github.com/migueldeicaza/SwiftTerm.git", from: "1.2.0"),
-        .package(url: "https://github.com/Lakr233/libghostty-spm.git", from: "1.0.0"),
     ],
     targets: [
         // MARK: - App Entry Point
@@ -48,24 +47,13 @@ let package = Package(
             path: "Sources/Persistence"
         ),
 
-        // MARK: - libghostty-vt (C library for VT parsing/state)
-        // NOTE: CGhosttyVT headers + static lib are in Sources/CGhosttyVT/ and Frameworks/.
-        // Currently not linked due to missing Highway (hwy) SIMD dependency.
-        // The GhosttyVTTerminal.swift wrapper is ready — needs linker flags resolved.
-        // To enable: add "CGhosttyVT" to Terminal dependencies and uncomment linkerSettings.
-        .target(
-            name: "CGhosttyVT",
-            path: "Sources/CGhosttyVT",
-            publicHeadersPath: "include"
-        ),
-
-        // MARK: - Terminal Provider Protocol + PTY
+        // MARK: - Terminal PTY
         .target(
             name: "Terminal",
             dependencies: ["Models"],
             path: "Sources/Terminal",
             exclude: ["GhosttyVTTerminal.swift"],
-            sources: ["TerminalProvider.swift", "PTYProcess.swift", "NativePTYProvider.swift", "TmuxSessionManager.swift"]
+            sources: ["PTYProcess.swift", "TmuxSessionManager.swift"]
         ),
 
         // MARK: - Terminal SwiftUI View (NSViewRepresentable)
@@ -75,7 +63,6 @@ let package = Package(
                 "Terminal",
                 "Theme",
                 .product(name: "SwiftTerm", package: "SwiftTerm"),
-                .product(name: "GhosttyTerminal", package: "libghostty-spm"),
             ],
             path: "Sources/TerminalView"
         ),
