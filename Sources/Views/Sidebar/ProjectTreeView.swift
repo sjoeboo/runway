@@ -9,6 +9,7 @@ public struct ProjectTreeView: View {
     let sessions: [Session]
     let sessionPRs: [String: PullRequest]
     @Binding var selectedSessionID: String?
+    @Binding var selectedProjectID: String?
     var onRestart: ((String) -> Void)?
     var onDelete: ((String) -> Void)?
     var onNewSession: ((String?) -> Void)?
@@ -19,6 +20,8 @@ public struct ProjectTreeView: View {
     var onViewPR: ((String) -> Void)?
     var onReorderSessions: ((String?, IndexSet, Int) -> Void)?
     var onReorderProjects: ((IndexSet, Int) -> Void)?
+    var onSelectProject: ((String?) -> Void)?
+    var onSelectSession: ((String?) -> Void)?
     @Environment(\.theme) private var theme
 
     public init(
@@ -26,6 +29,7 @@ public struct ProjectTreeView: View {
         sessions: [Session],
         sessionPRs: [String: PullRequest] = [:],
         selectedSessionID: Binding<String?>,
+        selectedProjectID: Binding<String?> = .constant(nil),
         onRestart: ((String) -> Void)? = nil,
         onDelete: ((String) -> Void)? = nil,
         onNewSession: ((String?) -> Void)? = nil,
@@ -35,12 +39,15 @@ public struct ProjectTreeView: View {
         onDeleteProject: ((String) -> Void)? = nil,
         onViewPR: ((String) -> Void)? = nil,
         onReorderSessions: ((String?, IndexSet, Int) -> Void)? = nil,
-        onReorderProjects: ((IndexSet, Int) -> Void)? = nil
+        onReorderProjects: ((IndexSet, Int) -> Void)? = nil,
+        onSelectProject: ((String?) -> Void)? = nil,
+        onSelectSession: ((String?) -> Void)? = nil
     ) {
         self.projects = projects
         self.sessions = sessions
         self.sessionPRs = sessionPRs
         self._selectedSessionID = selectedSessionID
+        self._selectedProjectID = selectedProjectID
         self.onRestart = onRestart
         self.onDelete = onDelete
         self.onNewSession = onNewSession
@@ -51,6 +58,8 @@ public struct ProjectTreeView: View {
         self.onViewPR = onViewPR
         self.onReorderSessions = onReorderSessions
         self.onReorderProjects = onReorderProjects
+        self.onSelectProject = onSelectProject
+        self.onSelectSession = onSelectSession
     }
 
     public var body: some View {
@@ -69,7 +78,9 @@ public struct ProjectTreeView: View {
                     onViewPR: onViewPR,
                     onReorderSessions: { fromOffsets, toOffset in
                         onReorderSessions?(project.id, fromOffsets, toOffset)
-                    }
+                    },
+                    onSelectProject: onSelectProject,
+                    onSelectSession: onSelectSession
                 )
             }
             .onMove { fromOffsets, toOffset in
@@ -87,7 +98,8 @@ public struct ProjectTreeView: View {
                             onRestart: onRestart,
                             onDelete: onDelete,
                             onRenameSession: onRenameSession,
-                            onViewPR: onViewPR
+                            onViewPR: onViewPR,
+                            onSelectSession: onSelectSession
                         )
                         .tag(session.id)
                     }
@@ -127,6 +139,8 @@ struct ProjectSection: View {
     var onDeleteProject: ((String) -> Void)?
     var onViewPR: ((String) -> Void)?
     var onReorderSessions: ((IndexSet, Int) -> Void)?
+    var onSelectProject: ((String?) -> Void)?
+    var onSelectSession: ((String?) -> Void)?
     @AppStorage private var isExpanded: Bool
     @State private var isHeaderHovered = false
     @State private var isRenaming = false
@@ -144,7 +158,9 @@ struct ProjectSection: View {
         onRenameProject: ((String, String) -> Void)? = nil,
         onDeleteProject: ((String) -> Void)? = nil,
         onViewPR: ((String) -> Void)? = nil,
-        onReorderSessions: ((IndexSet, Int) -> Void)? = nil
+        onReorderSessions: ((IndexSet, Int) -> Void)? = nil,
+        onSelectProject: ((String?) -> Void)? = nil,
+        onSelectSession: ((String?) -> Void)? = nil
     ) {
         self.project = project
         self.sessions = sessions
@@ -157,6 +173,8 @@ struct ProjectSection: View {
         self.onDeleteProject = onDeleteProject
         self.onViewPR = onViewPR
         self.onReorderSessions = onReorderSessions
+        self.onSelectProject = onSelectProject
+        self.onSelectSession = onSelectSession
         self._isExpanded = AppStorage(wrappedValue: true, "project.expanded.\(project.id)")
     }
 
@@ -169,7 +187,8 @@ struct ProjectSection: View {
                     onRestart: onRestart,
                     onDelete: onDelete,
                     onRenameSession: onRenameSession,
-                    onViewPR: onViewPR
+                    onViewPR: onViewPR,
+                    onSelectSession: onSelectSession
                 )
                 .tag(session.id)
             }
@@ -195,6 +214,9 @@ struct ProjectSection: View {
                     Text(project.name)
                         .font(.system(.title3, weight: .semibold))
                         .foregroundColor(theme.chrome.text)
+                        .onTapGesture {
+                            onSelectProject?(project.id)
+                        }
                 }
                 Spacer()
 
@@ -235,6 +257,12 @@ struct ProjectSection: View {
                 Label("Open in Finder", systemImage: "folder")
             }
 
+            Button {
+                onSelectProject?(project.id)
+            } label: {
+                Label("Project Settings\u{2026}", systemImage: "gear")
+            }
+
             Divider()
 
             Button(role: .destructive) {
@@ -256,6 +284,7 @@ struct SessionRowView: View {
     var onDelete: ((String) -> Void)?
     var onRenameSession: ((String, String) -> Void)?
     var onViewPR: ((String) -> Void)?
+    var onSelectSession: ((String?) -> Void)?
     @State private var isHovered = false
     @State private var isRenaming = false
     @State private var editTitle: String = ""
@@ -291,9 +320,17 @@ struct SessionRowView: View {
                 // Linked PR info
                 if let pr = linkedPR {
                     HStack(spacing: 4) {
-                        Text("#\(pr.number)")
-                            .font(.caption2)
-                            .foregroundColor(theme.chrome.accent)
+                        Button {
+                            if let url = URL(string: pr.url) {
+                                NSWorkspace.shared.open(url)
+                            }
+                        } label: {
+                            Text("#\(pr.number)")
+                                .font(.caption2)
+                                .foregroundColor(pr.numberColor(chrome: theme.chrome))
+                        }
+                        .buttonStyle(.plain)
+                        .help("Open PR #\(pr.number) in browser")
                         if pr.checks.total > 0 {
                             if pr.checks.allPassed {
                                 Image(systemName: "checkmark.circle.fill")
@@ -320,6 +357,20 @@ struct SessionRowView: View {
                             Image(systemName: "exclamationmark.triangle")
                                 .font(.system(size: 8))
                                 .foregroundColor(theme.chrome.orange)
+                        }
+                        if pr.additions > 0 || pr.deletions > 0 {
+                            HStack(spacing: 1) {
+                                Text("+\(pr.additions)")
+                                    .foregroundColor(theme.chrome.green)
+                                Text("-\(pr.deletions)")
+                                    .foregroundColor(theme.chrome.red)
+                            }
+                            .font(.caption2)
+                        }
+                        if pr.isDraft {
+                            Text("Draft")
+                                .font(.system(size: 8))
+                                .foregroundColor(theme.chrome.textDim)
                         }
                     }
                 }
@@ -360,6 +411,9 @@ struct SessionRowView: View {
             }
         }
         .padding(.vertical, 2)
+        .onTapGesture {
+            onSelectSession?(session.id)
+        }
         .onHover { hovering in
             isHovered = hovering
         }

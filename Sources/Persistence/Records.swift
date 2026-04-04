@@ -83,6 +83,11 @@ struct ProjectRecord: Codable, FetchableRecord, MutablePersistableRecord {
     var defaultBranch: String
     var sortOrder: Int
     var createdAt: Date
+    var themeID: String?
+    var permissionMode: String?
+    var ghRepo: String?
+    var ghHost: String?
+    var issuesEnabled: Bool
 
     init(_ project: Project) {
         self.id = project.id
@@ -91,6 +96,11 @@ struct ProjectRecord: Codable, FetchableRecord, MutablePersistableRecord {
         self.defaultBranch = project.defaultBranch
         self.sortOrder = project.sortOrder
         self.createdAt = project.createdAt
+        self.themeID = project.themeID
+        self.permissionMode = project.permissionMode?.rawValue
+        self.ghRepo = project.ghRepo
+        self.ghHost = project.ghHost
+        self.issuesEnabled = project.issuesEnabled
     }
 
     func toProject() -> Project {
@@ -100,7 +110,12 @@ struct ProjectRecord: Codable, FetchableRecord, MutablePersistableRecord {
             path: path,
             defaultBranch: defaultBranch,
             sortOrder: sortOrder,
-            createdAt: createdAt
+            createdAt: createdAt,
+            themeID: themeID,
+            permissionMode: permissionMode.flatMap { PermissionMode(rawValue: $0) },
+            ghRepo: ghRepo,
+            ghHost: ghHost,
+            issuesEnabled: issuesEnabled
         )
     }
 }
