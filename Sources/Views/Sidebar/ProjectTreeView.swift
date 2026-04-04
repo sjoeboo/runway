@@ -11,7 +11,7 @@ public struct ProjectTreeView: View {
     @Binding var selectedSessionID: String?
     @Binding var selectedProjectID: String?
     var onRestart: ((String) -> Void)?
-    var onDelete: ((String) -> Void)?
+    var onDelete: ((String, Bool) -> Void)?
     var onNewSession: ((String?) -> Void)?
     var onNewProject: (() -> Void)?
     var onRenameSession: ((String, String) -> Void)?
@@ -31,7 +31,7 @@ public struct ProjectTreeView: View {
         selectedSessionID: Binding<String?>,
         selectedProjectID: Binding<String?> = .constant(nil),
         onRestart: ((String) -> Void)? = nil,
-        onDelete: ((String) -> Void)? = nil,
+        onDelete: ((String, Bool) -> Void)? = nil,
         onNewSession: ((String?) -> Void)? = nil,
         onNewProject: (() -> Void)? = nil,
         onRenameSession: ((String, String) -> Void)? = nil,
@@ -63,11 +63,12 @@ public struct ProjectTreeView: View {
     }
 
     public var body: some View {
+        let sessionsByProject = Dictionary(grouping: sessions) { $0.projectID ?? "" }
         List(selection: $selectedSessionID) {
             ForEach(projects) { project in
                 ProjectSection(
                     project: project,
-                    sessions: sessions.filter { $0.groupID == project.id },
+                    sessions: sessionsByProject[project.id] ?? [],
                     sessionPRs: sessionPRs,
                     onRestart: onRestart,
                     onDelete: onDelete,
@@ -88,7 +89,7 @@ public struct ProjectTreeView: View {
             }
 
             // Ungrouped sessions
-            let ungrouped = sessions.filter { $0.groupID == nil }
+            let ungrouped = sessionsByProject[""] ?? []
             if !ungrouped.isEmpty {
                 Section("Sessions") {
                     ForEach(ungrouped) { session in
@@ -132,7 +133,7 @@ struct ProjectSection: View {
     let sessions: [Session]
     let sessionPRs: [String: PullRequest]
     var onRestart: ((String) -> Void)?
-    var onDelete: ((String) -> Void)?
+    var onDelete: ((String, Bool) -> Void)?
     var onNewSession: (() -> Void)?
     var onRenameSession: ((String, String) -> Void)?
     var onRenameProject: ((String, String) -> Void)?
@@ -152,7 +153,7 @@ struct ProjectSection: View {
         sessions: [Session],
         sessionPRs: [String: PullRequest],
         onRestart: ((String) -> Void)?,
-        onDelete: ((String) -> Void)?,
+        onDelete: ((String, Bool) -> Void)?,
         onNewSession: (() -> Void)?,
         onRenameSession: ((String, String) -> Void)? = nil,
         onRenameProject: ((String, String) -> Void)? = nil,
@@ -279,7 +280,7 @@ struct SessionRowView: View {
     let session: Session
     var linkedPR: PullRequest?
     var onRestart: ((String) -> Void)?
-    var onDelete: ((String) -> Void)?
+    var onDelete: ((String, Bool) -> Void)?
     var onRenameSession: ((String, String) -> Void)?
     var onViewPR: ((String) -> Void)?
     var onSelectSession: ((String?) -> Void)?
@@ -466,11 +467,20 @@ struct SessionRowView: View {
             isPresented: $showDeleteConfirmation,
             titleVisibility: .visible
         ) {
-            Button("Delete", role: .destructive) {
-                onDelete?(session.id)
+            Button("Delete Session Only") {
+                onDelete?(session.id, false)
+            }
+            if session.worktreeBranch != nil {
+                Button("Delete Session & Worktree", role: .destructive) {
+                    onDelete?(session.id, true)
+                }
             }
         } message: {
-            Text("This will stop the session and remove it from Runway. The worktree will remain on disk.")
+            if session.worktreeBranch != nil {
+                Text("This will stop the session and remove it from Runway. You can also delete the worktree and branch.")
+            } else {
+                Text("This will stop the session and remove it from Runway.")
+            }
         }
     }
 

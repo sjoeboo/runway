@@ -45,6 +45,12 @@ struct RunwayApp: App {
 
                 Button("New Project") { store.showNewProjectDialog = true }
                     .keyboardShortcut("p", modifiers: [.command, .shift])
+
+                Button("Send to Session") { store.showSendBar.toggle() }
+                    .keyboardShortcut("x", modifiers: [.command, .shift])
+
+                Button("Find in Terminal") { store.showTerminalSearch.toggle() }
+                    .keyboardShortcut("f", modifiers: .command)
             }
         }
 
@@ -180,7 +186,7 @@ struct ContentView: View {
                     set: { store.selectedProjectID = $0 }
                 ),
                 onRestart: { id in Task { await store.restartSession(id: id) } },
-                onDelete: { id in store.deleteSession(id: id) },
+                onDelete: { id, deleteWorktree in store.deleteSession(id: id, deleteWorktree: deleteWorktree) },
                 onNewSession: { projectID in
                     store.newSessionProjectID = projectID
                     store.showNewSessionDialog = true
@@ -231,7 +237,18 @@ struct ContentView: View {
             if let sessionID = store.selectedSessionID,
                 let session = store.sessions.first(where: { $0.id == sessionID })
             {
-                SessionDetailView(session: session, linkedPR: store.sessionPRs[sessionID])
+                SessionDetailView(
+                    session: session,
+                    linkedPR: store.sessionPRs[sessionID],
+                    showSendBar: Binding(
+                        get: { store.showSendBar },
+                        set: { store.showSendBar = $0 }
+                    ),
+                    showTerminalSearch: Binding(
+                        get: { store.showTerminalSearch },
+                        set: { store.showTerminalSearch = $0 }
+                    )
+                )
             } else if let projectID = store.selectedProjectID,
                 let project = store.projects.first(where: { $0.id == projectID })
             {

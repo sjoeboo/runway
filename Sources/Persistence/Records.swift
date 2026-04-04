@@ -9,7 +9,7 @@ struct SessionRecord: Codable, FetchableRecord, MutablePersistableRecord {
 
     var id: String
     var title: String
-    var groupID: String?
+    var projectID: String?
     var path: String
     var tool: String
     var status: String
@@ -24,7 +24,7 @@ struct SessionRecord: Codable, FetchableRecord, MutablePersistableRecord {
     init(_ session: Session) {
         self.id = session.id
         self.title = session.title
-        self.groupID = session.groupID
+        self.projectID = session.projectID
         self.path = session.path
         self.tool = Self.encodeTool(session.tool)
         self.status = session.status.rawValue
@@ -41,7 +41,7 @@ struct SessionRecord: Codable, FetchableRecord, MutablePersistableRecord {
         Session(
             id: id,
             title: title,
-            groupID: groupID,
+            projectID: projectID,
             path: path,
             tool: Self.decodeTool(tool),
             status: SessionStatus(rawValue: status) ?? .stopped,

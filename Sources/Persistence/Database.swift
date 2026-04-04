@@ -169,6 +169,12 @@ public final class Database: Sendable {
             }
         }
 
+        migrator.registerMigration("v7_rename_groupid_to_projectid") { db in
+            try db.alter(table: "sessions") { t in
+                t.rename(column: "groupID", to: "projectID")
+            }
+        }
+
         try migrator.migrate(dbQueue)
     }
 

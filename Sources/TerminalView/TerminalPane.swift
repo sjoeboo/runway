@@ -187,6 +187,11 @@ class MouseSelectionMonitor {
             return event
         }
     }
+
+    func stop() {
+        if let m = monitor { NSEvent.removeMonitor(m) }
+        monitor = nil
+    }
 }
 
 // MARK: - Container View
@@ -257,6 +262,11 @@ class ShiftEnterMonitor {
             }
             return event
         }
+    }
+
+    func stop() {
+        if let m = monitor { NSEvent.removeMonitor(m) }
+        monitor = nil
     }
 }
 

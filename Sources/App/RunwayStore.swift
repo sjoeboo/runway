@@ -30,6 +30,8 @@ public final class RunwayStore {
     var newSessionProjectID: String?
     var statusMessage: StatusMessage?
     var tmuxAvailable: Bool = false
+    var showSendBar: Bool = false
+    var showTerminalSearch: Bool = false
 
     /// Maps session ID → linked PullRequest (matched by worktree branch)
     var sessionPRs: [String: PullRequest] = [:]
@@ -88,6 +90,9 @@ public final class RunwayStore {
 
         // Load cached PRs synchronously for instant display while background fetch runs
         loadCachedPRs()
+
+        // Start buffer-based status detection for sessions without hook events
+        startBufferDetection()
     }
 
     // MARK: - State Loading
@@ -177,7 +182,7 @@ public final class RunwayStore {
 
         var session = Session(
             title: request.title,
-            groupID: request.projectID,
+            projectID: request.projectID,
             path: sessionPath,
             tool: request.tool,
             status: .starting,
@@ -287,12 +292,20 @@ public final class RunwayStore {
         selectedSessionID = id
     }
 
-    func deleteSession(id: String) {
+    func deleteSession(id: String, deleteWorktree: Bool = false) {
+        // Capture worktree info before removing session from array
+        let session = sessions.first(where: { $0.id == id })
+        let worktreeBranch = session?.worktreeBranch
+        let sessionPath = session?.path
+        let projectPath = session.flatMap { sess in
+            projects.first(where: { $0.id == sess.projectID })?.path
+        }
+
         // Find next sibling before removing, so we can select it after deletion
         let nextSelection: String? = {
             guard let idx = sessions.firstIndex(where: { $0.id == id }) else { return nil }
-            let projectID = sessions[idx].groupID
-            let siblings = sessions.filter { $0.groupID == projectID }
+            let projectID = sessions[idx].projectID
+            let siblings = sessions.filter { $0.projectID == projectID }
             guard let siblingIdx = siblings.firstIndex(where: { $0.id == id }) else { return nil }
             if siblingIdx + 1 < siblings.count {
                 return siblings[siblingIdx + 1].id  // next sibling
@@ -304,14 +317,29 @@ public final class RunwayStore {
 
         sessions.removeAll { $0.id == id }
         try? database?.deleteSession(id: id)
+        TerminalSessionCache.shared.removeAll(forSessionID: id)
         if selectedSessionID == id {
             selectedSessionID = nextSelection
         }
 
-        // Clean up tmux session
-        if tmuxAvailable {
-            Task {
+        // Clean up tmux session and optionally worktree
+        Task {
+            if tmuxAvailable {
                 try? await tmuxManager.killSession(name: "runway-\(id)")
+            }
+
+            if deleteWorktree, let repoPath = projectPath, let wtPath = sessionPath,
+                worktreeBranch != nil
+            {
+                do {
+                    try await worktreeManager.removeWorktree(
+                        repoPath: repoPath, worktreePath: wtPath, deleteBranch: true
+                    )
+                } catch {
+                    await MainActor.run {
+                        statusMessage = .error("Worktree cleanup failed: \(error.localizedDescription)")
+                    }
+                }
             }
         }
     }
@@ -386,7 +414,7 @@ public final class RunwayStore {
     // MARK: - Reordering
 
     func reorderSessions(in projectID: String?, fromOffsets: IndexSet, toOffset: Int) {
-        var subset = sessions.filter { $0.groupID == projectID }
+        var subset = sessions.filter { $0.projectID == projectID }
         subset.move(fromOffsets: fromOffsets, toOffset: toOffset)
         for (i, session) in subset.enumerated() {
             if let idx = sessions.firstIndex(where: { $0.id == session.id }) {
@@ -442,6 +470,50 @@ public final class RunwayStore {
             updateSessionStatus(id: event.sessionID, status: .waiting)
         case .notification:
             break
+        }
+    }
+
+    // MARK: - Buffer-based Status Detection
+
+    /// Polls terminal buffers to detect session status for sessions without hook events.
+    /// Runs every 3 seconds and updates status based on terminal content analysis.
+    func startBufferDetection() {
+        Task { @MainActor in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(3))
+                pollTerminalBuffers()
+            }
+        }
+    }
+
+    private func pollTerminalBuffers() {
+        for i in sessions.indices {
+            let session = sessions[i]
+            guard session.status != .stopped else { continue }
+
+            // Read last 15 lines from the cached terminal view
+            guard let terminal = TerminalSessionCache.shared.mainTerminal(forSessionID: session.id) else {
+                continue
+            }
+
+            let terminalAccess = terminal.getTerminal()
+            let rows = terminalAccess.rows
+            let startRow = max(0, rows - 15)
+            var lines: [String] = []
+            for row in startRow..<rows {
+                if let line = terminalAccess.getLine(row: row) {
+                    lines.append(line.translateToString(trimRight: true))
+                }
+            }
+            let content = lines.joined(separator: "\n")
+            guard !content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { continue }
+
+            if let detected = statusDetector.detect(content: content, tool: session.tool),
+                detected != session.status
+            {
+                sessions[i].status = detected
+                try? database?.updateSessionStatus(id: session.id, status: detected)
+            }
         }
     }
 

@@ -4,7 +4,7 @@ import Foundation
 public struct Session: Identifiable, Codable, Sendable {
     public let id: String
     public var title: String
-    public var groupID: String?
+    public var projectID: String?
     public var path: String
     public var tool: Tool
     public var status: SessionStatus
@@ -19,7 +19,7 @@ public struct Session: Identifiable, Codable, Sendable {
     public init(
         id: String = Session.generateID(),
         title: String,
-        groupID: String? = nil,
+        projectID: String? = nil,
         path: String,
         tool: Tool = .claude,
         status: SessionStatus = .starting,
@@ -33,7 +33,7 @@ public struct Session: Identifiable, Codable, Sendable {
     ) {
         self.id = id
         self.title = title
-        self.groupID = groupID
+        self.projectID = projectID
         self.path = path
         self.tool = tool
         self.status = status
