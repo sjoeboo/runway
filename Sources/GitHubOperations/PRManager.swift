@@ -3,6 +3,10 @@ import Models
 
 /// Manages GitHub PR operations by shelling out to the `gh` CLI.
 public actor PRManager {
+    /// Cached hosts from `gh auth status` — rarely changes at runtime
+    private var cachedHosts: [String]?
+    private var hostsCacheTime: Date?
+
     public init() {}
 
     /// Fetch PRs for a given category.
@@ -32,11 +36,20 @@ public actor PRManager {
     }
 
     /// Discover all hosts the user is authenticated with via `gh auth status`.
+    /// Results are cached for 5 minutes to avoid spawning a subprocess on every fetch.
     private func discoverHosts() async -> [String] {
-        guard let output = try? await runGH(args: ["auth", "status"]) else {
-            return ["github.com"]
+        if let cached = cachedHosts, let time = hostsCacheTime,
+            Date().timeIntervalSince(time) < 300
+        {
+            return cached
         }
-        return parseHosts(from: output)
+        guard let output = try? await runGH(args: ["auth", "status"]) else {
+            return cachedHosts ?? ["github.com"]
+        }
+        let hosts = parseHosts(from: output)
+        cachedHosts = hosts
+        hostsCacheTime = Date()
+        return hosts
     }
 
     /// Fetch detailed PR information.
@@ -52,7 +65,8 @@ public actor PRManager {
     }
 
     /// Extract the GitHub host from a PR URL (e.g., "https://ghe.spotify.net/..." → "ghe.spotify.net").
-    public func hostFromURL(_ url: String) -> String? {
+    /// Nonisolated because this is pure URL parsing with no actor state.
+    nonisolated public func hostFromURL(_ url: String) -> String? {
         guard let parsed = URL(string: url), let host = parsed.host else { return nil }
         return host == "github.com" ? nil : host  // nil means default (github.com)
     }
@@ -128,38 +142,7 @@ public actor PRManager {
 
     @discardableResult
     private func runGH(args: [String], cwd: String? = nil, host: String? = nil) async throws -> String {
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
-        var env = ProcessInfo.processInfo.environment
-        if let host {
-            env["GH_HOST"] = host
-        } else {
-            env.removeValue(forKey: "GH_HOST")
-        }
-        process.environment = env
-        process.arguments = ["gh"] + args
-        if let cwd {
-            process.currentDirectoryURL = URL(fileURLWithPath: cwd)
-        }
-
-        let pipe = Pipe()
-        let errPipe = Pipe()
-        process.standardOutput = pipe
-        process.standardError = errPipe
-
-        try process.run()
-        process.waitUntilExit()
-
-        let data = pipe.fileHandleForReading.readDataToEndOfFile()
-        let output = String(data: data, encoding: .utf8) ?? ""
-
-        if process.terminationStatus != 0 {
-            let errData = errPipe.fileHandleForReading.readDataToEndOfFile()
-            let errOutput = String(data: errData, encoding: .utf8) ?? ""
-            throw GHError.commandFailed(args: args, exitCode: process.terminationStatus, stderr: errOutput)
-        }
-
-        return output
+        try await ShellRunner.runGH(args: args, cwd: cwd, host: host)
     }
 
     private func parseHosts(from output: String) -> [String] {
@@ -191,7 +174,7 @@ public actor PRManager {
         case .reviewRequested:
             args += ["--review-requested", "@me"]
         case .all:
-            args += ["--author", "@me"]
+            break  // No author filter — show all open PRs
         }
 
         return args

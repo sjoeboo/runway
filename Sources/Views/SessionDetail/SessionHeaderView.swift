@@ -81,29 +81,10 @@ public struct SessionHeaderView: View {
                                 .help("Open PR in browser")
 
                                 // Check summary
-                                if pr.checks.total > 0 {
-                                    HStack(spacing: 3) {
-                                        Group {
-                                            if pr.checks.allPassed {
-                                                Image(systemName: "checkmark.circle.fill")
-                                                    .foregroundColor(theme.chrome.green)
-                                            } else if pr.checks.hasFailed {
-                                                Image(systemName: "xmark.circle.fill")
-                                                    .foregroundColor(theme.chrome.red)
-                                            } else {
-                                                Image(systemName: "clock.fill")
-                                                    .foregroundColor(theme.chrome.yellow)
-                                            }
-                                        }
-                                        .font(.caption2)
-                                        Text("\(pr.checks.passed)/\(pr.checks.total)")
-                                            .font(.caption)
-                                            .foregroundColor(theme.chrome.textDim)
-                                    }
-                                }
+                                CheckSummaryBadge(checks: pr.checks, style: .inline)
 
                                 // Review decision badge
-                                reviewBadge(for: pr.reviewDecision)
+                                ReviewDecisionBadge(decision: pr.reviewDecision, style: .capsule)
 
                                 // Diff stats
                                 if pr.additions > 0 || pr.deletions > 0 {
@@ -130,68 +111,8 @@ public struct SessionHeaderView: View {
 
     // MARK: - Status Dot
 
-    @ViewBuilder
     private var statusDot: some View {
-        switch session.status {
-        case .running:
-            Circle()
-                .fill(theme.chrome.green)
-                .frame(width: 7, height: 7)
-        case .waiting:
-            Circle()
-                .fill(theme.chrome.yellow)
-                .frame(width: 7, height: 7)
-        case .starting:
-            ProgressView()
-                .progressViewStyle(.circular)
-                .scaleEffect(0.45)
-                .frame(width: 7, height: 7)
-        case .error:
-            Circle()
-                .fill(theme.chrome.red)
-                .frame(width: 7, height: 7)
-        case .idle, .stopped:
-            Circle()
-                .strokeBorder(theme.chrome.textDim, lineWidth: 1.5)
-                .frame(width: 7, height: 7)
-        }
-    }
-
-    // MARK: - Review Badge
-
-    @ViewBuilder
-    private func reviewBadge(for decision: ReviewDecision) -> some View {
-        switch decision {
-        case .approved:
-            Text("Approved")
-                .font(.caption2)
-                .fontWeight(.medium)
-                .foregroundColor(theme.chrome.green)
-                .padding(.horizontal, 5)
-                .padding(.vertical, 2)
-                .background(theme.chrome.green.opacity(0.15))
-                .clipShape(Capsule())
-        case .changesRequested:
-            Text("Changes")
-                .font(.caption2)
-                .fontWeight(.medium)
-                .foregroundColor(theme.chrome.orange)
-                .padding(.horizontal, 5)
-                .padding(.vertical, 2)
-                .background(theme.chrome.orange.opacity(0.15))
-                .clipShape(Capsule())
-        case .pending:
-            Text("Review")
-                .font(.caption2)
-                .fontWeight(.medium)
-                .foregroundColor(theme.chrome.yellow)
-                .padding(.horizontal, 5)
-                .padding(.vertical, 2)
-                .background(theme.chrome.yellow.opacity(0.15))
-                .clipShape(Capsule())
-        case .none:
-            EmptyView()
-        }
+        SessionStatusIndicator(status: session.status, size: 7)
     }
 }
 

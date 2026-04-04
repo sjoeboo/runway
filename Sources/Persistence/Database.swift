@@ -18,6 +18,9 @@ public final class Database: Sendable {
         config.prepareDatabase { db in
             // WAL mode for concurrent readers
             try db.execute(sql: "PRAGMA journal_mode = WAL")
+            // NORMAL is safe with WAL — only risks data loss on power failure, not OS crash.
+            // Reduces write latency by ~1ms per write (hot path: every hook status update).
+            try db.execute(sql: "PRAGMA synchronous = NORMAL")
             // 5-second busy timeout for inter-process serialization
             try db.execute(sql: "PRAGMA busy_timeout = 5000")
         }
@@ -205,11 +208,10 @@ public final class Database: Sendable {
 
     public func updateSessionStatus(id: String, status: SessionStatus) throws {
         try dbQueue.write { db in
-            if var record = try SessionRecord.fetchOne(db, key: id) {
-                record.status = status.rawValue
-                record.lastAccessedAt = Date()
-                try record.update(db)
-            }
+            try db.execute(
+                sql: "UPDATE sessions SET status = ?, lastAccessedAt = ? WHERE id = ?",
+                arguments: [status.rawValue, Date(), id]
+            )
         }
     }
 
@@ -356,47 +358,4 @@ public final class Database: Sendable {
         }
     }
 
-    // MARK: - Group CRUD
-
-    public func groups(forProject projectID: String) throws -> [Group] {
-        try dbQueue.read { db in
-            try GroupRecord
-                .filter(Column("projectID") == projectID)
-                .order(Column("sortOrder"))
-                .fetchAll(db)
-                .map { $0.toGroup() }
-        }
-    }
-
-    public func saveGroup(_ group: Group) throws {
-        try dbQueue.write { db in
-            var record = GroupRecord(group)
-            try record.save(db)
-        }
-    }
-
-    // MARK: - Todo CRUD
-
-    public func todos(forProject projectID: String) throws -> [Todo] {
-        try dbQueue.read { db in
-            try TodoRecord
-                .filter(Column("projectID") == projectID)
-                .order(Column("sortOrder"))
-                .fetchAll(db)
-                .map { $0.toTodo() }
-        }
-    }
-
-    public func saveTodo(_ todo: Todo) throws {
-        try dbQueue.write { db in
-            var record = TodoRecord(todo)
-            try record.save(db)
-        }
-    }
-
-    public func deleteTodo(id: String) throws {
-        try dbQueue.write { db in
-            _ = try TodoRecord.deleteOne(db, key: id)
-        }
-    }
 }

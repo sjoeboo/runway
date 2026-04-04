@@ -1,4 +1,0 @@
-module CGhosttyVT {
-    header "ghostty_vt.h"
-    export *
-}

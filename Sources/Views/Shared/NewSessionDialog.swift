@@ -147,10 +147,13 @@ public struct NewSessionDialog: View {
     }
 
     private func autobranchName(from title: String) -> String {
-        let sanitized = title.lowercased()
-            .replacingOccurrences(of: " ", with: "-")
-            .replacingOccurrences(of: "/", with: "-")
-        return sanitized.isEmpty ? "" : "feature/\(sanitized)"
+        // Strip all git-illegal characters: ~, ^, :, ?, *, [, \, control chars, spaces, ..
+        var sanitized = title.lowercased()
+            .replacing(/[^a-z0-9\-]/, with: "-")
+            .replacing(/--+/, with: "-")
+            .trimmingCharacters(in: CharacterSet(charactersIn: "-."))
+        if sanitized.isEmpty { return "" }
+        return "feature/\(sanitized)"
     }
 
     private func create() {

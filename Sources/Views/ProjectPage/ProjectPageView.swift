@@ -153,10 +153,15 @@ public struct ProjectPageView: View {
         .sheet(isPresented: $showSettings) {
             ProjectSettingsSheet(
                 project: $editableProject,
-                themes: ThemeManager().allThemes,
+                themes: AppTheme.builtIn,
                 onSave: { updated in onUpdateProject(updated) },
                 onDetectRepo: onDetectRepo
             )
+        }
+        .onChange(of: project) { _, newProject in
+            if editableProject.id == newProject.id {
+                editableProject = newProject
+            }
         }
         .task(id: project.id) {
             if project.issuesEnabled {

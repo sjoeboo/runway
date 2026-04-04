@@ -198,18 +198,16 @@ struct ProjectSection: View {
         } label: {
             HStack(spacing: 4) {
                 if isRenaming {
-                    TextField(
-                        "Project name", text: $editName,
-                        onCommit: {
+                    TextField("Project name", text: $editName)
+                        .onSubmit {
                             if !editName.isEmpty {
                                 onRenameProject?(project.id, editName)
                             }
                             isRenaming = false
                         }
-                    )
-                    .textFieldStyle(.plain)
-                    .font(.system(.title3, weight: .semibold))
-                    .onAppear { editName = project.name }
+                        .textFieldStyle(.plain)
+                        .font(.system(.title3, weight: .semibold))
+                        .onAppear { editName = project.name }
                 } else {
                     Text(project.name)
                         .font(.system(.title3, weight: .semibold))
@@ -288,6 +286,7 @@ struct SessionRowView: View {
     @State private var isHovered = false
     @State private var isRenaming = false
     @State private var editTitle: String = ""
+    @State private var showDeleteConfirmation = false
     @Environment(\.theme) private var theme
 
     var body: some View {
@@ -295,18 +294,16 @@ struct SessionRowView: View {
             statusIndicator
             VStack(alignment: .leading, spacing: 2) {
                 if isRenaming {
-                    TextField(
-                        "Session name", text: $editTitle,
-                        onCommit: {
+                    TextField("Session name", text: $editTitle)
+                        .onSubmit {
                             if !editTitle.isEmpty {
                                 onRenameSession?(session.id, editTitle)
                             }
                             isRenaming = false
                         }
-                    )
-                    .textFieldStyle(.plain)
-                    .font(.system(.body, design: .default))
-                    .onAppear { editTitle = session.title }
+                        .textFieldStyle(.plain)
+                        .font(.system(.body, design: .default))
+                        .onAppear { editTitle = session.title }
                 } else {
                     Text(session.title)
                         .font(.system(.body, design: .default))
@@ -331,33 +328,8 @@ struct SessionRowView: View {
                         }
                         .buttonStyle(.plain)
                         .help("Open PR #\(pr.number) in browser")
-                        if pr.checks.total > 0 {
-                            if pr.checks.allPassed {
-                                Image(systemName: "checkmark.circle.fill")
-                                    .font(.system(size: 8))
-                                    .foregroundColor(theme.chrome.green)
-                            } else if pr.checks.hasFailed {
-                                Image(systemName: "xmark.circle.fill")
-                                    .font(.system(size: 8))
-                                    .foregroundColor(theme.chrome.red)
-                            } else {
-                                Image(systemName: "clock.fill")
-                                    .font(.system(size: 8))
-                                    .foregroundColor(theme.chrome.yellow)
-                            }
-                            Text("\(pr.checks.passed)/\(pr.checks.total)")
-                                .font(.caption2)
-                                .foregroundColor(theme.chrome.textDim)
-                        }
-                        if pr.reviewDecision == .approved {
-                            Image(systemName: "checkmark")
-                                .font(.system(size: 8))
-                                .foregroundColor(theme.chrome.green)
-                        } else if pr.reviewDecision == .changesRequested {
-                            Image(systemName: "exclamationmark.triangle")
-                                .font(.system(size: 8))
-                                .foregroundColor(theme.chrome.orange)
-                        }
+                        CheckSummaryBadge(checks: pr.checks)
+                        ReviewDecisionBadge(decision: pr.reviewDecision, style: .iconOnly)
                         if pr.additions > 0 || pr.deletions > 0 {
                             HStack(spacing: 1) {
                                 Text("+\(pr.additions)")
@@ -391,7 +363,7 @@ struct SessionRowView: View {
                     .help("Restart session")
 
                     Button {
-                        onDelete?(session.id)
+                        showDeleteConfirmation = true
                     } label: {
                         Image(systemName: "trash")
                             .font(.system(size: 11))
@@ -484,33 +456,25 @@ struct SessionRowView: View {
             }
 
             Button(role: .destructive) {
-                onDelete?(session.id)
+                showDeleteConfirmation = true
             } label: {
                 Label("Delete Session", systemImage: "trash")
             }
         }
+        .confirmationDialog(
+            "Delete '\(session.title)'?",
+            isPresented: $showDeleteConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button("Delete", role: .destructive) {
+                onDelete?(session.id)
+            }
+        } message: {
+            Text("This will stop the session and remove it from Runway. The worktree will remain on disk.")
+        }
     }
 
-    @ViewBuilder
     private var statusIndicator: some View {
-        switch session.status {
-        case .running:
-            Circle().fill(theme.chrome.green).frame(width: 8, height: 8)
-        case .waiting:
-            Image(systemName: "circle.lefthalf.filled")
-                .font(.system(size: 8))
-                .foregroundColor(theme.chrome.yellow)
-        case .idle:
-            Circle().stroke(theme.chrome.textDim, lineWidth: 1).frame(width: 8, height: 8)
-        case .error:
-            Image(systemName: "xmark.circle.fill")
-                .font(.system(size: 8))
-                .foregroundColor(theme.chrome.red)
-        case .starting:
-            ProgressView().controlSize(.mini)
-        case .stopped:
-            Circle().stroke(theme.chrome.textDim, lineWidth: 1).frame(width: 8, height: 8)
-                .opacity(0.5)
-        }
+        SessionStatusIndicator(status: session.status, size: 8)
     }
 }

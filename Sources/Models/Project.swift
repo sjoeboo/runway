@@ -1,7 +1,7 @@
 import Foundation
 
 /// A registered project (git repository) that contains sessions and worktrees.
-public struct Project: Identifiable, Codable, Sendable {
+public struct Project: Identifiable, Codable, Sendable, Equatable {
     public let id: String
     public var name: String
     public var path: String

@@ -63,26 +63,31 @@ public final class RunwayStore {
         self.tmuxManager = TmuxSessionManager()
         self.issueManager = IssueManager()
 
-        // Open database
+        // Open database — surface failure to user since silent nil means all writes are lost
         do {
             self.database = try Database()
         } catch {
             print("[Runway] Failed to open database: \(error)")
             self.database = nil
+            // Deferred to after init completes since statusMessage triggers UI
+            Task { @MainActor [weak self] in
+                self?.statusMessage = .error("Database failed to open — session data will not persist. \(error.localizedDescription)")
+            }
         }
 
-        // Check tmux availability, then load state (reconciliation needs tmux status)
+        // Check tmux availability, load state, then fetch PRs (sequenced so enrichPRs
+        // has sessions available for PR-session linking)
         Task {
             tmuxAvailable = await tmuxManager.isAvailable()
             await loadState()
+            await fetchPRs()
         }
 
         // Start hook server + inject Claude hooks (sequenced — inject needs the port)
         Task { await startHookServer() }
 
-        // Load cached PRs synchronously for instant display, then refresh in background
+        // Load cached PRs synchronously for instant display while background fetch runs
         loadCachedPRs()
-        Task { await fetchPRs() }
     }
 
     // MARK: - State Loading
@@ -93,8 +98,9 @@ public final class RunwayStore {
             projects = try db.allProjects()
             sessions = try db.allSessions()
 
-            // Auto-detect default branches for projects that still have the placeholder "main"
-            for i in projects.indices {
+            // Auto-detect default branches only for projects that still have the placeholder "main".
+            // Projects with an already-detected non-"main" branch skip the git subprocess call.
+            for i in projects.indices where projects[i].defaultBranch == "main" {
                 let detected = await worktreeManager.detectDefaultBranch(repoPath: projects[i].path)
                 if projects[i].defaultBranch != detected {
                     projects[i].defaultBranch = detected
@@ -212,7 +218,12 @@ public final class RunwayStore {
 
         // Now add to UI — tmux session is ready for TerminalPane to attach
         sessions.append(session)
-        try? database?.saveSession(session)
+        do {
+            try database?.saveSession(session)
+        } catch {
+            print("[Runway] Failed to save session: \(error)")
+            statusMessage = .error("Failed to save session: \(error.localizedDescription)")
+        }
         selectedSessionID = session.id
     }
 
@@ -222,7 +233,11 @@ public final class RunwayStore {
         if let idx = sessions.firstIndex(where: { $0.id == id }) {
             sessions[idx].status = status
         }
-        try? database?.updateSessionStatus(id: id, status: status)
+        do {
+            try database?.updateSessionStatus(id: id, status: status)
+        } catch {
+            print("[Runway] Failed to update session status: \(error)")
+        }
     }
 
     func restartSession(id: String) async {
@@ -273,10 +288,24 @@ public final class RunwayStore {
     }
 
     func deleteSession(id: String) {
+        // Find next sibling before removing, so we can select it after deletion
+        let nextSelection: String? = {
+            guard let idx = sessions.firstIndex(where: { $0.id == id }) else { return nil }
+            let projectID = sessions[idx].groupID
+            let siblings = sessions.filter { $0.groupID == projectID }
+            guard let siblingIdx = siblings.firstIndex(where: { $0.id == id }) else { return nil }
+            if siblingIdx + 1 < siblings.count {
+                return siblings[siblingIdx + 1].id  // next sibling
+            } else if siblingIdx > 0 {
+                return siblings[siblingIdx - 1].id  // previous sibling
+            }
+            return nil
+        }()
+
         sessions.removeAll { $0.id == id }
         try? database?.deleteSession(id: id)
         if selectedSessionID == id {
-            selectedSessionID = sessions.first?.id
+            selectedSessionID = nextSelection
         }
 
         // Clean up tmux session
@@ -290,17 +319,17 @@ public final class RunwayStore {
     // MARK: - Project Management
 
     func createProject(name: String, path: String, defaultBranch: String = "main") {
-        var project = Project(name: name, path: path, defaultBranch: defaultBranch)
+        let project = Project(name: name, path: path, defaultBranch: defaultBranch)
         projects.append(project)
         try? database?.saveProject(project)
 
         // Auto-detect default branch in background
+        let projectID = project.id
         Task {
             let detected = await worktreeManager.detectDefaultBranch(repoPath: path)
-            if detected != defaultBranch, let idx = projects.firstIndex(where: { $0.id == project.id }) {
+            if detected != defaultBranch, let idx = projects.firstIndex(where: { $0.id == projectID }) {
                 projects[idx].defaultBranch = detected
-                project.defaultBranch = detected
-                try? database?.saveProject(project)
+                try? database?.saveProject(projects[idx])
             }
         }
     }
@@ -456,43 +485,74 @@ public final class RunwayStore {
     }
 
     /// Background-enrich PRs with detail data (checks, reviews, branches, diff counts).
-    /// Also links PRs to sessions by matching headBranch to session worktreeBranch.
+    /// Uses bounded concurrency via TaskGroup to avoid sequential subprocess calls.
+    /// Collects results into a local dictionary and merges in a single pass to avoid
+    /// index-mutation races and minimize SwiftUI re-renders.
     private func enrichPRs() async {
-        for i in pullRequests.indices {
-            let pr = pullRequests[i]
+        // Snapshot PRs that need enrichment (by ID, not index)
+        let toEnrich = pullRequests.filter { $0.checks.total == 0 }
+        guard !toEnrich.isEmpty else {
+            // Still need to link sessions even if all PRs are enriched
+            await linkSessionPRs()
+            return
+        }
 
-            // Skip if already enriched (has checks data from cache)
-            if pr.checks.total > 0 { continue }
+        // Fetch details concurrently with bounded parallelism
+        var enriched: [String: PRDetail] = [:]
+        await withTaskGroup(of: (String, PRDetail?).self) { group in
+            var inFlight = 0
+            let maxConcurrency = 5
 
-            let host = await prManager.hostFromURL(pr.url)
-
-            guard
-                let detail = try? await prManager.fetchDetail(
-                    repo: pr.repo, number: pr.number, host: host
-                )
-            else { continue }
-
-            // Enrich the list-level PR with detail data
-            if i < pullRequests.count, pullRequests[i].id == pr.id {
-                pullRequests[i].checks = detail.checks
-                pullRequests[i].reviewDecision = detail.reviewDecision
-                if !detail.headBranch.isEmpty {
-                    pullRequests[i].headBranch = detail.headBranch
-                    pullRequests[i].baseBranch = detail.baseBranch
+            for pr in toEnrich {
+                if inFlight >= maxConcurrency {
+                    if let (id, detail) = await group.next() {
+                        if let detail { enriched[id] = detail }
+                        inFlight -= 1
+                    }
                 }
-                pullRequests[i].additions = detail.additions
-                pullRequests[i].deletions = detail.deletions
-                pullRequests[i].changedFiles = detail.changedFiles
+
+                let host = prManager.hostFromURL(pr.url)
+                group.addTask { [prManager] in
+                    let detail = try? await prManager.fetchDetail(
+                        repo: pr.repo, number: pr.number, host: host
+                    )
+                    return (pr.id, detail)
+                }
+                inFlight += 1
             }
 
+            // Collect remaining results
+            for await (id, detail) in group {
+                if let detail { enriched[id] = detail }
+            }
         }
+
+        // Merge all enrichments in a single pass (one array mutation = one SwiftUI invalidation)
+        var updated = pullRequests
+        for i in updated.indices {
+            guard let detail = enriched[updated[i].id] else { continue }
+            updated[i].checks = detail.checks
+            updated[i].reviewDecision = detail.reviewDecision
+            if !detail.headBranch.isEmpty {
+                updated[i].headBranch = detail.headBranch
+                updated[i].baseBranch = detail.baseBranch
+            }
+            updated[i].additions = detail.additions
+            updated[i].deletions = detail.deletions
+            updated[i].changedFiles = detail.changedFiles
+        }
+        pullRequests = updated
 
         // Cache enriched PRs to database
         try? database?.cachePRs(pullRequests)
         try? database?.cleanPRCache()
 
-        // Link PRs to sessions by running gh pr view in each session's worktree directory
-        // (like Hangar — gh CLI auto-detects branch from the git checkout)
+        // Link PRs to sessions
+        await linkSessionPRs()
+    }
+
+    /// Link PRs to sessions by running gh pr view in each session's worktree directory.
+    private func linkSessionPRs() async {
         for session in sessions where session.worktreeBranch != nil {
             if let pr = try? await prManager.fetchPRForWorktree(path: session.path) {
                 sessionPRs[session.id] = pr
@@ -512,7 +572,7 @@ public final class RunwayStore {
         guard let pr else { return }
 
         do {
-            let host = await prManager.hostFromURL(pr.url)
+            let host = prManager.hostFromURL(pr.url)
             prDetail = try await prManager.fetchDetail(repo: pr.repo, number: pr.number, host: host)
         } catch {
             print("[Runway] Failed to fetch PR detail: \(error)")
@@ -520,7 +580,7 @@ public final class RunwayStore {
     }
 
     func approvePR(_ pr: PullRequest) async {
-        let host = await prManager.hostFromURL(pr.url)
+        let host = prManager.hostFromURL(pr.url)
         do {
             try await prManager.approve(repo: pr.repo, number: pr.number, host: host)
             statusMessage = .success("Approved #\(pr.number)")
@@ -531,7 +591,7 @@ public final class RunwayStore {
     }
 
     func commentOnPR(_ pr: PullRequest, body: String) async {
-        let host = await prManager.hostFromURL(pr.url)
+        let host = prManager.hostFromURL(pr.url)
         do {
             try await prManager.comment(repo: pr.repo, number: pr.number, body: body, host: host)
             // Refresh detail to show new comment
@@ -542,7 +602,7 @@ public final class RunwayStore {
     }
 
     func requestChangesOnPR(_ pr: PullRequest, body: String) async {
-        let host = await prManager.hostFromURL(pr.url)
+        let host = prManager.hostFromURL(pr.url)
         do {
             try await prManager.requestChanges(repo: pr.repo, number: pr.number, body: body, host: host)
             statusMessage = .success("Requested changes on #\(pr.number)")
@@ -554,7 +614,7 @@ public final class RunwayStore {
     }
 
     func mergePR(_ pr: PullRequest, strategy: MergeStrategy = .squash) async {
-        let host = await prManager.hostFromURL(pr.url)
+        let host = prManager.hostFromURL(pr.url)
         do {
             try await prManager.merge(repo: pr.repo, number: pr.number, strategy: strategy, host: host)
             statusMessage = .success("Merged #\(pr.number)")
@@ -565,7 +625,7 @@ public final class RunwayStore {
     }
 
     func togglePRDraft(_ pr: PullRequest) async {
-        let host = await prManager.hostFromURL(pr.url)
+        let host = prManager.hostFromURL(pr.url)
         do {
             try await prManager.toggleDraft(repo: pr.repo, number: pr.number, makeDraft: !pr.isDraft, host: host)
             statusMessage = .success(pr.isDraft ? "Marked #\(pr.number) as ready" : "Converted #\(pr.number) to draft")

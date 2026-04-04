@@ -63,7 +63,7 @@ public struct PRDetailDrawer: View {
                 Text("#\(pr.number)")
                     .font(.caption)
                     .foregroundColor(theme.chrome.textDim)
-                reviewBadge
+                ReviewDecisionBadge(decision: pr.reviewDecision)
                 Spacer()
                 Button(action: onClose) {
                     Image(systemName: "xmark")
@@ -502,26 +502,6 @@ public struct PRDetailDrawer: View {
             Label("Closed", systemImage: "xmark.circle.fill")
                 .font(.caption)
                 .foregroundColor(theme.chrome.red)
-        }
-    }
-
-    @ViewBuilder
-    private var reviewBadge: some View {
-        switch pr.reviewDecision {
-        case .approved:
-            Label("Approved", systemImage: "checkmark.circle.fill")
-                .font(.caption2)
-                .foregroundColor(theme.chrome.green)
-        case .changesRequested:
-            Label("Changes", systemImage: "exclamationmark.triangle.fill")
-                .font(.caption2)
-                .foregroundColor(theme.chrome.orange)
-        case .pending:
-            Label("Review needed", systemImage: "clock")
-                .font(.caption2)
-                .foregroundColor(theme.chrome.yellow)
-        case .none:
-            EmptyView()
         }
     }
 

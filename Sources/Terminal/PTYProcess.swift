@@ -4,6 +4,17 @@ import Foundation
     import Darwin
 #endif
 
+/// Size of a terminal in columns and rows.
+public struct TerminalSize: Sendable {
+    public var cols: Int
+    public var rows: Int
+
+    public init(cols: Int = 80, rows: Int = 24) {
+        self.cols = cols
+        self.rows = rows
+    }
+}
+
 /// Manages a child process connected via a pseudo-terminal (PTY).
 ///
 /// Uses `forkpty()` from Darwin to create a PTY pair and fork the child process.
@@ -11,8 +22,12 @@ import Foundation
 public final class PTYProcess: @unchecked Sendable {
     public let pid: pid_t
     public let masterFD: Int32
-    public private(set) var isAlive: Bool = true
+    public var isAlive: Bool {
+        lock.withLock { _isAlive }
+    }
 
+    private var _isAlive: Bool = true
+    private let lock = NSLock()
     private let readSource: DispatchSourceRead
     private let outputHandler: @Sendable (Data) -> Void
     private let exitHandler: @Sendable (Int32) -> Void
@@ -143,14 +158,20 @@ public final class PTYProcess: @unchecked Sendable {
         kill(pid, SIGTERM)
 
         DispatchQueue.global().asyncAfter(deadline: .now() + timeout) { [weak self] in
-            guard let self, self.isAlive else { return }
+            guard let self, self.lock.withLock({ self._isAlive }) else { return }
             kill(self.pid, SIGKILL)
         }
     }
 
     private func handleExit() {
-        isAlive = false
-        readSource.cancel()
+        let shouldCancel = lock.withLock {
+            guard _isAlive else { return false }
+            _isAlive = false
+            return true
+        }
+        if shouldCancel {
+            readSource.cancel()
+        }
     }
 }
 

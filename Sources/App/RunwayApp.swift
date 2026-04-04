@@ -60,6 +60,7 @@ struct ContentView: View {
     @Environment(RunwayStore.self) private var store
     @Environment(\.theme) private var theme
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @AppStorage("sidebarWidth") private var sidebarWidth: Double = 280
 
     var body: some View {
@@ -102,13 +103,12 @@ struct ContentView: View {
                 .theme(theme)
             }
 
-            // Status message toast
+            // Status message toast — .task(id:) auto-cancels on message change
             if let msg = store.statusMessage {
                 statusToast(msg)
-                    .onAppear {
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
-                            store.statusMessage = nil
-                        }
+                    .task(id: msg) {
+                        try? await Task.sleep(for: .seconds(3))
+                        store.statusMessage = nil
                     }
             }
         }
@@ -149,8 +149,8 @@ struct ContentView: View {
         .background(toastColor(for: msg.kind).opacity(0.9))
         .cornerRadius(6)
         .padding(.bottom, 8)
-        .transition(.move(edge: .bottom).combined(with: .opacity))
-        .animation(.easeInOut(duration: 0.3), value: msg)
+        .transition(reduceMotion ? .opacity : .move(edge: .bottom).combined(with: .opacity))
+        .animation(reduceMotion ? .none : .easeInOut(duration: 0.3), value: msg)
     }
 
     private func toastColor(for kind: StatusMessage.Kind) -> Color {

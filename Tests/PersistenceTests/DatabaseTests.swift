@@ -87,21 +87,3 @@ import Testing
     #expect(sessions[1].title == "first")  // sortOrder 10
     #expect(sessions[2].title == "third")  // sortOrder 20
 }
-
-@Test func todoCRUD() throws {
-    let db = try Database(inMemory: true)
-
-    let project = Project(name: "test", path: "/tmp")
-    try db.saveProject(project)
-
-    let todo = Todo(title: "Fix bug", projectID: project.id)
-    try db.saveTodo(todo)
-
-    let todos = try db.todos(forProject: project.id)
-    #expect(todos.count == 1)
-    #expect(todos.first?.title == "Fix bug")
-
-    try db.deleteTodo(id: todo.id)
-    let after = try db.todos(forProject: project.id)
-    #expect(after.isEmpty)
-}

@@ -47,22 +47,10 @@ public actor IssueManager {
 
     /// Detect repo and host from a local git working directory.
     public func detectRepo(path: String) async -> (repo: String, host: String?)? {
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
-        process.arguments = ["git", "remote", "get-url", "origin"]
-        process.currentDirectoryURL = URL(fileURLWithPath: path)
-
-        let pipe = Pipe()
-        process.standardOutput = pipe
-        process.standardError = Pipe()
-
-        guard (try? process.run()) != nil else { return nil }
-        process.waitUntilExit()
-        guard process.terminationStatus == 0 else { return nil }
-
-        let data = pipe.fileHandleForReading.readDataToEndOfFile()
-        let remoteURL = (String(data: data, encoding: .utf8) ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
-
+        guard let output = try? await ShellRunner.runGit(in: path, args: ["remote", "get-url", "origin"]) else {
+            return nil
+        }
+        let remoteURL = output.trimmingCharacters(in: .whitespacesAndNewlines)
         return parseRemoteURL(remoteURL)
     }
 
@@ -70,38 +58,7 @@ public actor IssueManager {
 
     @discardableResult
     private func runGH(args: [String], cwd: String? = nil, host: String? = nil) async throws -> String {
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
-        var env = ProcessInfo.processInfo.environment
-        if let host {
-            env["GH_HOST"] = host
-        } else {
-            env.removeValue(forKey: "GH_HOST")
-        }
-        process.environment = env
-        process.arguments = ["gh"] + args
-        if let cwd {
-            process.currentDirectoryURL = URL(fileURLWithPath: cwd)
-        }
-
-        let pipe = Pipe()
-        let errPipe = Pipe()
-        process.standardOutput = pipe
-        process.standardError = errPipe
-
-        try process.run()
-        process.waitUntilExit()
-
-        let data = pipe.fileHandleForReading.readDataToEndOfFile()
-        let output = String(data: data, encoding: .utf8) ?? ""
-
-        if process.terminationStatus != 0 {
-            let errData = errPipe.fileHandleForReading.readDataToEndOfFile()
-            let errOutput = String(data: errData, encoding: .utf8) ?? ""
-            throw IssueError.commandFailed("gh \(args.joined(separator: " ")) failed (exit \(process.terminationStatus)): \(errOutput)")
-        }
-
-        return output
+        try await ShellRunner.runGH(args: args, cwd: cwd, host: host)
     }
 
     private func parseIssues(_ json: String, repo: String) throws -> [GitHubIssue] {
