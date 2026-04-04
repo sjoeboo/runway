@@ -88,6 +88,7 @@ struct ProjectRecord: Codable, FetchableRecord, MutablePersistableRecord {
     var ghRepo: String?
     var ghHost: String?
     var issuesEnabled: Bool
+    var branchPrefix: String?
 
     init(_ project: Project) {
         self.id = project.id
@@ -101,6 +102,7 @@ struct ProjectRecord: Codable, FetchableRecord, MutablePersistableRecord {
         self.ghRepo = project.ghRepo
         self.ghHost = project.ghHost
         self.issuesEnabled = project.issuesEnabled
+        self.branchPrefix = project.branchPrefix
     }
 
     func toProject() -> Project {
@@ -115,7 +117,8 @@ struct ProjectRecord: Codable, FetchableRecord, MutablePersistableRecord {
             permissionMode: permissionMode.flatMap { PermissionMode(rawValue: $0) },
             ghRepo: ghRepo,
             ghHost: ghHost,
-            issuesEnabled: issuesEnabled
+            issuesEnabled: issuesEnabled,
+            branchPrefix: branchPrefix
         )
     }
 }

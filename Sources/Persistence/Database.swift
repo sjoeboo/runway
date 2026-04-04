@@ -175,7 +175,12 @@ public final class Database: Sendable {
             }
         }
 
-        try migrator.migrate(dbQueue)
+        migrator.registerMigration("v8_project_branch_prefix") { db in
+            try db.alter(table: "projects") { t in
+                t.add(column: "branchPrefix", .text)
+            }
+        }
+
     }
 
     // MARK: - Default Path

@@ -51,6 +51,9 @@ struct RunwayApp: App {
 
                 Button("Find in Terminal") { store.showTerminalSearch.toggle() }
                     .keyboardShortcut("f", modifiers: .command)
+
+                Button("Search Sessions") { store.focusSidebarSearch = true }
+                    .keyboardShortcut("k", modifiers: .command)
             }
         }
 
@@ -182,36 +185,16 @@ struct ContentView: View {
     // MARK: - Sidebar
 
     private var sidebar: some View {
-        VStack(spacing: 0) {
-            ProjectTreeView(
-                projects: store.projects,
-                sessions: store.sessions,
-                sessionPRs: store.sessionPRs,
-                selectedSessionID: Binding(
-                    get: { store.selectedSessionID },
-                    set: { store.selectedSessionID = $0 }
-                ),
-                selectedProjectID: Binding(
-                    get: { store.selectedProjectID },
-                    set: { store.selectedProjectID = $0 }
-                ),
-                onRestart: { id in Task { await store.restartSession(id: id) } },
-                onDelete: { id, deleteWorktree in store.deleteSession(id: id, deleteWorktree: deleteWorktree) },
-                onNewSession: { projectID in
-                    store.newSessionProjectID = projectID
-                    store.showNewSessionDialog = true
-                },
-                onNewProject: { store.showNewProjectDialog = true },
-                onReorderSessions: { projectID, fromOffsets, toOffset in
-                    store.reorderSessions(in: projectID, fromOffsets: fromOffsets, toOffset: toOffset)
-                },
-                onReorderProjects: { fromOffsets, toOffset in
-                    store.reorderProjects(fromOffsets: fromOffsets, toOffset: toOffset)
-                },
-                onSelectProject: { store.selectProject($0) },
-                onSelectSession: { store.selectSession($0) }
-            )
-        }
+        @Bindable var store = store
+        return ProjectTreeView(
+            projects: store.projects,
+            sessions: store.sessions,
+            sessionPRs: store.sessionPRs,
+            selectedSessionID: $store.selectedSessionID,
+            searchQuery: $store.sidebarSearchQuery,
+            focusSearch: $store.focusSidebarSearch,
+            actions: store
+        )
         .frame(minWidth: 200)
         .background(
             GeometryReader { geo in
@@ -305,7 +288,14 @@ struct ContentView: View {
                 onComment: { pr, body in Task { await store.commentOnPR(pr, body: body) } },
                 onRequestChanges: { pr, body in Task { await store.requestChangesOnPR(pr, body: body) } },
                 onMerge: { pr, strategy in Task { await store.mergePR(pr, strategy: strategy) } },
-                onToggleDraft: { pr in Task { await store.togglePRDraft(pr) } }
+                onToggleDraft: { pr in Task { await store.togglePRDraft(pr) } },
+                onSendToSession: { pr, _ in
+                    // Find session linked to this PR and switch to it with send bar open
+                    if let sessionID = store.sessionPRs.first(where: { $0.value.id == pr.id })?.key {
+                        store.selectSession(sessionID)
+                        store.showSendBar = true
+                    }
+                }
             )
         }
     }

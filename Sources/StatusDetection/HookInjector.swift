@@ -32,7 +32,7 @@ public struct HookInjector: Sendable {
     ///   - configDir: Path to Claude Code config directory (default: ~/.claude)
     /// - Returns: `true` if hooks were newly installed or upgraded
     @discardableResult
-    public func inject(port: UInt16 = 47437, configDir: String? = nil) throws -> Bool {
+    public func inject(port: UInt16 = 47437, configDir: String? = nil, force: Bool = false) throws -> Bool {
         let dir = configDir ?? defaultClaudeConfigDir()
         let settingsPath = "\(dir)/settings.json"
 
@@ -42,9 +42,9 @@ public struct HookInjector: Sendable {
         // Parse existing hooks section
         var hooks = (rawSettings["hooks"] as? [String: Any]) ?? [:]
 
-        // Check if HTTP hooks are already installed at this port
+        // Check if HTTP hooks are already installed at this port (skip if force)
         let hookURL = String(format: Self.hookURLTemplate, Int(port))
-        if httpHooksInstalled(in: hooks, url: hookURL) {
+        if !force && httpHooksInstalled(in: hooks, url: hookURL) {
             return false
         }
 

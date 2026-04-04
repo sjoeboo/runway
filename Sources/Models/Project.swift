@@ -18,6 +18,9 @@ public struct Project: Identifiable, Codable, Sendable, Equatable {
     public var ghHost: String?
     public var issuesEnabled: Bool
 
+    /// Branch name prefix template (e.g. "feature/", "fix/", "matt/"). Nil = no prefix.
+    public var branchPrefix: String?
+
     public init(
         id: String = Project.generateID(),
         name: String,
@@ -29,7 +32,8 @@ public struct Project: Identifiable, Codable, Sendable, Equatable {
         permissionMode: PermissionMode? = nil,
         ghRepo: String? = nil,
         ghHost: String? = nil,
-        issuesEnabled: Bool = false
+        issuesEnabled: Bool = false,
+        branchPrefix: String? = nil
     ) {
         self.id = id
         self.name = name
@@ -42,6 +46,7 @@ public struct Project: Identifiable, Codable, Sendable, Equatable {
         self.ghRepo = ghRepo
         self.ghHost = ghHost
         self.issuesEnabled = issuesEnabled
+        self.branchPrefix = branchPrefix
     }
 
     public static func generateID() -> String {

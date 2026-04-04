@@ -8,6 +8,7 @@ import SwiftUI
 import Terminal
 import TerminalView
 import Theme
+import Views
 
 /// Root application state — the single source of truth for the Runway app.
 @Observable
@@ -32,6 +33,8 @@ public final class RunwayStore {
     var tmuxAvailable: Bool = false
     var showSendBar: Bool = false
     var showTerminalSearch: Bool = false
+    var sidebarSearchQuery: String = ""
+    var focusSidebarSearch: Bool = false
 
     /// Maps session ID → linked PullRequest (matched by worktree branch)
     var sessionPRs: [String: PullRequest] = [:]
@@ -245,7 +248,7 @@ public final class RunwayStore {
         }
     }
 
-    func restartSession(id: String) async {
+    public func restartSession(id: String) async {
         guard let idx = sessions.firstIndex(where: { $0.id == id }) else { return }
         let session = sessions[idx]
 
@@ -292,7 +295,7 @@ public final class RunwayStore {
         selectedSessionID = id
     }
 
-    func deleteSession(id: String, deleteWorktree: Bool = false) {
+    public func deleteSession(id: String, deleteWorktree: Bool = false) {
         // Capture worktree info before removing session from array
         let session = sessions.first(where: { $0.id == id })
         let worktreeBranch = session?.worktreeBranch
@@ -362,19 +365,19 @@ public final class RunwayStore {
         }
     }
 
-    func deleteProject(id: String) {
+    public func deleteProject(id: String) {
         projects.removeAll { $0.id == id }
         try? database?.deleteProject(id: id)
     }
 
     // MARK: - Navigation
 
-    func selectProject(_ projectID: String?) {
+    public func selectProject(_ projectID: String?) {
         selectedProjectID = projectID
         selectedSessionID = nil
     }
 
-    func selectSession(_ sessionID: String?) {
+    public func selectSession(_ sessionID: String?) {
         selectedSessionID = sessionID
         selectedProjectID = nil
         if currentView == .prs {
@@ -397,14 +400,14 @@ public final class RunwayStore {
 
     // MARK: - Renaming
 
-    func renameSession(id: String, title: String) {
+    public func renameSession(id: String, title: String) {
         if let idx = sessions.firstIndex(where: { $0.id == id }) {
             sessions[idx].title = title
             try? database?.saveSession(sessions[idx])
         }
     }
 
-    func renameProject(id: String, name: String) {
+    public func renameProject(id: String, name: String) {
         if let idx = projects.firstIndex(where: { $0.id == id }) {
             projects[idx].name = name
             try? database?.saveProject(projects[idx])
@@ -413,7 +416,7 @@ public final class RunwayStore {
 
     // MARK: - Reordering
 
-    func reorderSessions(in projectID: String?, fromOffsets: IndexSet, toOffset: Int) {
+    public func reorderSessions(in projectID: String?, fromOffsets: IndexSet, toOffset: Int) {
         var subset = sessions.filter { $0.projectID == projectID }
         subset.move(fromOffsets: fromOffsets, toOffset: toOffset)
         for (i, session) in subset.enumerated() {
@@ -424,7 +427,7 @@ public final class RunwayStore {
         }
     }
 
-    func reorderProjects(fromOffsets: IndexSet, toOffset: Int) {
+    public func reorderProjects(fromOffsets: IndexSet, toOffset: Int) {
         projects.move(fromOffsets: fromOffsets, toOffset: toOffset)
         for i in projects.indices {
             projects[i].sortOrder = i
@@ -444,9 +447,10 @@ public final class RunwayStore {
         do {
             try await hookServer.start()
 
-            // Inject Claude hooks with the actual port
+            // Always re-inject hooks — port is ephemeral, so previous hooks may point
+            // to a stale port from a prior launch.
             if let port = await hookServer.actualPort {
-                try hookInjector.inject(port: port)
+                try hookInjector.inject(port: port, force: true)
             } else {
                 print("[Runway] Hook server started but no port available")
             }
@@ -772,6 +776,19 @@ public final class RunwayStore {
         }
     }
 
+}
+
+// MARK: - SidebarActions Conformance
+
+extension RunwayStore: SidebarActions {
+    public func newSession(projectID: String?) {
+        newSessionProjectID = projectID
+        showNewSessionDialog = true
+    }
+
+    public func newProject() {
+        showNewProjectDialog = true
+    }
 }
 
 // MARK: - Status Message

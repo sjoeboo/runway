@@ -12,6 +12,7 @@ public struct PRDetailDrawer: View {
     let onRequestChanges: (String) -> Void
     let onMerge: (MergeStrategy) -> Void
     let onToggleDraft: () -> Void
+    var onSendToSession: ((String) -> Void)?
 
     @State private var selectedTab: PRDetailTab = .overview
     @State private var sheetCommentText: String = ""
@@ -37,10 +38,12 @@ public struct PRDetailDrawer: View {
         onComment: @escaping (String) -> Void = { _ in },
         onRequestChanges: @escaping (String) -> Void = { _ in },
         onMerge: @escaping (MergeStrategy) -> Void = { _ in },
-        onToggleDraft: @escaping () -> Void = {}
+        onToggleDraft: @escaping () -> Void = {},
+        onSendToSession: ((String) -> Void)? = nil
     ) {
         self.pr = pr
         self.detail = detail
+        self.onSendToSession = onSendToSession
         self.onClose = onClose
         self.onApprove = onApprove
         self.onComment = onComment
@@ -155,6 +158,17 @@ public struct PRDetailDrawer: View {
                     .controlSize(.small)
                 }
 
+                if let onSendToSession {
+                    Button {
+                        let context = "Review PR #\(pr.number): \(pr.title)"
+                        onSendToSession(context)
+                    } label: {
+                        Image(systemName: "paperplane")
+                    }
+                    .controlSize(.small)
+                    .help("Send to linked session")
+                }
+
                 Button {
                     if let url = URL(string: pr.url) {
                         NSWorkspace.shared.open(url)
@@ -265,13 +279,19 @@ public struct PRDetailDrawer: View {
 
     private var tabBar: some View {
         HStack(spacing: 0) {
-            ForEach(PRDetailTab.allCases, id: \.self) { tab in
+            ForEach(Array(PRDetailTab.allCases.enumerated()), id: \.element) { index, tab in
                 Button(action: { selectedTab = tab }) {
                     VStack(spacing: 4) {
-                        Text(tabTitle(tab))
-                            .font(.subheadline)
-                            .fontWeight(selectedTab == tab ? .semibold : .regular)
-                            .foregroundColor(selectedTab == tab ? theme.chrome.accent : theme.chrome.textDim)
+                        HStack(spacing: 2) {
+                            Text(tabTitle(tab))
+                                .font(.subheadline)
+                                .fontWeight(selectedTab == tab ? .semibold : .regular)
+                            // Show shortcut hint for discoverability
+                            Text("^\(index + 1)")
+                                .font(.system(size: 9))
+                                .foregroundColor(theme.chrome.textDim.opacity(0.5))
+                        }
+                        .foregroundColor(selectedTab == tab ? theme.chrome.accent : theme.chrome.textDim)
 
                         Rectangle()
                             .fill(selectedTab == tab ? theme.chrome.accent : .clear)
@@ -281,6 +301,7 @@ public struct PRDetailDrawer: View {
                     .padding(.top, 8)
                 }
                 .buttonStyle(.plain)
+                .keyboardShortcut(KeyEquivalent(Character("\(index + 1)")), modifiers: .control)
             }
             Spacer()
         }
@@ -389,18 +410,45 @@ public struct PRDetailDrawer: View {
         return lines
     }
 
+    /// Unified timeline item for sorting reviews and comments together.
+    private enum TimelineItem: Identifiable {
+        case review(PRReview)
+        case comment(PRComment)
+
+        var id: String {
+            switch self {
+            case .review(let review): "review-\(review.id)"
+            case .comment(let comment): "comment-\(comment.id)"
+            }
+        }
+
+        var date: Date {
+            switch self {
+            case .review(let review): review.submittedAt ?? .distantPast
+            case .comment(let comment): comment.createdAt
+            }
+        }
+    }
+
     private var conversationTab: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 12) {
-                if let reviews = detail?.reviews {
-                    ForEach(reviews) { review in
-                        reviewCard(review)
+                // Interleave reviews and comments by date
+                let items: [TimelineItem] = {
+                    var all: [TimelineItem] = []
+                    if let reviews = detail?.reviews {
+                        all += reviews.map { .review($0) }
                     }
-                }
+                    if let comments = detail?.comments {
+                        all += comments.map { .comment($0) }
+                    }
+                    return all.sorted { $0.date < $1.date }
+                }()
 
-                if let comments = detail?.comments {
-                    ForEach(comments) { comment in
-                        commentCard(comment)
+                ForEach(items) { item in
+                    switch item {
+                    case .review(let review): reviewCard(review)
+                    case .comment(let comment): commentCard(comment)
                     }
                 }
 
@@ -433,29 +481,47 @@ public struct PRDetailDrawer: View {
     }
 
     private func reviewCard(_ review: PRReview) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack {
-                Text(review.author)
-                    .font(.caption)
-                    .fontWeight(.semibold)
-                Text(review.state.lowercased())
-                    .font(.caption2)
-                    .foregroundColor(reviewColor(review.state))
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 2)
-                    .background(reviewColor(review.state).opacity(0.1))
-                    .cornerRadius(4)
+        HStack(spacing: 0) {
+            // Colored left border indicating review decision
+            RoundedRectangle(cornerRadius: 1)
+                .fill(reviewColor(review.state))
+                .frame(width: 3)
+
+            VStack(alignment: .leading, spacing: 4) {
+                HStack {
+                    Image(systemName: reviewIcon(review.state))
+                        .font(.caption2)
+                        .foregroundColor(reviewColor(review.state))
+                    Text(review.author)
+                        .font(.caption)
+                        .fontWeight(.semibold)
+                    Text(review.state.lowercased())
+                        .font(.caption2)
+                        .foregroundColor(reviewColor(review.state))
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(reviewColor(review.state).opacity(0.1))
+                        .cornerRadius(4)
+                }
+                if !review.body.isEmpty {
+                    Text(review.body)
+                        .font(.body)
+                        .foregroundColor(theme.chrome.text)
+                }
             }
-            if !review.body.isEmpty {
-                Text(review.body)
-                    .font(.body)
-                    .foregroundColor(theme.chrome.text)
-            }
+            .padding(8)
         }
-        .padding(8)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(theme.chrome.surface)
         .cornerRadius(6)
+    }
+
+    private func reviewIcon(_ state: String) -> String {
+        switch state.uppercased() {
+        case "APPROVED": "checkmark.circle.fill"
+        case "CHANGES_REQUESTED": "exclamationmark.triangle.fill"
+        default: "clock"
+        }
     }
 
     private func commentCard(_ comment: PRComment) -> some View {
