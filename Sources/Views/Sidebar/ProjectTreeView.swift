@@ -327,7 +327,7 @@ struct SessionRowView: View {
                         } label: {
                             Text("#\(pr.number)")
                                 .font(.caption2)
-                                .foregroundColor(theme.chrome.accent)
+                                .foregroundColor(pr.numberColor(chrome: theme.chrome))
                         }
                         .buttonStyle(.plain)
                         .help("Open PR #\(pr.number) in browser")

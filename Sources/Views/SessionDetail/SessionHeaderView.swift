@@ -75,7 +75,7 @@ public struct SessionHeaderView: View {
                                     Text("#\(pr.number)")
                                         .font(.caption)
                                         .fontWeight(.medium)
-                                        .foregroundColor(theme.chrome.purple)
+                                        .foregroundColor(pr.numberColor(chrome: theme.chrome))
                                 }
                                 .buttonStyle(.plain)
                                 .help("Open PR in browser")
