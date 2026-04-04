@@ -181,6 +181,7 @@ public final class Database: Sendable {
             }
         }
 
+        try migrator.migrate(dbQueue)
     }
 
     // MARK: - Default Path
