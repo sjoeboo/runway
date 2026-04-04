@@ -204,14 +204,15 @@ public struct HookInjector: Sendable {
     }
 
     /// Remove Runway hooks from an event's matcher blocks. Returns nil if event should be removed entirely.
-    private func removeRunwayHooksFromEvent(_ eventData: Any) -> Any? {
+    /// Always returns [[String: Any]] to maintain array format required by Claude Code.
+    private func removeRunwayHooksFromEvent(_ eventData: Any) -> [[String: Any]]? {
         let blocks: [[String: Any]]
         if let single = eventData as? [String: Any] {
             blocks = [single]
         } else if let array = eventData as? [[String: Any]] {
             blocks = array
         } else {
-            return eventData
+            return nil
         }
 
         var cleaned: [[String: Any]] = []
@@ -224,19 +225,19 @@ public struct HookInjector: Sendable {
             cleaned.append(block)
         }
 
-        if cleaned.isEmpty { return nil }
-        return cleaned.count == 1 ? cleaned[0] : cleaned
+        return cleaned.isEmpty ? nil : cleaned
     }
 
     /// Merge our hook entry into an event's existing matcher blocks.
-    private func mergeHookEvent(existing: Any?, matcher: String?, hook: [String: Any]) -> Any {
+    /// Always returns [[String: Any]] — Claude Code requires the array format for all hook events.
+    private func mergeHookEvent(existing: Any?, matcher: String?, hook: [String: Any]) -> [[String: Any]] {
         var block: [String: Any] = [:]
         if let matcher {
             block["matcher"] = matcher
         }
 
         if let existing {
-            // Append to existing blocks
+            // Normalise to array (handle legacy object format written by older versions)
             let blocks: [[String: Any]]
             if let single = existing as? [String: Any] {
                 blocks = [single]
@@ -246,7 +247,7 @@ public struct HookInjector: Sendable {
                 blocks = []
             }
 
-            // Find a block with matching matcher (or no matcher)
+            // Find a block with matching matcher (or no matcher) and append our hook
             var found = false
             var result = blocks
             for i in result.indices {
@@ -265,10 +266,10 @@ public struct HookInjector: Sendable {
                 result.append(block)
             }
 
-            return result.count == 1 ? result[0] : result
+            return result
         } else {
             block["hooks"] = [hook]
-            return block
+            return [block]
         }
     }
 }
