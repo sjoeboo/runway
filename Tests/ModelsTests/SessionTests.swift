@@ -46,3 +46,13 @@ import Testing
     #expect(SessionStatus.idle.rawValue == "idle")
     #expect(SessionStatus.error.rawValue == "error")
 }
+
+@Test func sessionPRNumberDefaultsToNil() {
+    let session = Session(title: "test", path: "/tmp")
+    #expect(session.prNumber == nil)
+}
+
+@Test func sessionPRNumberPreserved() {
+    let session = Session(title: "review", path: "/tmp", prNumber: 247)
+    #expect(session.prNumber == 247)
+}

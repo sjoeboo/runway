@@ -154,6 +154,22 @@ public actor PRManager {
         return try parseSinglePR(output)
     }
 
+    /// Resolve a PR by number — used by PR review session creation.
+    /// Returns a full PullRequest with branch info, state, and checks.
+    public func resolvePR(repo: String, number: Int, host: String? = nil) async throws -> PullRequest {
+        let output = try await runGH(
+            args: [
+                "pr", "view", "\(number)",
+                "--repo", repo,
+                "--json",
+                "number,title,state,headRefName,baseRefName,author,url,isDraft,additions,deletions,changedFiles,createdAt,updatedAt,reviewDecision,statusCheckRollup",
+            ], host: host)
+        guard let pr = try parseSinglePR(output) else {
+            throw PRResolveError.notFound(number: number, repo: repo)
+        }
+        return pr
+    }
+
     /// Approve a PR.
     public func approve(repo: String, number: Int, body: String? = nil, host: String? = nil) async throws {
         var args = ["pr", "review", "\(number)", "--repo", repo, "--approve"]
@@ -338,6 +354,20 @@ public enum GHError: Error, LocalizedError {
         switch self {
         case .commandFailed(let args, let exitCode, let stderr):
             "gh \(args.joined(separator: " ")) failed (exit \(exitCode)): \(stderr)"
+        }
+    }
+}
+
+public enum PRResolveError: Error, LocalizedError {
+    case notFound(number: Int, repo: String)
+    case noProject
+
+    public var errorDescription: String? {
+        switch self {
+        case .notFound(let number, let repo):
+            "PR #\(number) not found in \(repo)"
+        case .noProject:
+            "No project matches the PR repository"
         }
     }
 }

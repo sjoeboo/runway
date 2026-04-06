@@ -15,6 +15,7 @@ public struct ProjectPRsTab: View {
     var onRequestChanges: ((PullRequest, String) -> Void)?
     var onMerge: ((PullRequest, MergeStrategy) -> Void)?
     var onToggleDraft: ((PullRequest) -> Void)?
+    var onReviewPR: ((PullRequest) -> Void)?
 
     @AppStorage("hideDrafts") private var hideDrafts: Bool = false
     @Environment(\.theme) private var theme
@@ -29,7 +30,8 @@ public struct ProjectPRsTab: View {
         onComment: ((PullRequest, String) -> Void)? = nil,
         onRequestChanges: ((PullRequest, String) -> Void)? = nil,
         onMerge: ((PullRequest, MergeStrategy) -> Void)? = nil,
-        onToggleDraft: ((PullRequest) -> Void)? = nil
+        onToggleDraft: ((PullRequest) -> Void)? = nil,
+        onReviewPR: ((PullRequest) -> Void)? = nil
     ) {
         self.pullRequests = pullRequests
         self.onSelectPR = onSelectPR
@@ -41,6 +43,7 @@ public struct ProjectPRsTab: View {
         self.onRequestChanges = onRequestChanges
         self.onMerge = onMerge
         self.onToggleDraft = onToggleDraft
+        self.onReviewPR = onReviewPR
     }
 
     private var selectedPR: PullRequest? {
@@ -130,7 +133,7 @@ public struct ProjectPRsTab: View {
     private var prList: some View {
         List {
             ForEach(filteredPRs) { pr in
-                ProjectPRRowView(pr: pr)
+                ProjectPRRowView(pr: pr, onReview: onReviewPR.map { callback in { callback(pr) } })
                     .contentShape(Rectangle())
                     .onTapGesture { onSelectPR(pr) }
                     .listRowInsets(EdgeInsets(top: 4, leading: 12, bottom: 4, trailing: 12))
@@ -145,6 +148,7 @@ public struct ProjectPRsTab: View {
 
 private struct ProjectPRRowView: View {
     let pr: PullRequest
+    var onReview: (() -> Void)?
     @Environment(\.theme) private var theme
 
     var body: some View {
@@ -189,6 +193,11 @@ private struct ProjectPRRowView: View {
             }
         }
         .padding(.vertical, 4)
+        .contextMenu {
+            if let onReview {
+                Button("Open Review Session") { onReview() }
+            }
+        }
     }
 
     @ViewBuilder

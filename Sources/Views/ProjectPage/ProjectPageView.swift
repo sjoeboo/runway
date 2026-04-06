@@ -30,6 +30,7 @@ public struct ProjectPageView: View {
     var onRequestChangesPR: ((PullRequest, String) -> Void)?
     var onMergePR: ((PullRequest, MergeStrategy) -> Void)?
     var onToggleDraftPR: ((PullRequest) -> Void)?
+    var onReviewPR: ((PullRequest) -> Void)?
     let onUpdateProject: (Project) -> Void
     let onDetectRepo: () async -> (repo: String, host: String?)?
     let onFetchLabels: () -> Void
@@ -57,6 +58,7 @@ public struct ProjectPageView: View {
         onRequestChangesPR: ((PullRequest, String) -> Void)? = nil,
         onMergePR: ((PullRequest, MergeStrategy) -> Void)? = nil,
         onToggleDraftPR: ((PullRequest) -> Void)? = nil,
+        onReviewPR: ((PullRequest) -> Void)? = nil,
         onUpdateProject: @escaping (Project) -> Void,
         onDetectRepo: @escaping () async -> (repo: String, host: String?)?,
         onFetchLabels: @escaping () -> Void
@@ -78,6 +80,7 @@ public struct ProjectPageView: View {
         self.onRequestChangesPR = onRequestChangesPR
         self.onMergePR = onMergePR
         self.onToggleDraftPR = onToggleDraftPR
+        self.onReviewPR = onReviewPR
         self.onUpdateProject = onUpdateProject
         self.onDetectRepo = onDetectRepo
         self.onFetchLabels = onFetchLabels
@@ -174,7 +177,8 @@ public struct ProjectPageView: View {
                     onComment: onCommentPR,
                     onRequestChanges: onRequestChangesPR,
                     onMerge: onMergePR,
-                    onToggleDraft: onToggleDraftPR
+                    onToggleDraft: onToggleDraftPR,
+                    onReviewPR: onReviewPR
                 )
             }
         }

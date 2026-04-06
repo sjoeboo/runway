@@ -121,6 +121,13 @@ public actor TmuxSessionManager {
         ("/usr/bin/env", ["tmux", "attach-session", "-t", name])
     }
 
+    /// Send text to a tmux session without pressing Enter.
+    /// Used to pre-fill terminal input (e.g., initial review prompt).
+    public func sendText(sessionName: String, text: String) async throws {
+        // send-keys -l sends literal text (no key interpretation)
+        try await runTmux(args: ["send-keys", "-t", sessionName, "-l", text])
+    }
+
     // MARK: - Private
 
     @discardableResult

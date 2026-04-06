@@ -9,6 +9,7 @@ public struct Session: Identifiable, Codable, Sendable {
     public var tool: Tool
     public var status: SessionStatus
     public var worktreeBranch: String?
+    public var prNumber: Int?
     public var parentID: String?
     public var command: String?
     public var permissionMode: PermissionMode
@@ -24,6 +25,7 @@ public struct Session: Identifiable, Codable, Sendable {
         tool: Tool = .claude,
         status: SessionStatus = .starting,
         worktreeBranch: String? = nil,
+        prNumber: Int? = nil,
         parentID: String? = nil,
         command: String? = nil,
         permissionMode: PermissionMode = .default,
@@ -38,6 +40,7 @@ public struct Session: Identifiable, Codable, Sendable {
         self.tool = tool
         self.status = status
         self.worktreeBranch = worktreeBranch
+        self.prNumber = prNumber
         self.parentID = parentID
         self.command = command
         self.permissionMode = permissionMode

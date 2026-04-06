@@ -87,3 +87,23 @@ import Testing
     #expect(sessions[1].title == "first")  // sortOrder 10
     #expect(sessions[2].title == "third")  // sortOrder 20
 }
+
+@Test func sessionPRNumberPersistence() throws {
+    let db = try Database(inMemory: true)
+
+    let session = Session(title: "review", path: "/tmp", prNumber: 42)
+    try db.saveSession(session)
+
+    let fetched = try db.session(id: session.id)
+    #expect(fetched?.prNumber == 42)
+}
+
+@Test func sessionPRNumberNilPersistence() throws {
+    let db = try Database(inMemory: true)
+
+    let session = Session(title: "test", path: "/tmp")
+    try db.saveSession(session)
+
+    let fetched = try db.session(id: session.id)
+    #expect(fetched?.prNumber == nil)
+}
