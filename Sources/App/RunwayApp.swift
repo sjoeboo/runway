@@ -55,6 +55,9 @@ struct RunwayApp: App {
 
                 Button("Search Sessions") { store.focusSidebarSearch = true }
                     .keyboardShortcut("k", modifiers: .command)
+
+                Button("Review PR") { store.showReviewPRDialog = true }
+                    .keyboardShortcut("r", modifiers: [.command, .shift])
             }
         }
 
@@ -132,6 +135,46 @@ struct ContentView: View {
                 NewProjectDialog { name, path, branch in
                     store.createProject(name: name, path: path, defaultBranch: branch)
                 }
+                .theme(theme)
+            }
+            .sheet(
+                isPresented: Binding(
+                    get: { store.showReviewPRSheet },
+                    set: { store.showReviewPRSheet = $0 }
+                )
+            ) {
+                if let pr = store.reviewPRCandidate {
+                    ReviewPRSheet(
+                        pr: pr,
+                        projects: store.projects
+                    ) { sessionName, projectID, initialPrompt in
+                        Task {
+                            await store.handleReviewPR(
+                                pr: pr,
+                                sessionName: sessionName,
+                                projectID: projectID,
+                                initialPrompt: initialPrompt
+                            )
+                        }
+                        store.reviewPRCandidate = nil
+                    }
+                    .theme(theme)
+                }
+            }
+            .sheet(
+                isPresented: Binding(
+                    get: { store.showReviewPRDialog },
+                    set: { store.showReviewPRDialog = $0 }
+                )
+            ) {
+                ReviewPRNumberDialog(
+                    projects: store.projects,
+                    isResolving: store.isResolvingPR,
+                    onResolve: { number, repo, host in
+                        Task { await store.resolvePRForReview(number: number, repo: repo, host: host) }
+                        store.showReviewPRDialog = false
+                    }
+                )
                 .theme(theme)
             }
 

@@ -39,6 +39,10 @@ public final class RunwayStore {
     var showTerminalSearch: Bool = false
     var sidebarSearchQuery: String = ""
     var focusSidebarSearch: Bool = false
+    var showReviewPRDialog: Bool = false
+    var showReviewPRSheet: Bool = false
+    var reviewPRCandidate: PullRequest? = nil
+    var isResolvingPR: Bool = false
 
     /// Maps session ID → linked PullRequest (matched by worktree branch)
     var sessionPRs: [String: PullRequest] = [:]
@@ -861,6 +865,89 @@ public final class RunwayStore {
         }
     }
 
+    // MARK: - PR Review Session
+
+    func handleReviewPR(pr: PullRequest, sessionName: String, projectID: String?, initialPrompt: String) async {
+        guard let project = projects.first(where: { $0.id == projectID }) else {
+            statusMessage = .error("No project selected for PR review")
+            return
+        }
+
+        let worktreePath: String
+        do {
+            worktreePath = try await worktreeManager.checkoutWorktree(
+                repoPath: project.path,
+                branch: pr.headBranch
+            )
+        } catch {
+            statusMessage = .error("Worktree failed: \(error.localizedDescription)")
+            return
+        }
+
+        let resolvedMode = project.permissionMode ?? .default
+
+        var session = Session(
+            title: sessionName,
+            projectID: projectID,
+            path: worktreePath,
+            tool: .claude,
+            status: .starting,
+            worktreeBranch: pr.headBranch,
+            prNumber: pr.number,
+            permissionMode: resolvedMode
+        )
+
+        if tmuxAvailable {
+            let tmuxName = "runway-\(session.id)"
+            let command = ([session.tool.command] + session.permissionMode.cliFlags).joined(separator: " ")
+
+            do {
+                try await tmuxManager.createSession(
+                    name: tmuxName,
+                    workDir: worktreePath,
+                    command: command,
+                    env: [
+                        "RUNWAY_SESSION_ID": session.id,
+                        "RUNWAY_TITLE": session.title,
+                    ]
+                )
+                session.status = .running
+            } catch {
+                statusMessage = .error("tmux session failed: \(error.localizedDescription)")
+            }
+        }
+
+        sessions.append(session)
+        do {
+            try database?.saveSession(session)
+        } catch {
+            statusMessage = .error("Failed to save session: \(error.localizedDescription)")
+        }
+        selectedSessionID = session.id
+        currentView = .sessions
+
+        sessionPRs[session.id] = pr
+
+        if !initialPrompt.isEmpty, tmuxAvailable {
+            let tmuxName = "runway-\(session.id)"
+            try? await Task.sleep(for: .milliseconds(500))
+            try? await tmuxManager.sendText(sessionName: tmuxName, text: initialPrompt)
+        }
+    }
+
+    func resolvePRForReview(number: Int, repo: String, host: String?) async {
+        isResolvingPR = true
+        defer { isResolvingPR = false }
+
+        do {
+            let pr = try await prManager.resolvePR(repo: repo, number: number, host: host)
+            reviewPRCandidate = pr
+            showReviewPRSheet = true
+        } catch {
+            statusMessage = .error("Failed to resolve PR #\(number): \(error.localizedDescription)")
+        }
+    }
+
 }
 
 // MARK: - SidebarActions Conformance
@@ -879,6 +966,11 @@ extension RunwayStore: SidebarActions {
     // SidebarActions conformance — delegates to the full selectPR with navigate: true
     public func selectPR(_ pr: PullRequest?) async {
         await selectPR(pr, navigate: true)
+    }
+
+    public func reviewPR(_ pr: PullRequest) {
+        reviewPRCandidate = pr
+        showReviewPRSheet = true
     }
 }
 

@@ -21,6 +21,7 @@ public protocol SidebarActions {
     func selectProject(_ id: String?)
     func selectSession(_ id: String?)
     func selectPR(_ pr: PullRequest?) async
+    func reviewPR(_ pr: PullRequest)
 }
 
 /// Sidebar view showing the hierarchical project tree with sessions.
