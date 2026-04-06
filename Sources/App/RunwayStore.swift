@@ -647,6 +647,8 @@ public final class RunwayStore {
                 existing.isDraft = fresh.isDraft
                 existing.author = fresh.author
                 existing.origin = fresh.origin
+                existing.createdAt = fresh.createdAt
+                existing.updatedAt = fresh.updatedAt
                 return existing
             }
 
