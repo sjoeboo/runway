@@ -19,6 +19,8 @@ public struct PullRequest: Identifiable, Codable, Sendable {
     public var changedFiles: Int
     public var createdAt: Date
     public var updatedAt: Date
+    public var enrichedAt: Date?
+    public var origin: Set<PROrigin>
 
     public init(
         number: Int,
@@ -36,7 +38,9 @@ public struct PullRequest: Identifiable, Codable, Sendable {
         deletions: Int = 0,
         changedFiles: Int = 0,
         createdAt: Date = Date(),
-        updatedAt: Date = Date()
+        updatedAt: Date = Date(),
+        enrichedAt: Date? = nil,
+        origin: Set<PROrigin> = []
     ) {
         self.id = "\(repo)#\(number)"
         self.number = number
@@ -55,7 +59,21 @@ public struct PullRequest: Identifiable, Codable, Sendable {
         self.changedFiles = changedFiles
         self.createdAt = createdAt
         self.updatedAt = updatedAt
+        self.enrichedAt = enrichedAt
+        self.origin = origin
     }
+
+    public var needsEnrichment: Bool {
+        guard let enrichedAt else { return true }
+        return Date().timeIntervalSince(enrichedAt) > 300
+    }
+}
+
+// MARK: - PR Origin
+
+public enum PROrigin: String, Codable, Sendable, Hashable {
+    case mine
+    case reviewRequested
 }
 
 // MARK: - PR State
