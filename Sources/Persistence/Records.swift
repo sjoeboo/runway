@@ -14,6 +14,7 @@ struct SessionRecord: Codable, FetchableRecord, MutablePersistableRecord {
     var tool: String
     var status: String
     var worktreeBranch: String?
+    var prNumber: Int?
     var parentID: String?
     var command: String?
     var permissionMode: String
@@ -29,6 +30,7 @@ struct SessionRecord: Codable, FetchableRecord, MutablePersistableRecord {
         self.tool = Self.encodeTool(session.tool)
         self.status = session.status.rawValue
         self.worktreeBranch = session.worktreeBranch
+        self.prNumber = session.prNumber
         self.parentID = session.parentID
         self.command = session.command
         self.permissionMode = session.permissionMode.rawValue
@@ -46,6 +48,7 @@ struct SessionRecord: Codable, FetchableRecord, MutablePersistableRecord {
             tool: Self.decodeTool(tool),
             status: SessionStatus(rawValue: status) ?? .stopped,
             worktreeBranch: worktreeBranch,
+            prNumber: prNumber,
             parentID: parentID,
             command: command,
             permissionMode: PermissionMode(rawValue: permissionMode) ?? .default,

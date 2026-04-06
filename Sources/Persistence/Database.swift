@@ -181,6 +181,12 @@ public final class Database: Sendable {
             }
         }
 
+        migrator.registerMigration("v9_session_pr_number") { db in
+            try db.alter(table: "sessions") { t in
+                t.add(column: "prNumber", .integer)
+            }
+        }
+
         try migrator.migrate(dbQueue)
     }
 
