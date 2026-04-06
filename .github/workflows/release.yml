@@ -1,0 +1,66 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build & Release
+    runs-on: macos-15
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode_16.3.app/Contents/Developer
+
+      - name: Cache SPM
+        uses: actions/cache@v4
+        with:
+          path: .build
+          key: ${{ runner.os }}-spm-${{ hashFiles('Package.resolved') }}
+          restore-keys: |
+            ${{ runner.os }}-spm-
+
+      - name: Extract version from tag
+        id: version
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Building version: $VERSION"
+
+      - name: Build universal app bundle
+        run: ./scripts/package.sh --release --universal --version "${{ steps.version.outputs.version }}"
+
+      - name: Create DMG
+        run: ./scripts/create-dmg.sh
+
+      - name: Create zipped app
+        working-directory: build
+        run: |
+          ZIP_NAME="Runway-${{ steps.version.outputs.version }}-universal.app.zip"
+          ditto -c -k --keepParent Runway.app "$ZIP_NAME"
+          echo "Created $ZIP_NAME"
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          PREV_TAG=$(git tag --sort=-creatordate | sed -n '2p' || true)
+          NOTES_FLAG=""
+          if [ -n "$PREV_TAG" ]; then
+            NOTES_FLAG="--notes-start-tag $PREV_TAG"
+          fi
+          gh release create "$GITHUB_REF_NAME" \
+            --title "Runway v${VERSION}" \
+            --generate-notes \
+            $NOTES_FLAG \
+            "build/Runway-${VERSION}-universal.dmg#Runway-${VERSION}-universal.dmg (installer)" \
+            "build/Runway-${VERSION}-universal.app.zip#Runway-${VERSION}-universal.app.zip (app bundle)"
