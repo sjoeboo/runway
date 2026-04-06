@@ -27,9 +27,11 @@ public enum ShellRunner {
         // If common Homebrew paths are already present, we're running via
         // `swift run` or the terminal — nothing to fix.
         if current.contains("/opt/homebrew/bin") || current.contains("/usr/local/bin") {
+            print("[Runway] PATH already contains Homebrew dirs, skipping enrichment")
             return
         }
 
+        print("[Runway] Enriching PATH (launchd PATH: \(current))")
         let shell = ProcessInfo.processInfo.environment["SHELL"] ?? "/bin/zsh"
         let process = Process()
         process.executableURL = URL(fileURLWithPath: shell)
@@ -40,6 +42,7 @@ public enum ShellRunner {
         process.standardError = FileHandle.nullDevice
 
         guard (try? process.run()) != nil else {
+            print("[Runway] Login shell failed to launch, applying fallback PATH")
             applyFallbackPath(current)
             return
         }
@@ -50,7 +53,9 @@ public enum ShellRunner {
 
         if process.terminationStatus == 0, !resolved.isEmpty {
             setenv("PATH", resolved, 1)
+            print("[Runway] PATH enriched via login shell (\(resolved.components(separatedBy: ":").count) entries)")
         } else {
+            print("[Runway] Login shell exited \(process.terminationStatus), applying fallback PATH")
             applyFallbackPath(current)
         }
     }
