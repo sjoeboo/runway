@@ -25,13 +25,22 @@ public struct ReviewPRSheet: View {
 
         let truncatedTitle = pr.title.count > 60 ? String(pr.title.prefix(57)) + "..." : pr.title
         self._sessionName = State(initialValue: "Review: \(truncatedTitle)")
-        let matched = projects.first(where: { $0.ghRepo?.lowercased() == pr.repo.lowercased() })
+        // Match by ghRepo first, then fall back to project name matching the repo suffix
+        let repoLower = pr.repo.lowercased()
+        let repoName = repoLower.split(separator: "/").last.map(String.init) ?? repoLower
+        let matched =
+            projects.first(where: { $0.ghRepo?.lowercased() == repoLower })
+            ?? projects.first(where: { $0.name.lowercased() == repoName })
         self._selectedProjectID = State(initialValue: matched?.id)
     }
 
     private var autoDetected: Bool {
-        projects.first(where: { $0.ghRepo?.lowercased() == pr.repo.lowercased() })?.id
-            == selectedProjectID
+        let repoLower = pr.repo.lowercased()
+        let repoName = repoLower.split(separator: "/").last.map(String.init) ?? repoLower
+        let matched =
+            projects.first(where: { $0.ghRepo?.lowercased() == repoLower })
+            ?? projects.first(where: { $0.name.lowercased() == repoName })
+        return matched?.id == selectedProjectID
     }
 
     public var body: some View {
