@@ -822,6 +822,11 @@ extension RunwayStore: SidebarActions {
     public func newProject() {
         showNewProjectDialog = true
     }
+
+    // SidebarActions conformance — delegates to the full selectPR with navigate: true
+    public func selectPR(_ pr: PullRequest?) async {
+        await selectPR(pr, navigate: true)
+    }
 }
 
 // MARK: - Status Message

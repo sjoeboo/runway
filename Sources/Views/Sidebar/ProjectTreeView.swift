@@ -20,6 +20,7 @@ public protocol SidebarActions {
     func reorderProjects(fromOffsets: IndexSet, toOffset: Int)
     func selectProject(_ id: String?)
     func selectSession(_ id: String?)
+    func selectPR(_ pr: PullRequest?) async
 }
 
 /// Sidebar view showing the hierarchical project tree with sessions.
@@ -343,16 +344,14 @@ struct SessionRowView: View {
                 if let pr = linkedPR {
                     HStack(spacing: 4) {
                         Button {
-                            if let url = URL(string: pr.url) {
-                                NSWorkspace.shared.open(url)
-                            }
+                            Task { await actions.selectPR(pr) }
                         } label: {
                             Text("#\(pr.number)")
                                 .font(.caption2)
                                 .foregroundColor(pr.numberColor(chrome: theme.chrome))
                         }
                         .buttonStyle(LinkButtonStyle())
-                        .help("Open PR #\(pr.number) in browser")
+                        .help("View PR #\(pr.number) details")
                         CheckSummaryBadge(checks: pr.checks)
                         ReviewDecisionBadge(decision: pr.reviewDecision, style: .iconOnly)
                         if pr.additions > 0 || pr.deletions > 0 {
