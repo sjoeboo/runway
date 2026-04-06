@@ -4,6 +4,7 @@ import AppKit
 ///
 /// Since SPM executables don't have an asset catalog, the icon is generated
 /// at launch and set via NSApplication.applicationIconImage.
+@MainActor
 enum AppIcon {
     static func install() {
         let size = NSSize(width: 1024, height: 1024)
