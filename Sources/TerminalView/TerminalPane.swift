@@ -13,6 +13,8 @@ public struct TerminalPane: NSViewRepresentable {
     public let sessionID: String
     public let tabID: String
     @Environment(\.theme) private var theme
+    @AppStorage("terminalFontFamily") private var fontFamily: String = "MesloLGS Nerd Font"
+    @AppStorage("terminalFontSize") private var fontSize: Double = 13
 
     public init(config: TerminalConfig, sessionID: String = "", tabID: String = "") {
         self.config = config
@@ -57,6 +59,20 @@ public struct TerminalPane: NSViewRepresentable {
             if context.coordinator.lastThemeID != themeID {
                 context.coordinator.lastThemeID = themeID
                 applyTheme(terminal)
+            }
+
+            // Reapply font when settings change so existing terminals update live.
+            let currentFontFamily = fontFamily
+            let currentFontSize = fontSize
+            if context.coordinator.lastFontFamily != currentFontFamily
+                || context.coordinator.lastFontSize != currentFontSize
+            {
+                context.coordinator.lastFontFamily = currentFontFamily
+                context.coordinator.lastFontSize = currentFontSize
+                let size = CGFloat(currentFontSize)
+                terminal.font =
+                    NSFont(name: currentFontFamily, size: size)
+                    ?? NSFont.monospacedSystemFont(ofSize: size, weight: .regular)
             }
         }
     }
@@ -165,6 +181,8 @@ public struct TerminalPane: NSViewRepresentable {
     public class Coordinator {
         var terminal: LocalProcessTerminalView?
         var lastThemeID: String?
+        var lastFontFamily: String?
+        var lastFontSize: Double?
     }
 }
 
