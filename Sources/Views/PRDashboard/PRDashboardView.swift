@@ -68,53 +68,35 @@ public struct PRDashboardView: View {
 
     // MARK: - Filtering
 
-    private var filteredPRs: [PullRequest] {
-        var prs = pullRequests
-
-        // Tab filter
-        switch selectedTab {
-        case .all:
-            break
-        case .mine:
-            prs = prs.filter { $0.origin.contains(.mine) }
-        case .reviewRequested:
-            prs = prs.filter { $0.origin.contains(.reviewRequested) }
-        }
-
-        // Sessions filter
-        if showSessionPRsOnly {
-            prs = prs.filter { sessionPRIDs.contains($0.id) }
-        }
-
-        // Draft filter
-        if hideDrafts {
-            prs = prs.filter { !$0.isDraft }
-        }
-
-        return prs
-    }
-
-    private func tabCount(_ tab: PRTab) -> Int {
-        var prs = pullRequests
+    private func applyFilters(to prs: [PullRequest], tab: PRTab) -> [PullRequest] {
+        var result = prs
 
         switch tab {
         case .all:
             break
         case .mine:
-            prs = prs.filter { $0.origin.contains(.mine) }
+            result = result.filter { $0.origin.contains(.mine) }
         case .reviewRequested:
-            prs = prs.filter { $0.origin.contains(.reviewRequested) }
+            result = result.filter { $0.origin.contains(.reviewRequested) }
         }
 
         if showSessionPRsOnly {
-            prs = prs.filter { sessionPRIDs.contains($0.id) }
+            result = result.filter { sessionPRIDs.contains($0.id) }
         }
 
         if hideDrafts {
-            prs = prs.filter { !$0.isDraft }
+            result = result.filter { !$0.isDraft }
         }
 
-        return prs.count
+        return result
+    }
+
+    private var filteredPRs: [PullRequest] {
+        applyFilters(to: pullRequests, tab: selectedTab)
+    }
+
+    private func tabCount(_ tab: PRTab) -> Int {
+        applyFilters(to: pullRequests, tab: tab).count
     }
 
     // MARK: - Grouping

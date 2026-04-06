@@ -339,7 +339,7 @@ public struct PRDetailDrawer: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 12) {
                 if let body = detail?.body, !body.isEmpty {
-                    markdownBody(body)
+                    renderMarkdown(body)
                         .font(.body)
                         .foregroundColor(theme.chrome.text)
                         .textSelection(.enabled)
@@ -504,7 +504,7 @@ public struct PRDetailDrawer: View {
                         .cornerRadius(4)
                 }
                 if !review.body.isEmpty {
-                    markdownText(review.body)
+                    renderMarkdown(review.body, inlineOnly: true)
                         .font(.body)
                         .foregroundColor(theme.chrome.text)
                 }
@@ -536,7 +536,7 @@ public struct PRDetailDrawer: View {
                         .foregroundColor(theme.chrome.accent)
                 }
             }
-            markdownText(comment.body)
+            renderMarkdown(comment.body, inlineOnly: true)
                 .font(.body)
                 .foregroundColor(theme.chrome.text)
                 .textSelection(.enabled)
@@ -579,18 +579,14 @@ public struct PRDetailDrawer: View {
         }
     }
 
-    /// Render a markdown string as styled Text using AttributedString.
-    /// Falls back to plain text if markdown parsing fails.
-    private func markdownText(_ source: String) -> Text {
-        if let attributed = try? AttributedString(markdown: source, options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace)) {
-            return Text(attributed)
-        }
-        return Text(source)
-    }
-
-    /// Render a full markdown document (PR body — supports block elements like headings, lists).
-    private func markdownBody(_ source: String) -> Text {
-        if let attributed = try? AttributedString(markdown: source) {
+    /// Render markdown as styled Text. Use `inlineOnly: true` for comments/reviews
+    /// (preserves whitespace), `false` for PR body (supports headings, lists).
+    private func renderMarkdown(_ source: String, inlineOnly: Bool = false) -> Text {
+        let syntax: AttributedString.MarkdownParsingOptions.InterpretedSyntax =
+            inlineOnly ? .inlineOnlyPreservingWhitespace : .full
+        if let attributed = try? AttributedString(
+            markdown: source, options: .init(interpretedSyntax: syntax)
+        ) {
             return Text(attributed)
         }
         return Text(source)

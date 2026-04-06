@@ -700,16 +700,7 @@ public final class RunwayStore {
         var updated = pullRequests
         for i in updated.indices {
             guard let result = enriched[updated[i].id] else { continue }
-            updated[i].checks = result.checks
-            updated[i].reviewDecision = result.reviewDecision
-            if !result.headBranch.isEmpty {
-                updated[i].headBranch = result.headBranch
-                updated[i].baseBranch = result.baseBranch
-            }
-            updated[i].additions = result.additions
-            updated[i].deletions = result.deletions
-            updated[i].changedFiles = result.changedFiles
-            updated[i].enrichedAt = Date()
+            applyEnrichment(result, to: &updated[i])
         }
         pullRequests = updated
 
@@ -729,19 +720,22 @@ public final class RunwayStore {
         else { return }
 
         if let idx = pullRequests.firstIndex(where: { $0.id == pr.id }) {
-            pullRequests[idx].checks = result.checks
-            pullRequests[idx].reviewDecision = result.reviewDecision
-            if !result.headBranch.isEmpty {
-                pullRequests[idx].headBranch = result.headBranch
-                pullRequests[idx].baseBranch = result.baseBranch
-            }
-            pullRequests[idx].additions = result.additions
-            pullRequests[idx].deletions = result.deletions
-            pullRequests[idx].changedFiles = result.changedFiles
-            pullRequests[idx].enrichedAt = Date()
+            applyEnrichment(result, to: &pullRequests[idx])
+            try? database?.cachePR(pullRequests[idx])
         }
+    }
 
-        try? database?.cachePRs(pullRequests)
+    private func applyEnrichment(_ result: PREnrichResult, to pr: inout PullRequest) {
+        pr.checks = result.checks
+        pr.reviewDecision = result.reviewDecision
+        if !result.headBranch.isEmpty {
+            pr.headBranch = result.headBranch
+            pr.baseBranch = result.baseBranch
+        }
+        pr.additions = result.additions
+        pr.deletions = result.deletions
+        pr.changedFiles = result.changedFiles
+        pr.enrichedAt = Date()
     }
 
     /// Link PRs to sessions — concurrent, like Hangar.
