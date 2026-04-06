@@ -139,7 +139,7 @@ let package = Package(
         ),
         .testTarget(
             name: "GitHubOperationsTests",
-            dependencies: ["GitHubOperations"],
+            dependencies: ["GitHubOperations", "Models"],
             path: "Tests/GitHubOperationsTests"
         ),
         .testTarget(
