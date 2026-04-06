@@ -28,6 +28,8 @@ public final class RunwayStore {
     var prFilter: PRFilter = .mine
     var prLastFetched: Date?
     var isLoadingPRs: Bool = false
+    private var prPollTask: Task<Void, Never>?
+    private var lastPRFingerprint: PRFingerprint?
     var currentView: AppView = .sessions
     var showNewSessionDialog: Bool = false
     var showNewProjectDialog: Bool = false
@@ -90,6 +92,9 @@ public final class RunwayStore {
             tmuxAvailable = await tmuxManager.isAvailable()
             await loadState()
             await fetchPRs()
+            // Seed the fingerprint so the first poll doesn't trigger a redundant fetch
+            lastPRFingerprint = await prManager.prFingerprint(filter: prFilter)
+            startPRPoll()
         }
 
         // Start hook server + inject Claude hooks (sequenced — inject needs the port)
@@ -709,6 +714,25 @@ public final class RunwayStore {
         let staleness: TimeInterval = 60
         if let last = prLastFetched, Date().timeIntervalSince(last) < staleness { return }
         await fetchPRs()
+    }
+
+    /// Start a lightweight background poll that checks for PR changes every 30 seconds.
+    /// Only triggers a full fetch when the fingerprint (latest updatedAt) changes.
+    func startPRPoll() {
+        prPollTask?.cancel()
+        prPollTask = Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(30))
+                guard !Task.isCancelled, let self else { return }
+                guard !self.isLoadingPRs else { continue }
+                let fingerprint = await self.prManager.prFingerprint(filter: self.prFilter)
+                guard let fingerprint else { continue }
+                if fingerprint != self.lastPRFingerprint {
+                    self.lastPRFingerprint = fingerprint
+                    await self.fetchPRs()
+                }
+            }
+        }
     }
 
     /// In-memory detail cache with 5-minute TTL (matches Hangar).

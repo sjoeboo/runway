@@ -45,9 +45,13 @@ cp "$EXECUTABLE" "$MACOS/$APP_NAME"
 # Copy Info.plist
 cp "$PROJECT_DIR/scripts/Info.plist" "$CONTENTS/Info.plist"
 
-# Ad-hoc code sign (required on Apple Silicon)
+# Ad-hoc code sign with entitlements (required on Apple Silicon).
+# --options runtime enables the Hardened Runtime so macOS respects the
+# entitlements (inherit, JIT, unsigned memory) needed for spawning
+# shell subprocesses with proper file-system access.
 echo "==> Code signing..."
-codesign --force --sign - --deep "$APP_BUNDLE"
+ENTITLEMENTS="$SCRIPT_DIR/Runway.entitlements"
+codesign --force --sign - --deep --options runtime --entitlements "$ENTITLEMENTS" "$APP_BUNDLE"
 
 echo "==> Done: $APP_BUNDLE"
 echo ""
