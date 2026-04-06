@@ -413,8 +413,8 @@ private struct GHPRItem: Decodable {
     let additions: Int?
     let deletions: Int?
     let changedFiles: Int?
-    let createdAt: String?
-    let updatedAt: String?
+    let createdAt: Date?
+    let updatedAt: Date?
     let reviewDecision: String?
     let statusCheckRollup: [GHCheck]?
 
@@ -454,7 +454,9 @@ private struct GHPRItem: Decodable {
             reviewDecision: review,
             additions: additions ?? 0,
             deletions: deletions ?? 0,
-            changedFiles: changedFiles ?? 0
+            changedFiles: changedFiles ?? 0,
+            createdAt: createdAt ?? Date(),
+            updatedAt: updatedAt ?? Date()
         )
     }
 
@@ -477,8 +479,8 @@ private struct GHSearchPRItem: Decodable {
     let repository: GHRepository
     let url: String?
     let isDraft: Bool?
-    let createdAt: String?
-    let updatedAt: String?
+    let createdAt: Date?
+    let updatedAt: Date?
     let author: GHSearchAuthor?
 
     func toPullRequest() -> PullRequest {
@@ -506,7 +508,9 @@ private struct GHSearchPRItem: Decodable {
             reviewDecision: .none,
             additions: 0,
             deletions: 0,
-            changedFiles: 0
+            changedFiles: 0,
+            createdAt: createdAt ?? Date(),
+            updatedAt: updatedAt ?? Date()
         )
     }
 }
