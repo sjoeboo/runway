@@ -338,6 +338,7 @@ struct ContentView: View {
                     onRequestChangesPR: { pr, body in Task { await store.requestChangesOnPR(pr, body: body) } },
                     onMergePR: { pr, strategy in Task { await store.mergePR(pr, strategy: strategy) } },
                     onToggleDraftPR: { pr in Task { await store.togglePRDraft(pr) } },
+                    onReviewPR: { pr in store.reviewPR(pr) },
                     onUpdateProject: { store.updateProjectSettings($0) },
                     onDetectRepo: { await store.detectGHRepo(for: project) },
                     onFetchLabels: { Task { await store.fetchLabels(forProject: projectID) } }
@@ -376,7 +377,8 @@ struct ContentView: View {
                         store.selectSession(sessionID)
                         store.showSendBar = true
                     }
-                }
+                },
+                onReviewPR: { pr in store.reviewPR(pr) }
             )
         }
     }

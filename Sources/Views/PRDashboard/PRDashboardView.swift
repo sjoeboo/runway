@@ -17,6 +17,7 @@ public struct PRDashboardView: View {
     var onMerge: ((PullRequest, MergeStrategy) -> Void)?
     var onToggleDraft: ((PullRequest) -> Void)?
     var onSendToSession: ((PullRequest, String) -> Void)?
+    var onReviewPR: ((PullRequest) -> Void)?
 
     @State private var selectedTab: PRTab = .mine
     @AppStorage("prListWidth") private var prListWidth: Double = 380
@@ -36,7 +37,8 @@ public struct PRDashboardView: View {
         onRequestChanges: ((PullRequest, String) -> Void)? = nil,
         onMerge: ((PullRequest, MergeStrategy) -> Void)? = nil,
         onToggleDraft: ((PullRequest) -> Void)? = nil,
-        onSendToSession: ((PullRequest, String) -> Void)? = nil
+        onSendToSession: ((PullRequest, String) -> Void)? = nil,
+        onReviewPR: ((PullRequest) -> Void)? = nil
     ) {
         self.pullRequests = pullRequests
         self.selectedPRID = selectedPRID
@@ -51,6 +53,7 @@ public struct PRDashboardView: View {
         self.onMerge = onMerge
         self.onToggleDraft = onToggleDraft
         self.onSendToSession = onSendToSession
+        self.onReviewPR = onReviewPR
     }
 
     private var selectedPR: PullRequest? {
@@ -125,7 +128,7 @@ public struct PRDashboardView: View {
                             }
                         )
                     ) { pr in
-                        PRRowView(pr: pr)
+                        PRRowView(pr: pr, onReview: onReviewPR.map { callback in { callback(pr) } })
                             .tag(pr.id)
                     }
                 }
@@ -183,6 +186,7 @@ public enum PRTab: String, CaseIterable, Sendable {
 
 struct PRRowView: View {
     let pr: PullRequest
+    var onReview: (() -> Void)?
     @Environment(\.theme) private var theme
 
     var body: some View {
@@ -232,6 +236,11 @@ struct PRRowView: View {
         }
         .padding(.vertical, 4)
         .opacity(pr.isDraft ? 0.5 : 1.0)
+        .contextMenu {
+            if let onReview {
+                Button("Open Review Session") { onReview() }
+            }
+        }
     }
 
     @ViewBuilder
