@@ -78,13 +78,21 @@ public struct TerminalTabView: View {
                 }
             }
         }
-        .onAppear { initializeTabs() }
+        .onAppear { initializeTabsIfReady() }
         .onChange(of: session.id) { _, _ in
             // Reset tabs when switching to a different session — without this,
             // @State persists the old session's tabs and the wrong terminal shows.
             tabs = []
             selectedTabID = nil
-            initializeTabs()
+            initializeTabsIfReady()
+        }
+        .onChange(of: session.status) { _, newStatus in
+            // Wait for the tmux session to be created before attaching.
+            // TerminalPane calls `tmux attach-session` immediately, so we
+            // must not initialize tabs until the tmux session actually exists.
+            if tabs.isEmpty, newStatus != .starting {
+                initializeTabs()
+            }
         }
     }
 
@@ -150,6 +158,15 @@ public struct TerminalTabView: View {
 
     private var selectedTab: TerminalTab? {
         tabs.first(where: { $0.id == selectedTabID }) ?? tabs.first
+    }
+
+    /// Only initialize tabs once the tmux session exists.
+    /// New sessions start as .starting and transition to .running once tmux is created.
+    /// Restored sessions are .idle (tmux alive) or .stopped (tmux gone).
+    /// We must NOT attach during .starting — the tmux session doesn't exist yet.
+    private func initializeTabsIfReady() {
+        guard session.status != .starting else { return }
+        initializeTabs()
     }
 
     private func initializeTabs() {
