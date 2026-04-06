@@ -1,7 +1,12 @@
 #!/bin/bash
 # Package Runway as a macOS .app bundle
 #
-# Usage: ./scripts/package.sh [--release]
+# Usage: ./scripts/package.sh [--release] [--universal] [--version <ver>]
+#
+# Flags:
+#   --release     Build with optimizations (-c release)
+#   --universal   Build arm64 + x86_64 and merge with lipo
+#   --version X   Stamp version X into Info.plist (default: 0.0.0-dev)
 #
 # Creates: build/Runway.app
 
@@ -18,21 +23,65 @@ RESOURCES="$CONTENTS/Resources"
 
 # Parse args
 BUILD_CONFIG="debug"
-SWIFT_FLAGS=()
-if [[ "${1:-}" == "--release" ]]; then
-    BUILD_CONFIG="release"
-    SWIFT_FLAGS=(-c release)
-fi
+SWIFT_CONFIG_FLAGS=()
+UNIVERSAL=false
+VERSION="0.0.0-dev"
 
-echo "==> Building Runway ($BUILD_CONFIG)..."
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --release)
+            BUILD_CONFIG="release"
+            SWIFT_CONFIG_FLAGS=(-c release)
+            shift
+            ;;
+        --universal)
+            UNIVERSAL=true
+            shift
+            ;;
+        --version)
+            VERSION="$2"
+            shift 2
+            ;;
+        *)
+            echo "Unknown flag: $1" >&2
+            exit 1
+            ;;
+    esac
+done
+
+echo "==> Building Runway ($BUILD_CONFIG, universal=$UNIVERSAL, version=$VERSION)..."
 cd "$PROJECT_DIR"
-swift build ${SWIFT_FLAGS[@]+"${SWIFT_FLAGS[@]}"}
 
-# Find the built executable
-EXECUTABLE="$PROJECT_DIR/.build/$BUILD_CONFIG/$APP_NAME"
-if [[ ! -f "$EXECUTABLE" ]]; then
-    echo "Error: Executable not found at $EXECUTABLE"
-    exit 1
+if $UNIVERSAL; then
+    echo "    Building arm64..."
+    swift build ${SWIFT_CONFIG_FLAGS[@]+"${SWIFT_CONFIG_FLAGS[@]}"} --arch arm64
+    echo "    Building x86_64..."
+    swift build ${SWIFT_CONFIG_FLAGS[@]+"${SWIFT_CONFIG_FLAGS[@]}"} --arch x86_64
+
+    ARM_BIN="$PROJECT_DIR/.build/arm64-apple-macosx/$BUILD_CONFIG/$APP_NAME"
+    X86_BIN="$PROJECT_DIR/.build/x86_64-apple-macosx/$BUILD_CONFIG/$APP_NAME"
+
+    if [[ ! -f "$ARM_BIN" ]]; then
+        echo "Error: arm64 executable not found at $ARM_BIN" >&2
+        exit 1
+    fi
+    if [[ ! -f "$X86_BIN" ]]; then
+        echo "Error: x86_64 executable not found at $X86_BIN" >&2
+        exit 1
+    fi
+
+    echo "    Merging with lipo..."
+    mkdir -p "$BUILD_DIR"
+    MERGED_BIN="$BUILD_DIR/$APP_NAME-universal"
+    lipo -create -output "$MERGED_BIN" "$ARM_BIN" "$X86_BIN"
+    EXECUTABLE="$MERGED_BIN"
+else
+    swift build ${SWIFT_CONFIG_FLAGS[@]+"${SWIFT_CONFIG_FLAGS[@]}"}
+    EXECUTABLE="$PROJECT_DIR/.build/$BUILD_CONFIG/$APP_NAME"
+    if [[ ! -f "$EXECUTABLE" ]]; then
+        echo "Error: Executable not found at $EXECUTABLE" >&2
+        exit 1
+    fi
 fi
 
 echo "==> Creating app bundle..."
@@ -42,8 +91,8 @@ mkdir -p "$MACOS" "$RESOURCES"
 # Copy executable
 cp "$EXECUTABLE" "$MACOS/$APP_NAME"
 
-# Copy Info.plist
-cp "$PROJECT_DIR/scripts/Info.plist" "$CONTENTS/Info.plist"
+# Stamp version into Info.plist
+sed -e "s/__VERSION__/$VERSION/g" "$SCRIPT_DIR/Info.plist" > "$CONTENTS/Info.plist"
 
 # Copy icon and app image resources
 cp "$PROJECT_DIR/images/Runway.icns" "$RESOURCES/Runway.icns"
@@ -57,7 +106,7 @@ echo "==> Code signing..."
 ENTITLEMENTS="$SCRIPT_DIR/Runway.entitlements"
 codesign --force --sign - --deep --options runtime --entitlements "$ENTITLEMENTS" "$APP_BUNDLE"
 
-echo "==> Done: $APP_BUNDLE"
+echo "==> Done: $APP_BUNDLE (version $VERSION)"
 echo ""
 echo "To run:  open $APP_BUNDLE"
-echo "To distribute: create a DMG or zip the .app"
+echo "To create DMG: ./scripts/create-dmg.sh"
