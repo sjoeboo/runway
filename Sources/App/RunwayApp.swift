@@ -356,16 +356,12 @@ struct ContentView: View {
                 selectedPRID: store.selectedPRID,
                 detail: store.prDetail,
                 isLoading: store.isLoadingPRs,
+                sessionPRIDs: store.sessionPRIDs,
+                selectedTab: Binding(
+                    get: { store.prTab },
+                    set: { store.prTab = $0 }
+                ),
                 onSelectPR: { pr in Task { await store.selectPR(pr) } },
-                onFilterChange: { tab in
-                    let filter: PRFilter =
-                        switch tab {
-                        case .all: .all
-                        case .mine: .mine
-                        case .reviewRequested: .reviewRequested
-                        }
-                    Task { await store.fetchPRs(filter: filter) }
-                },
                 onRefresh: { Task { await store.fetchPRs() } },
                 onApprove: { pr in Task { await store.approvePR(pr) } },
                 onComment: { pr, body in Task { await store.commentOnPR(pr, body: body) } },
@@ -373,7 +369,6 @@ struct ContentView: View {
                 onMerge: { pr, strategy in Task { await store.mergePR(pr, strategy: strategy) } },
                 onToggleDraft: { pr in Task { await store.togglePRDraft(pr) } },
                 onSendToSession: { pr, _ in
-                    // Find session linked to this PR and switch to it with send bar open
                     if let sessionID = store.sessionPRs.first(where: { $0.value.id == pr.id })?.key {
                         store.selectSession(sessionID)
                         store.showSendBar = true

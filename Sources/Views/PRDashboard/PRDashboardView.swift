@@ -2,14 +2,15 @@ import Models
 import SwiftUI
 import Theme
 
-/// PR dashboard with tab-filtered list and detail drawer.
+/// PR dashboard with grouped sections, tab counts, and sessions toggle.
 public struct PRDashboardView: View {
     let pullRequests: [PullRequest]
     let selectedPRID: String?
     let detail: PRDetail?
     let isLoading: Bool
+    let sessionPRIDs: Set<String>
+    @Binding var selectedTab: PRTab
     let onSelectPR: (PullRequest?) -> Void
-    let onFilterChange: (PRTab) -> Void
     let onRefresh: () -> Void
     let onApprove: (PullRequest) -> Void
     let onComment: (PullRequest, String) -> Void
@@ -19,9 +20,12 @@ public struct PRDashboardView: View {
     var onSendToSession: ((PullRequest, String) -> Void)?
     var onReviewPR: ((PullRequest) -> Void)?
 
-    @State private var selectedTab: PRTab = .mine
     @AppStorage("prListWidth") private var prListWidth: Double = 380
     @AppStorage("hideDrafts") private var hideDrafts: Bool = false
+    @AppStorage("showSessionPRsOnly") private var showSessionPRsOnly: Bool = false
+    @AppStorage("prGroupNeedsAttentionExpanded") private var needsAttentionExpanded: Bool = true
+    @AppStorage("prGroupInProgressExpanded") private var inProgressExpanded: Bool = true
+    @AppStorage("prGroupReadyExpanded") private var readyExpanded: Bool = true
     @Environment(\.theme) private var theme
 
     public init(
@@ -29,8 +33,9 @@ public struct PRDashboardView: View {
         selectedPRID: String? = nil,
         detail: PRDetail? = nil,
         isLoading: Bool = false,
+        sessionPRIDs: Set<String> = [],
+        selectedTab: Binding<PRTab> = .constant(.mine),
         onSelectPR: @escaping (PullRequest?) -> Void = { _ in },
-        onFilterChange: @escaping (PRTab) -> Void = { _ in },
         onRefresh: @escaping () -> Void = {},
         onApprove: @escaping (PullRequest) -> Void = { _ in },
         onComment: @escaping (PullRequest, String) -> Void = { _, _ in },
@@ -44,8 +49,9 @@ public struct PRDashboardView: View {
         self.selectedPRID = selectedPRID
         self.detail = detail
         self.isLoading = isLoading
+        self.sessionPRIDs = sessionPRIDs
+        self._selectedTab = selectedTab
         self.onSelectPR = onSelectPR
-        self.onFilterChange = onFilterChange
         self.onRefresh = onRefresh
         self.onApprove = onApprove
         self.onComment = onComment
@@ -60,15 +66,126 @@ public struct PRDashboardView: View {
         pullRequests.first(where: { $0.id == selectedPRID })
     }
 
-    private var visiblePRs: [PullRequest] {
-        hideDrafts ? pullRequests.filter { !$0.isDraft } : pullRequests
+    // MARK: - Filtering
+
+    private var filteredPRs: [PullRequest] {
+        var prs = pullRequests
+
+        // Tab filter
+        switch selectedTab {
+        case .all:
+            break
+        case .mine:
+            prs = prs.filter { $0.origin.contains(.mine) }
+        case .reviewRequested:
+            prs = prs.filter { $0.origin.contains(.reviewRequested) }
+        }
+
+        // Sessions filter
+        if showSessionPRsOnly {
+            prs = prs.filter { sessionPRIDs.contains($0.id) }
+        }
+
+        // Draft filter
+        if hideDrafts {
+            prs = prs.filter { !$0.isDraft }
+        }
+
+        return prs
     }
+
+    private func tabCount(_ tab: PRTab) -> Int {
+        var prs = pullRequests
+
+        switch tab {
+        case .all:
+            break
+        case .mine:
+            prs = prs.filter { $0.origin.contains(.mine) }
+        case .reviewRequested:
+            prs = prs.filter { $0.origin.contains(.reviewRequested) }
+        }
+
+        if showSessionPRsOnly {
+            prs = prs.filter { sessionPRIDs.contains($0.id) }
+        }
+
+        if hideDrafts {
+            prs = prs.filter { !$0.isDraft }
+        }
+
+        return prs.count
+    }
+
+    // MARK: - Grouping
+
+    enum PRGroup: String, CaseIterable {
+        case needsAttention = "Needs Attention"
+        case inProgress = "In Progress"
+        case ready = "Ready"
+    }
+
+    private func group(for pr: PullRequest) -> PRGroup {
+        if pr.checks.hasFailed || pr.reviewDecision == .changesRequested {
+            return .needsAttention
+        }
+        if pr.checks.allPassed && pr.reviewDecision == .approved {
+            return .ready
+        }
+        return .inProgress
+    }
+
+    private func groupedPRs() -> [(group: PRGroup, prs: [PullRequest])] {
+        var byGroup: [PRGroup: [PullRequest]] = [:]
+        for pr in filteredPRs {
+            let g = group(for: pr)
+            byGroup[g, default: []].append(pr)
+        }
+        return PRGroup.allCases.compactMap { g in
+            guard let prs = byGroup[g], !prs.isEmpty else { return nil }
+            return (g, prs)
+        }
+    }
+
+    private func isGroupExpanded(_ group: PRGroup) -> Bool {
+        switch group {
+        case .needsAttention: return needsAttentionExpanded
+        case .inProgress: return inProgressExpanded
+        case .ready: return readyExpanded
+        }
+    }
+
+    private func toggleGroupExpanded(_ group: PRGroup) {
+        switch group {
+        case .needsAttention: needsAttentionExpanded.toggle()
+        case .inProgress: inProgressExpanded.toggle()
+        case .ready: readyExpanded.toggle()
+        }
+    }
+
+    private func groupColor(_ group: PRGroup) -> Color {
+        switch group {
+        case .needsAttention: return theme.chrome.red
+        case .inProgress: return theme.chrome.yellow
+        case .ready: return theme.chrome.green
+        }
+    }
+
+    private func groupIcon(_ group: PRGroup) -> String {
+        switch group {
+        case .needsAttention: return "exclamationmark.circle"
+        case .inProgress: return "clock"
+        case .ready: return "checkmark.circle"
+        }
+    }
+
+    // MARK: - Body
 
     public var body: some View {
         HStack(spacing: 0) {
             // Left: PR list
             VStack(spacing: 0) {
-                // Tab bar
+                // Toolbar
                 HStack(spacing: 0) {
                     ForEach(PRTab.allCases, id: \.self) { tab in
                         tabButton(tab)
@@ -78,8 +195,19 @@ public struct PRDashboardView: View {
                     if isLoading {
                         ProgressView()
                             .controlSize(.small)
-                            .padding(.trailing, 12)
+                            .padding(.trailing, 8)
                     }
+
+                    // Sessions filter toggle
+                    Button {
+                        showSessionPRsOnly.toggle()
+                    } label: {
+                        Image(systemName: showSessionPRsOnly ? "terminal.fill" : "terminal")
+                            .font(.caption)
+                    }
+                    .buttonStyle(IconButtonStyle())
+                    .help(showSessionPRsOnly ? "Showing session PRs only" : "Show only session PRs")
+                    .padding(.trailing, 4)
 
                     Button {
                         hideDrafts.toggle()
@@ -105,7 +233,7 @@ public struct PRDashboardView: View {
                 Divider()
 
                 // PR list
-                if pullRequests.isEmpty && !isLoading {
+                if filteredPRs.isEmpty && !isLoading {
                     Spacer()
                     VStack(spacing: 8) {
                         Image(systemName: "pull.request")
@@ -118,8 +246,8 @@ public struct PRDashboardView: View {
                     }
                     Spacer()
                 } else {
+                    let groups = groupedPRs()
                     List(
-                        visiblePRs,
                         selection: Binding(
                             get: { selectedPRID },
                             set: { id in
@@ -127,9 +255,22 @@ public struct PRDashboardView: View {
                                 onSelectPR(pr)
                             }
                         )
-                    ) { pr in
-                        PRRowView(pr: pr, onReview: onReviewPR.map { callback in { callback(pr) } })
-                            .tag(pr.id)
+                    ) {
+                        ForEach(groups, id: \.group) { entry in
+                            Section {
+                                if isGroupExpanded(entry.group) {
+                                    ForEach(entry.prs) { pr in
+                                        PRRowView(
+                                            pr: pr,
+                                            onReview: onReviewPR.map { callback in { callback(pr) } }
+                                        )
+                                        .tag(pr.id)
+                                    }
+                                }
+                            } header: {
+                                groupHeader(entry.group, count: entry.prs.count)
+                            }
+                        }
                     }
                 }
             }
@@ -158,16 +299,14 @@ public struct PRDashboardView: View {
         .onAppear { onRefresh() }
     }
 
+    // MARK: - Tab Button
+
     private func tabButton(_ tab: PRTab) -> some View {
-        Button(action: {
+        let count = tabCount(tab)
+        return Button(action: {
             selectedTab = tab
-            switch tab {
-            case .all: onFilterChange(tab)
-            case .mine: onFilterChange(tab)
-            case .reviewRequested: onFilterChange(tab)
-            }
         }) {
-            Text(tab.rawValue)
+            Text("\(tab.rawValue) (\(count))")
                 .font(.subheadline)
                 .fontWeight(selectedTab == tab ? .semibold : .regular)
                 .foregroundColor(selectedTab == tab ? theme.chrome.accent : theme.chrome.textDim)
@@ -176,13 +315,42 @@ public struct PRDashboardView: View {
         }
         .buttonStyle(.plain)
     }
+
+    // MARK: - Group Header
+
+    private func groupHeader(_ group: PRGroup, count: Int) -> some View {
+        Button(action: { toggleGroupExpanded(group) }) {
+            HStack(spacing: 6) {
+                Image(systemName: groupIcon(group))
+                    .font(.caption)
+                    .foregroundColor(groupColor(group))
+                Text(group.rawValue)
+                    .font(.caption)
+                    .fontWeight(.semibold)
+                    .foregroundColor(theme.chrome.textDim)
+                Text("(\(count))")
+                    .font(.caption)
+                    .foregroundColor(theme.chrome.textDim)
+                Spacer()
+                Image(systemName: isGroupExpanded(group) ? "chevron.down" : "chevron.right")
+                    .font(.caption2)
+                    .foregroundColor(theme.chrome.textDim)
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
 }
+
+// MARK: - PR Tab
 
 public enum PRTab: String, CaseIterable, Sendable {
     case all = "All"
     case mine = "Mine"
     case reviewRequested = "Review Requests"
 }
+
+// MARK: - PR Row View
 
 struct PRRowView: View {
     let pr: PullRequest
@@ -259,5 +427,4 @@ struct PRRowView: View {
             Circle().fill(theme.chrome.red).frame(width: 8, height: 8)
         }
     }
-
 }

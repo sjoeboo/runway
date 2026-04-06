@@ -25,7 +25,7 @@ public final class RunwayStore {
     var selectionVersion: Int = 0
     var selectedPRID: String?
     var prDetail: PRDetail?
-    var prFilter: PRFilter = .mine
+    var prTab: PRTab = .mine
     var prLastFetched: Date?
     var isLoadingPRs: Bool = false
     private var prPollTask: Task<Void, Never>?
@@ -51,6 +51,11 @@ public final class RunwayStore {
 
     /// Maps session ID → linked PullRequest (matched by worktree branch)
     var sessionPRs: [String: PullRequest] = [:]
+
+    /// Set of PR IDs linked to active Runway sessions — used for the Sessions filter toggle.
+    var sessionPRIDs: Set<String> {
+        Set(sessionPRs.values.map(\.id))
+    }
 
     var selectedProjectID: String?
     var projectIssues: [String: [GitHubIssue]] = [:]
@@ -100,7 +105,7 @@ public final class RunwayStore {
             await loadState()
             await fetchPRs()
             // Seed the fingerprint so the first poll doesn't trigger a redundant fetch
-            lastPRFingerprint = await prManager.prFingerprint(filter: prFilter)
+            lastPRFingerprint = await prManager.prFingerprint(filter: .mine)
             startPRPoll()
         }
 
@@ -624,29 +629,27 @@ public final class RunwayStore {
         }
     }
 
-    func fetchPRs(filter: PRFilter? = nil) async {
-        if let filter { prFilter = filter }
+    func fetchPRs() async {
         isLoadingPRs = true
         defer { isLoadingPRs = false }
 
         do {
-            // Search across all repos — like Hangar, shows all user's PRs globally
-            let freshPRs = try await prManager.fetchPRs(filter: prFilter)
+            let freshPRs = try await prManager.fetchAllPRs()
             prLastFetched = Date()
 
             // Merge: keep enriched data from cache/previous enrichment where available
             let existingByID = Dictionary(pullRequests.map { ($0.id, $0) }, uniquingKeysWith: { _, new in new })
             pullRequests = freshPRs.map { fresh in
                 guard var existing = existingByID[fresh.id] else { return fresh }
-                // Update fields that search refreshes (state, title, etc.)
+                // Update fields that search refreshes
                 existing.title = fresh.title
                 existing.state = fresh.state
                 existing.isDraft = fresh.isDraft
                 existing.author = fresh.author
+                existing.origin = fresh.origin
                 return existing
             }
 
-            // Background: enrich any PRs that don't have detail data yet
             Task { await enrichPRs() }
         } catch {
             print("[Runway] Failed to fetch PRs: \(error)")
@@ -658,7 +661,7 @@ public final class RunwayStore {
     /// Like Hangar, fetches only statusCheckRollup+reviewDecision — 1 subprocess per PR
     /// instead of 2 (fetchDetail + REST files).
     private func enrichPRs() async {
-        let toEnrich = pullRequests.filter { $0.checks.total == 0 }
+        let toEnrich = pullRequests.filter { $0.needsEnrichment }
         guard !toEnrich.isEmpty else {
             await linkSessionPRs()
             return
@@ -706,6 +709,7 @@ public final class RunwayStore {
             updated[i].additions = result.additions
             updated[i].deletions = result.deletions
             updated[i].changedFiles = result.changedFiles
+            updated[i].enrichedAt = Date()
         }
         pullRequests = updated
 
@@ -713,6 +717,31 @@ public final class RunwayStore {
         try? database?.cleanPRCache()
 
         await linkSessionPRs()
+    }
+
+    /// Re-enrich a single PR immediately (called after user actions like approve/merge).
+    private func reEnrichPR(_ pr: PullRequest) async {
+        let host = prManager.hostFromURL(pr.url)
+        guard
+            let result = try? await prManager.enrichChecks(
+                repo: pr.repo, number: pr.number, host: host
+            )
+        else { return }
+
+        if let idx = pullRequests.firstIndex(where: { $0.id == pr.id }) {
+            pullRequests[idx].checks = result.checks
+            pullRequests[idx].reviewDecision = result.reviewDecision
+            if !result.headBranch.isEmpty {
+                pullRequests[idx].headBranch = result.headBranch
+                pullRequests[idx].baseBranch = result.baseBranch
+            }
+            pullRequests[idx].additions = result.additions
+            pullRequests[idx].deletions = result.deletions
+            pullRequests[idx].changedFiles = result.changedFiles
+            pullRequests[idx].enrichedAt = Date()
+        }
+
+        try? database?.cachePRs(pullRequests)
     }
 
     /// Link PRs to sessions — concurrent, like Hangar.
@@ -750,7 +779,7 @@ public final class RunwayStore {
                 try? await Task.sleep(for: .seconds(30))
                 guard !Task.isCancelled, let self else { return }
                 guard !self.isLoadingPRs else { continue }
-                let fingerprint = await self.prManager.prFingerprint(filter: self.prFilter)
+                let fingerprint = await self.prManager.prFingerprint(filter: .mine)
                 guard let fingerprint else { continue }
                 if fingerprint != self.lastPRFingerprint {
                     self.lastPRFingerprint = fingerprint
@@ -794,7 +823,7 @@ public final class RunwayStore {
         do {
             try await prManager.approve(repo: pr.repo, number: pr.number, host: host)
             statusMessage = .success("Approved #\(pr.number)")
-            await fetchPRs()
+            await reEnrichPR(pr)
         } catch {
             statusMessage = .error("Approve failed: \(error.localizedDescription)")
         }
@@ -817,7 +846,7 @@ public final class RunwayStore {
             try await prManager.requestChanges(repo: pr.repo, number: pr.number, body: body, host: host)
             statusMessage = .success("Requested changes on #\(pr.number)")
             prDetail = try await prManager.fetchDetail(repo: pr.repo, number: pr.number, host: host)
-            await fetchPRs()
+            await reEnrichPR(pr)
         } catch {
             statusMessage = .error("Request changes failed: \(error.localizedDescription)")
         }
