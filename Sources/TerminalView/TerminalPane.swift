@@ -65,6 +65,9 @@ public struct TerminalPane: NSViewRepresentable {
 
         let terminal = LocalProcessTerminalView(frame: .zero)
 
+        // Increase scrollback from SwiftTerm's 500-line default
+        terminal.changeScrollback(10_000)
+
         // Font
         let fontSize = CGFloat(config.fontSize ?? 13)
         let fontName = config.fontFamily ?? "MesloLGS Nerd Font"

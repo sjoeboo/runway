@@ -1,6 +1,31 @@
 import Foundation
 import Models
 
+/// Lightweight result from enrichChecks — only what's needed for list display.
+public struct PREnrichResult: Sendable {
+    public var checks: CheckSummary
+    public var reviewDecision: ReviewDecision
+    public var headBranch: String
+    public var baseBranch: String
+    public var additions: Int
+    public var deletions: Int
+    public var changedFiles: Int
+
+    public init(
+        checks: CheckSummary = CheckSummary(), reviewDecision: ReviewDecision = .none,
+        headBranch: String = "", baseBranch: String = "",
+        additions: Int = 0, deletions: Int = 0, changedFiles: Int = 0
+    ) {
+        self.checks = checks
+        self.reviewDecision = reviewDecision
+        self.headBranch = headBranch
+        self.baseBranch = baseBranch
+        self.additions = additions
+        self.deletions = deletions
+        self.changedFiles = changedFiles
+    }
+}
+
 /// Manages GitHub PR operations by shelling out to the `gh` CLI.
 public actor PRManager {
     /// Cached hosts from `gh auth status` — rarely changes at runtime
@@ -50,6 +75,23 @@ public actor PRManager {
         cachedHosts = hosts
         hostsCacheTime = Date()
         return hosts
+    }
+
+    /// Lightweight enrichment — fetch only checks and review decision for list display.
+    /// Single subprocess per PR (vs fetchDetail's 2).
+    public func enrichChecks(repo: String, number: Int, host: String? = nil) async throws -> PREnrichResult {
+        let output = try await runGH(
+            args: [
+                "pr", "view", "\(number)",
+                "--repo", repo,
+                "--json",
+                "statusCheckRollup,reviewDecision,headRefName,baseRefName,additions,deletions,changedFiles",
+            ], host: host)
+        guard let data = output.data(using: .utf8) else {
+            return PREnrichResult()
+        }
+        let resp = try JSONDecoder.gh.decode(GHEnrichResponse.self, from: data)
+        return resp.toEnrichResult()
     }
 
     /// Fetch detailed PR information including per-file diffs.
@@ -331,34 +373,6 @@ private struct GHPRItem: Decodable {
         )
     }
 
-    private func parseChecks(_ rollup: [GHCheck]) -> CheckSummary {
-        var passed = 0
-        var failed = 0
-        var pending = 0
-        for check in rollup {
-            let status = check.status?.uppercased() ?? ""
-            let conclusion = check.conclusion?.uppercased() ?? ""
-            let checkState = check.state?.uppercased() ?? ""
-
-            if status == "COMPLETED" {
-                if conclusion == "SUCCESS" || conclusion == "NEUTRAL" || conclusion == "SKIPPED" {
-                    passed += 1
-                } else if conclusion == "FAILURE" || conclusion == "TIMED_OUT" || conclusion == "CANCELLED" {
-                    failed += 1
-                } else {
-                    pending += 1
-                }
-            } else if checkState == "SUCCESS" {
-                passed += 1
-            } else if checkState == "FAILURE" || checkState == "ERROR" {
-                failed += 1
-            } else {
-                pending += 1
-            }
-        }
-        return CheckSummary(passed: passed, failed: failed, pending: pending)
-    }
-
     private func extractRepo(from url: String) -> String {
         // https://github.com/owner/repo/pull/123 → owner/repo
         let parts = url.components(separatedBy: "/")
@@ -474,33 +488,6 @@ private struct GHPRDetailResponse: Decodable {
         )
     }
 
-    private func parseChecks(_ checks: [GHCheck]) -> CheckSummary {
-        var passed = 0
-        var failed = 0
-        var pending = 0
-        for check in checks {
-            let status = check.status?.uppercased() ?? ""
-            let conclusion = check.conclusion?.uppercased() ?? ""
-            let state = check.state?.uppercased() ?? ""
-
-            if status == "COMPLETED" {
-                if conclusion == "SUCCESS" || conclusion == "NEUTRAL" || conclusion == "SKIPPED" {
-                    passed += 1
-                } else if conclusion == "FAILURE" || conclusion == "TIMED_OUT" || conclusion == "CANCELLED" {
-                    failed += 1
-                } else {
-                    pending += 1
-                }
-            } else if state == "SUCCESS" {
-                passed += 1
-            } else if state == "FAILURE" || state == "ERROR" {
-                failed += 1
-            } else {
-                pending += 1
-            }
-        }
-        return CheckSummary(passed: passed, failed: failed, pending: pending)
-    }
 }
 
 private struct GHCheck: Decodable {
@@ -557,11 +544,68 @@ private struct GHComment: Decodable {
     }
 }
 
+/// Lightweight response for enrichChecks — only the fields needed for list display.
+private struct GHEnrichResponse: Decodable {
+    let statusCheckRollup: [GHCheck]?
+    let reviewDecision: String?
+    let headRefName: String?
+    let baseRefName: String?
+    let additions: Int?
+    let deletions: Int?
+    let changedFiles: Int?
+
+    func toEnrichResult() -> PREnrichResult {
+        let checks = parseChecks(statusCheckRollup ?? [])
+        let review: ReviewDecision
+        switch reviewDecision?.uppercased() {
+        case "APPROVED": review = .approved
+        case "CHANGES_REQUESTED": review = .changesRequested
+        case "REVIEW_REQUIRED": review = .pending
+        default: review = .none
+        }
+        return PREnrichResult(
+            checks: checks, reviewDecision: review,
+            headBranch: headRefName ?? "", baseBranch: baseRefName ?? "",
+            additions: additions ?? 0, deletions: deletions ?? 0, changedFiles: changedFiles ?? 0
+        )
+    }
+}
+
 private struct GHFile: Decodable {
     let path: String?
     let additions: Int?
     let deletions: Int?
     let patch: String?
+}
+
+// MARK: - Shared Helpers
+
+private func parseChecks(_ checks: [GHCheck]) -> CheckSummary {
+    var passed = 0
+    var failed = 0
+    var pending = 0
+    for check in checks {
+        let status = check.status?.uppercased() ?? ""
+        let conclusion = check.conclusion?.uppercased() ?? ""
+        let checkState = check.state?.uppercased() ?? ""
+
+        if status == "COMPLETED" {
+            if conclusion == "SUCCESS" || conclusion == "NEUTRAL" || conclusion == "SKIPPED" {
+                passed += 1
+            } else if conclusion == "FAILURE" || conclusion == "TIMED_OUT" || conclusion == "CANCELLED" {
+                failed += 1
+            } else {
+                pending += 1
+            }
+        } else if checkState == "SUCCESS" {
+            passed += 1
+        } else if checkState == "FAILURE" || checkState == "ERROR" {
+            failed += 1
+        } else {
+            pending += 1
+        }
+    }
+    return CheckSummary(passed: passed, failed: failed, pending: pending)
 }
 
 /// REST API response for /repos/:owner/:repo/pulls/:number/files

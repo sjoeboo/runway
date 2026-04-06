@@ -247,6 +247,13 @@ struct ContentView: View {
 
     @ViewBuilder
     private var detail: some View {
+        detailContent
+            // Force re-render when selectionVersion changes (fixes nil→nil no-op on first launch)
+            .id(store.selectionVersion)
+    }
+
+    @ViewBuilder
+    private var detailContent: some View {
         switch store.currentView {
         case .sessions:
             if let sessionID = store.selectedSessionID,
