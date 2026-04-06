@@ -94,11 +94,15 @@ public struct TerminalPane: NSViewRepresentable {
         } else {
             // Fallback: direct spawn (no tmux, no persistence)
             let shell = ProcessInfo.processInfo.environment["SHELL"] ?? "/bin/zsh"
+            // Use "-shellname" as execName so the shell starts as a login shell.
+            // Unix convention: argv[0] prefixed with '-' triggers login behavior,
+            // which sources ~/.zprofile, ~/.zshrc login blocks, completions, etc.
+            let shellBase = (shell as NSString).lastPathComponent
             terminal.startProcess(
                 executable: shell,
                 args: [],
                 environment: env,
-                execName: nil
+                execName: "-\(shellBase)"
             )
 
             if let cwd = config.workingDirectory {
