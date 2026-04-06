@@ -102,6 +102,7 @@ public final class RunwayStore {
         // has sessions available for PR-session linking)
         Task {
             tmuxAvailable = await tmuxManager.isAvailable()
+            print("[Runway] tmux available: \(tmuxAvailable)")
             await loadState()
             await fetchPRs()
             // Seed the fingerprint so the first poll doesn't trigger a redundant fetch
@@ -249,7 +250,11 @@ public final class RunwayStore {
 
     /// Creates the tmux session and updates the session status to .running.
     private func startTmuxSession(for session: inout Session, path: String) async {
-        guard tmuxAvailable else { return }
+        guard tmuxAvailable else {
+            updateSessionStatus(id: session.id, status: .error)
+            statusMessage = .error("tmux not found — install it with: brew install tmux")
+            return
+        }
 
         let tmuxName = "runway-\(session.id)"
         let command: String?
@@ -274,8 +279,8 @@ public final class RunwayStore {
             updateSessionStatus(id: session.id, status: .running)
         } catch {
             print("[Runway] Failed to create tmux session: \(error)")
+            updateSessionStatus(id: session.id, status: .error)
             statusMessage = .error("tmux session failed: \(error.localizedDescription)")
-            // Fall through — session still exists, TerminalPane will use direct spawn fallback
         }
     }
 

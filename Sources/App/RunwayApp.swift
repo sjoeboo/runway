@@ -9,13 +9,16 @@ import Views
 
 @main
 struct RunwayApp: App {
-    @State private var store = RunwayStore()
+    @State private var store: RunwayStore
 
     init() {
         // .app bundles from Finder/Dock inherit a minimal PATH from launchd.
-        // Enrich it with the user's login shell PATH so Homebrew tools
-        // (tmux, gh, claude, etc.) are found by /usr/bin/env.
+        // Enrich it BEFORE constructing RunwayStore — its init fires a Task
+        // that checks tmux availability, and waitUntilExit() pumps the
+        // RunLoop which can let that Task sneak in with the un-enriched PATH.
         ShellRunner.enrichPath()
+
+        _store = State(initialValue: RunwayStore())
 
         // SPM executables don't get a proper .app bundle, so macOS doesn't
         // activate them as GUI apps. Force regular activation policy so
