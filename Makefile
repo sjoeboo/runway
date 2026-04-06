@@ -1,6 +1,6 @@
 # Runway Development Makefile
 
-.PHONY: build test lint format fix check clean help
+.PHONY: build test lint format fix check clean help package dmg dist
 
 # Default target
 all: check
@@ -41,6 +41,16 @@ fix-format: ## Auto-fix formatting only
 check: build test lint format-check ## Build, test, lint, and format-check (mirrors CI)
 
 precommit: fix lint format-check test ## Auto-fix, then verify everything passes
+
+## Packaging ─────────────────────────────────────
+
+package: ## Build release universal .app bundle
+	./scripts/package.sh --release --universal
+
+dmg: ## Create DMG installer (run 'make package' first)
+	./scripts/create-dmg.sh
+
+dist: package dmg ## Full distribution build (package + DMG)
 
 ## Utility ───────────────────────────────────────
 
