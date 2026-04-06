@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!-- Allow spawning subprocesses (shell, tmux, git, claude) that inherit
+         the app's file-system permissions instead of being further restricted. -->
+    <key>com.apple.security.inherit</key>
+    <true/>
+
+    <!-- Required for JIT / SwiftTerm's terminal emulation on Apple Silicon -->
+    <key>com.apple.security.cs.allow-jit</key>
+    <true/>
+
+    <!-- Allow loading unsigned in-process code (SwiftTerm plugins, dynamic libs) -->
+    <key>com.apple.security.cs.allow-unsigned-executable-memory</key>
+    <true/>
+
+    <!-- Permit Xcode/lldb attachment during development -->
+    <key>com.apple.security.get-task-allow</key>
+    <true/>
+</dict>
+</plist>
