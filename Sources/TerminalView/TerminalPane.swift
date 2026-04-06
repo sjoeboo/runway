@@ -13,6 +13,8 @@ public struct TerminalPane: NSViewRepresentable {
     public let sessionID: String
     public let tabID: String
     @Environment(\.theme) private var theme
+    @AppStorage("terminalFontFamily") private var fontFamily: String = "MesloLGS Nerd Font"
+    @AppStorage("terminalFontSize") private var fontSize: Double = 13
 
     public init(config: TerminalConfig, sessionID: String = "", tabID: String = "") {
         self.config = config
@@ -58,6 +60,20 @@ public struct TerminalPane: NSViewRepresentable {
                 context.coordinator.lastThemeID = themeID
                 applyTheme(terminal)
             }
+
+            // Reapply font when settings change so existing terminals update live.
+            let currentFontFamily = fontFamily
+            let currentFontSize = fontSize
+            if context.coordinator.lastFontFamily != currentFontFamily
+                || context.coordinator.lastFontSize != currentFontSize
+            {
+                context.coordinator.lastFontFamily = currentFontFamily
+                context.coordinator.lastFontSize = currentFontSize
+                let size = CGFloat(currentFontSize)
+                terminal.font =
+                    NSFont(name: currentFontFamily, size: size)
+                    ?? NSFont.monospacedSystemFont(ofSize: size, weight: .regular)
+            }
         }
     }
 
@@ -66,7 +82,11 @@ public struct TerminalPane: NSViewRepresentable {
         ShiftEnterMonitor.shared.start()
         MouseSelectionMonitor.shared.start()
 
-        let terminal = LocalProcessTerminalView(frame: .zero)
+        // Use a reasonable default frame so the PTY is forked with sane
+        // dimensions (cols/rows). A .zero frame causes getWindowSize() to
+        // return 0×0, making early input render vertically at 1 column.
+        // Auto Layout will resize this to the real size shortly after.
+        let terminal = LocalProcessTerminalView(frame: NSRect(x: 0, y: 0, width: 800, height: 600))
 
         // Increase scrollback from SwiftTerm's 500-line default
         terminal.changeScrollback(10_000)
@@ -94,11 +114,15 @@ public struct TerminalPane: NSViewRepresentable {
         } else {
             // Fallback: direct spawn (no tmux, no persistence)
             let shell = ProcessInfo.processInfo.environment["SHELL"] ?? "/bin/zsh"
+            // Use "-shellname" as execName so the shell starts as a login shell.
+            // Unix convention: argv[0] prefixed with '-' triggers login behavior,
+            // which sources ~/.zprofile, ~/.zshrc login blocks, completions, etc.
+            let shellBase = (shell as NSString).lastPathComponent
             terminal.startProcess(
                 executable: shell,
                 args: [],
                 environment: env,
-                execName: nil
+                execName: "-\(shellBase)"
             )
 
             if let cwd = config.workingDirectory {
@@ -157,6 +181,8 @@ public struct TerminalPane: NSViewRepresentable {
     public class Coordinator {
         var terminal: LocalProcessTerminalView?
         var lastThemeID: String?
+        var lastFontFamily: String?
+        var lastFontSize: Double?
     }
 }
 
@@ -206,6 +232,21 @@ class MouseSelectionMonitor {
 /// Also registers for file drag-drop so users can drag files into the terminal.
 class TerminalContainerView: NSView {
     private var terminalRef: LocalProcessTerminalView?
+    private var hasSentInitialResize = false
+
+    override func layout() {
+        super.layout()
+        // After the first layout pass, the container has a real size from Auto Layout.
+        // Force SwiftTerm to re-measure and send SIGWINCH to the PTY so tmux/shell
+        // knows the correct terminal dimensions (fixes vertical input rendering).
+        if !hasSentInitialResize, let terminal = terminalRef,
+            bounds.width > 0, bounds.height > 0
+        {
+            hasSentInitialResize = true
+            terminal.frame = bounds
+            terminal.needsLayout = true
+        }
+    }
 
     override func hitTest(_ point: NSPoint) -> NSView? {
         // Pass mouse events through to the terminal subview

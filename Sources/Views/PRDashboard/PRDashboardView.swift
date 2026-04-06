@@ -215,6 +215,9 @@ struct PRRowView: View {
                             .font(.caption)
                             .foregroundColor(theme.chrome.accent)
                     }
+                    Text(pr.ageText)
+                        .font(.caption)
+                        .foregroundColor(theme.chrome.textDim)
                     CheckSummaryBadge(checks: pr.checks)
                     ReviewDecisionBadge(decision: pr.reviewDecision)
                 }

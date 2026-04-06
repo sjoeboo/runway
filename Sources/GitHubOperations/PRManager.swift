@@ -224,6 +224,34 @@ public actor PRManager {
         }
     }
 
+    /// Lightweight probe: returns a fingerprint (count + latest updatedAt) for open PRs.
+    /// Costs a single `gh search` subprocess with `--limit 1` — typically ~200ms.
+    /// Returns nil if the check fails (offline, auth expired, etc.).
+    public func prFingerprint(filter: PRFilter = .mine) async -> PRFingerprint? {
+        let hosts = await discoverHosts()
+        // Use the first host only — fast probe, not exhaustive
+        guard let host = hosts.first else { return nil }
+        var args = [
+            "search", "prs",
+            "--state", "open",
+            "--archived=false",
+            "--json", "updatedAt",
+            "--limit", "1",
+        ]
+        switch filter {
+        case .mine: args += ["--author", "@me"]
+        case .reviewRequested: args += ["--review-requested", "@me"]
+        case .all: break
+        }
+        // gh search --json returns an array; also print total via --jq is fragile,
+        // so we just check the latest updatedAt as our change signal.
+        guard let output = try? await runGH(args: args, host: host),
+            let data = output.data(using: .utf8),
+            let items = try? JSONDecoder.gh.decode([GHFingerprintItem].self, from: data)
+        else { return nil }
+        return PRFingerprint(latestUpdate: items.first?.updatedAt)
+    }
+
     // MARK: - Private
 
     @discardableResult
@@ -644,6 +672,17 @@ private struct GHRESTFile: Decodable {
     let additions: Int?
     let deletions: Int?
     let patch: String?
+}
+
+// MARK: - Fingerprint Types
+
+/// Lightweight snapshot of PR state used to detect changes without a full fetch.
+public struct PRFingerprint: Equatable, Sendable {
+    public let latestUpdate: String?
+}
+
+private struct GHFingerprintItem: Decodable {
+    let updatedAt: String?
 }
 
 // MARK: - JSONDecoder for gh output
