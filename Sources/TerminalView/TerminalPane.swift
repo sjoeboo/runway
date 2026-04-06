@@ -66,7 +66,11 @@ public struct TerminalPane: NSViewRepresentable {
         ShiftEnterMonitor.shared.start()
         MouseSelectionMonitor.shared.start()
 
-        let terminal = LocalProcessTerminalView(frame: .zero)
+        // Use a reasonable default frame so the PTY is forked with sane
+        // dimensions (cols/rows). A .zero frame causes getWindowSize() to
+        // return 0×0, making early input render vertically at 1 column.
+        // Auto Layout will resize this to the real size shortly after.
+        let terminal = LocalProcessTerminalView(frame: NSRect(x: 0, y: 0, width: 800, height: 600))
 
         // Increase scrollback from SwiftTerm's 500-line default
         terminal.changeScrollback(10_000)
@@ -210,6 +214,21 @@ class MouseSelectionMonitor {
 /// Also registers for file drag-drop so users can drag files into the terminal.
 class TerminalContainerView: NSView {
     private var terminalRef: LocalProcessTerminalView?
+    private var hasSentInitialResize = false
+
+    override func layout() {
+        super.layout()
+        // After the first layout pass, the container has a real size from Auto Layout.
+        // Force SwiftTerm to re-measure and send SIGWINCH to the PTY so tmux/shell
+        // knows the correct terminal dimensions (fixes vertical input rendering).
+        if !hasSentInitialResize, let terminal = terminalRef,
+            bounds.width > 0, bounds.height > 0
+        {
+            hasSentInitialResize = true
+            terminal.frame = bounds
+            terminal.needsLayout = true
+        }
+    }
 
     override func hitTest(_ point: NSPoint) -> NSView? {
         // Pass mouse events through to the terminal subview
