@@ -35,6 +35,9 @@ public struct TerminalPane: NSViewRepresentable {
             createTerminal()
         }
 
+        // Ensure scrollback is always upgraded, even for cached sessions
+        terminal.changeScrollback(10_000)
+
         container.embed(terminal)
         context.coordinator.terminal = terminal
 
