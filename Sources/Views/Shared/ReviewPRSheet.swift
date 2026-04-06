@@ -25,16 +25,13 @@ public struct ReviewPRSheet: View {
 
         let truncatedTitle = pr.title.count > 60 ? String(pr.title.prefix(57)) + "..." : pr.title
         self._sessionName = State(initialValue: "Review: \(truncatedTitle)")
-        let matched = projects.first(where: { $0.ghRepo == pr.repo })
+        let matched = projects.first(where: { $0.ghRepo?.lowercased() == pr.repo.lowercased() })
         self._selectedProjectID = State(initialValue: matched?.id)
     }
 
     private var autoDetected: Bool {
-        projects.first(where: { $0.ghRepo == pr.repo })?.id == selectedProjectID
-    }
-
-    private var projectsWithRepo: [Project] {
-        projects.filter { $0.ghRepo != nil }
+        projects.first(where: { $0.ghRepo?.lowercased() == pr.repo.lowercased() })?.id
+            == selectedProjectID
     }
 
     public var body: some View {
@@ -51,7 +48,7 @@ public struct ReviewPRSheet: View {
                     HStack {
                         Picker("Project", selection: $selectedProjectID) {
                             Text("None").tag(nil as String?)
-                            ForEach(projectsWithRepo) { project in
+                            ForEach(projects) { project in
                                 Text(project.name).tag(project.id as String?)
                             }
                         }
