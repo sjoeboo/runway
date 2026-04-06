@@ -60,6 +60,33 @@ public actor PRManager {
         }
     }
 
+    /// Fetch both "mine" and "review-requested" PRs in parallel, merge and deduplicate.
+    /// Each PR gets an `origin` set indicating which queries returned it.
+    public func fetchAllPRs() async throws -> [PullRequest] {
+        async let minePRs = fetchPRs(filter: .mine)
+        async let reviewPRs = fetchPRs(filter: .reviewRequested)
+
+        let (mine, review) = try await (minePRs, reviewPRs)
+
+        // Merge: deduplicate by ID, combine origins
+        var merged: [String: PullRequest] = [:]
+        for var pr in mine {
+            pr.origin = [.mine]
+            merged[pr.id] = pr
+        }
+        for var pr in review {
+            pr.origin = [.reviewRequested]
+            if var existing = merged[pr.id] {
+                existing.origin.insert(.reviewRequested)
+                merged[pr.id] = existing
+            } else {
+                merged[pr.id] = pr
+            }
+        }
+
+        return Array(merged.values)
+    }
+
     /// Discover all hosts the user is authenticated with via `gh auth status`.
     /// Results are cached for 5 minutes to avoid spawning a subprocess on every fetch.
     private func discoverHosts() async -> [String] {
@@ -386,8 +413,8 @@ private struct GHPRItem: Decodable {
     let additions: Int?
     let deletions: Int?
     let changedFiles: Int?
-    let createdAt: String?
-    let updatedAt: String?
+    let createdAt: Date?
+    let updatedAt: Date?
     let reviewDecision: String?
     let statusCheckRollup: [GHCheck]?
 
@@ -427,7 +454,9 @@ private struct GHPRItem: Decodable {
             reviewDecision: review,
             additions: additions ?? 0,
             deletions: deletions ?? 0,
-            changedFiles: changedFiles ?? 0
+            changedFiles: changedFiles ?? 0,
+            createdAt: createdAt ?? Date(),
+            updatedAt: updatedAt ?? Date()
         )
     }
 
@@ -450,8 +479,8 @@ private struct GHSearchPRItem: Decodable {
     let repository: GHRepository
     let url: String?
     let isDraft: Bool?
-    let createdAt: String?
-    let updatedAt: String?
+    let createdAt: Date?
+    let updatedAt: Date?
     let author: GHSearchAuthor?
 
     func toPullRequest() -> PullRequest {
@@ -479,7 +508,9 @@ private struct GHSearchPRItem: Decodable {
             reviewDecision: .none,
             additions: 0,
             deletions: 0,
-            changedFiles: 0
+            changedFiles: 0,
+            createdAt: createdAt ?? Date(),
+            updatedAt: updatedAt ?? Date()
         )
     }
 }

@@ -101,3 +101,35 @@ import Testing
     #expect(file.id == "src/main.swift")
     #expect(file.patch != nil)
 }
+
+// MARK: - PROrigin
+
+@Test func prOriginRawValues() {
+    #expect(PROrigin.mine.rawValue == "mine")
+    #expect(PROrigin.reviewRequested.rawValue == "reviewRequested")
+}
+
+// MARK: - PullRequest Origin & Enrichment
+
+@Test func pullRequestOriginDefaults() {
+    let pr = PullRequest(number: 1, title: "Test", state: .open, headBranch: "f", baseBranch: "main", author: "me", repo: "r")
+    #expect(pr.origin.isEmpty)
+    #expect(pr.enrichedAt == nil)
+}
+
+@Test func pullRequestNeedsEnrichmentWhenNil() {
+    let pr = PullRequest(number: 1, title: "Test", state: .open, headBranch: "f", baseBranch: "main", author: "me", repo: "r")
+    #expect(pr.needsEnrichment == true)
+}
+
+@Test func pullRequestNeedsEnrichmentWhenStale() {
+    var pr = PullRequest(number: 1, title: "Test", state: .open, headBranch: "f", baseBranch: "main", author: "me", repo: "r")
+    pr.enrichedAt = Date().addingTimeInterval(-600)  // 10 minutes ago
+    #expect(pr.needsEnrichment == true)
+}
+
+@Test func pullRequestDoesNotNeedEnrichmentWhenFresh() {
+    var pr = PullRequest(number: 1, title: "Test", state: .open, headBranch: "f", baseBranch: "main", author: "me", repo: "r")
+    pr.enrichedAt = Date().addingTimeInterval(-60)  // 1 minute ago
+    #expect(pr.needsEnrichment == false)
+}

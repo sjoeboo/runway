@@ -90,3 +90,14 @@ import Testing
     // Just verifying the actor initializes without issues
     _ = manager
 }
+
+// MARK: - PROrigin Integration
+
+@Test func prOriginSetOperations() {
+    // Verify Set<PROrigin> works as expected for dedup logic
+    var origins: Set<PROrigin> = [.mine]
+    origins.insert(.reviewRequested)
+    #expect(origins.count == 2)
+    #expect(origins.contains(.mine))
+    #expect(origins.contains(.reviewRequested))
+}

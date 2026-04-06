@@ -339,7 +339,7 @@ public struct PRDetailDrawer: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 12) {
                 if let body = detail?.body, !body.isEmpty {
-                    Text(stripHTML(body))
+                    renderMarkdown(body)
                         .font(.body)
                         .foregroundColor(theme.chrome.text)
                         .textSelection(.enabled)
@@ -504,7 +504,7 @@ public struct PRDetailDrawer: View {
                         .cornerRadius(4)
                 }
                 if !review.body.isEmpty {
-                    Text(review.body)
+                    renderMarkdown(review.body, inlineOnly: true)
                         .font(.body)
                         .foregroundColor(theme.chrome.text)
                 }
@@ -536,7 +536,7 @@ public struct PRDetailDrawer: View {
                         .foregroundColor(theme.chrome.accent)
                 }
             }
-            Text(comment.body)
+            renderMarkdown(comment.body, inlineOnly: true)
                 .font(.body)
                 .foregroundColor(theme.chrome.text)
                 .textSelection(.enabled)
@@ -577,6 +577,19 @@ public struct PRDetailDrawer: View {
                 .font(.caption)
                 .foregroundColor(theme.chrome.red)
         }
+    }
+
+    /// Render markdown as styled Text. Use `inlineOnly: true` for comments/reviews
+    /// (preserves whitespace), `false` for PR body (supports headings, lists).
+    private func renderMarkdown(_ source: String, inlineOnly: Bool = false) -> Text {
+        let syntax: AttributedString.MarkdownParsingOptions.InterpretedSyntax =
+            inlineOnly ? .inlineOnlyPreservingWhitespace : .full
+        if let attributed = try? AttributedString(
+            markdown: source, options: .init(interpretedSyntax: syntax)
+        ) {
+            return Text(attributed)
+        }
+        return Text(source)
     }
 
     private func stripHTML(_ html: String) -> String {
