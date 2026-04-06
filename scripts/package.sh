@@ -45,6 +45,10 @@ cp "$EXECUTABLE" "$MACOS/$APP_NAME"
 # Copy Info.plist
 cp "$PROJECT_DIR/scripts/Info.plist" "$CONTENTS/Info.plist"
 
+# Copy icon and app image resources
+cp "$PROJECT_DIR/images/Runway.icns" "$RESOURCES/Runway.icns"
+cp "$PROJECT_DIR/images/App-icon-1024.png" "$RESOURCES/App-icon-1024.png"
+
 # Ad-hoc code sign with entitlements (required on Apple Silicon).
 # --options runtime enables the Hardened Runtime so macOS respects the
 # entitlements (inherit, JIT, unsigned memory) needed for spawning
