@@ -68,6 +68,21 @@ import Testing
     #expect(MergeStrategy.allCases.count == 3)
 }
 
+// MARK: - PRResolveError
+
+@Test func prResolveErrorNotFoundDescription() {
+    let error = PRResolveError.notFound(number: 247, repo: "owner/repo")
+    #expect(error.errorDescription?.contains("247") == true)
+    #expect(error.errorDescription?.contains("owner/repo") == true)
+}
+
+@Test func prResolveErrorNoProjectDescription() {
+    let error = PRResolveError.noProject
+    let description = error.errorDescription
+    #expect(description != nil)
+    #expect(description?.isEmpty == false)
+}
+
 // MARK: - PRManager Actor
 
 @Test func prManagerCanBeCreated() async {
