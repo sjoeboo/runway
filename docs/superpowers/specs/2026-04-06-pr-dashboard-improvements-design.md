@@ -199,14 +199,28 @@ Passed to `PRDashboardView` as `sessionPRIDs: Set<String>`.
 
 ### Unchanged files
 - `PRRowView` — rows display identically
-- `PRDetailDrawer` — detail panel untouched
 - `PRBadges` — badges are fine as-is
 - `ProjectPRsTab` — project-scoped view has its own fetch
 - `PullRequest+ViewHelpers` — `ageText` etc. unchanged
 
 ---
 
-## 8. Files Modified
+## 8. Markdown Rendering in PR Detail
+
+### PRDetailDrawer (Sources/Views/PRDashboard/PRDetailDrawer.swift)
+
+PR body, review bodies, and comment bodies are currently displayed as plain text (HTML-stripped). Upgrade to native SwiftUI markdown rendering using `AttributedString(markdown:)`.
+
+**Implementation:**
+- Helper function `markdownText(_ source: String) -> Text` that converts a markdown string to `AttributedString` and returns a styled `Text` view. Falls back to plain text on parse failure.
+- Applied to: PR body (Overview tab), review bodies (Conversation tab), comment bodies (Conversation tab).
+- Supports: bold, italic, code spans, links (clickable), lists, headings. Does not support tables or syntax-highlighted code blocks (acceptable for v1).
+
+**No new dependencies** — uses Foundation's `AttributedString(markdown:, options:)` with `.inlineOnlyPreservingWhitespace` interpret option for inline content (comments), and full parsing for the PR body.
+
+---
+
+## 9. Files Modified
 
 | File | Change |
 |------|--------|
@@ -215,12 +229,13 @@ Passed to `PRDashboardView` as `sessionPRIDs: Set<String>`.
 | `Sources/App/RunwayStore.swift` | Hybrid fetch, TTL enrichment, `reEnrichPR()`, `prTab`, `sessionPRIDs`, remove `prFilter` |
 | `Sources/App/RunwayApp.swift` | Wire new dashboard params (`sessionPRIDs`, tab binding) |
 | `Sources/Views/PRDashboard/PRDashboardView.swift` | Grouped sections, tab counts, sessions toggle, fix tab sync |
+| `Sources/Views/PRDashboard/PRDetailDrawer.swift` | Markdown rendering for PR body, reviews, comments |
 | `Sources/Persistence/` | Migration v9: `enrichedAt` + `origin` columns |
 
-## 9. Not In Scope
+## 10. Not In Scope
 
 - Sort dropdown within groups (keep it simple — age sort only)
-- Changes to PR detail drawer
+- Full GFM rendering (tables, task lists, syntax highlighting) — upgrade to WKWebView later if needed
 - Changes to project PR tab
 - Changes to sidebar session PR badges
 - New PR notification system
