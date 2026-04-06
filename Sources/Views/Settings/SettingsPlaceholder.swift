@@ -101,21 +101,21 @@ public struct SettingsView: View {
                     if !fonts.nerd.isEmpty {
                         Section("Nerd Fonts") {
                             ForEach(fonts.nerd, id: \.self) { name in
-                                Text(name).font(.system(size: 12, design: .monospaced)).tag(name)
+                                Text(name).font(.system(.caption, design: .monospaced)).tag(name)
                             }
                         }
                     }
                     if !fonts.mono.isEmpty {
                         Section("Monospaced") {
                             ForEach(fonts.mono, id: \.self) { name in
-                                Text(name).font(.system(size: 12, design: .monospaced)).tag(name)
+                                Text(name).font(.system(.caption, design: .monospaced)).tag(name)
                             }
                         }
                     }
                     if !fonts.other.isEmpty {
                         Section("All Fonts") {
                             ForEach(fonts.other, id: \.self) { name in
-                                Text(name).font(.system(size: 12, design: .monospaced)).tag(name)
+                                Text(name).font(.system(.caption, design: .monospaced)).tag(name)
                             }
                         }
                     }

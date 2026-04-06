@@ -29,6 +29,7 @@ public final class RunwayStore {
     var showNewSessionDialog: Bool = false
     var showNewProjectDialog: Bool = false
     var newSessionProjectID: String?
+    var newSessionParentID: String?
     var statusMessage: StatusMessage?
     var tmuxAvailable: Bool = false
     var showSendBar: Bool = false
@@ -190,6 +191,7 @@ public final class RunwayStore {
             tool: request.tool,
             status: .starting,
             worktreeBranch: worktreeBranch,
+            parentID: request.parentID,
             permissionMode: resolvedMode
         )
 
@@ -642,10 +644,14 @@ public final class RunwayStore {
         await fetchPRs()
     }
 
-    func selectPR(_ pr: PullRequest?) async {
+    func selectPR(_ pr: PullRequest?, navigate: Bool = true) async {
         selectedPRID = pr?.id
         prDetail = nil
         guard let pr else { return }
+
+        if navigate {
+            currentView = .prs
+        }
 
         do {
             let host = prManager.hostFromURL(pr.url)
@@ -781,8 +787,9 @@ public final class RunwayStore {
 // MARK: - SidebarActions Conformance
 
 extension RunwayStore: SidebarActions {
-    public func newSession(projectID: String?) {
+    public func newSession(projectID: String?, parentID: String? = nil) {
         newSessionProjectID = projectID
+        newSessionParentID = parentID
         showNewSessionDialog = true
     }
 

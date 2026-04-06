@@ -17,7 +17,7 @@ public struct EmptyStateView: View {
     public var body: some View {
         VStack(spacing: 16) {
             Image(systemName: systemImage)
-                .font(.system(size: 48))
+                .font(.largeTitle)
                 .foregroundColor(theme.chrome.textDim)
             Text(title)
                 .font(.title2)

@@ -288,7 +288,7 @@ public struct PRDetailDrawer: View {
                                 .fontWeight(selectedTab == tab ? .semibold : .regular)
                             // Show shortcut hint for discoverability
                             Text("^\(index + 1)")
-                                .font(.system(size: 9))
+                                .font(.caption2)
                                 .foregroundColor(theme.chrome.textDim.opacity(0.5))
                         }
                         .foregroundColor(selectedTab == tab ? theme.chrome.accent : theme.chrome.textDim)

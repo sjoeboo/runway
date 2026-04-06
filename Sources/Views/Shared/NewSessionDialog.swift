@@ -19,15 +19,18 @@ public struct NewSessionDialog: View {
 
     let projects: [Project]
     let initialProjectID: String?
+    let parentID: String?
     let onCreate: (NewSessionRequest) -> Void
 
     public init(
         projects: [Project],
         initialProjectID: String? = nil,
+        parentID: String? = nil,
         onCreate: @escaping (NewSessionRequest) -> Void
     ) {
         self.projects = projects
         self.initialProjectID = initialProjectID
+        self.parentID = parentID
         self.onCreate = onCreate
         self._selectedProjectID = State(initialValue: initialProjectID)
     }
@@ -169,6 +172,7 @@ public struct NewSessionDialog: View {
         let request = NewSessionRequest(
             title: title,
             projectID: selectedProjectID,
+            parentID: parentID,
             path: path,
             tool: tool,
             useWorktree: useWorktree,

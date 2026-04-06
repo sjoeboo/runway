@@ -52,7 +52,7 @@ public actor PRManager {
         return hosts
     }
 
-    /// Fetch detailed PR information.
+    /// Fetch detailed PR information including per-file diffs.
     public func fetchDetail(repo: String, number: Int, host: String? = nil) async throws -> PRDetail {
         let output = try await runGH(
             args: [
@@ -61,7 +61,35 @@ public actor PRManager {
                 "--json",
                 "body,reviews,comments,files,statusCheckRollup,reviewDecision,headRefName,baseRefName,additions,deletions,changedFiles",
             ], host: host)
-        return try parsePRDetail(output)
+        var detail = try parsePRDetail(output)
+
+        // gh --json files doesn't include patch data; fetch via REST API
+        if let patches = try? await fetchFileDiffs(repo: repo, number: number, host: host) {
+            detail.files = detail.files.map { file in
+                var updated = file
+                updated.patch = patches[file.path]
+                return updated
+            }
+        }
+
+        return detail
+    }
+
+    /// Fetch per-file patch content via the REST API.
+    private func fetchFileDiffs(repo: String, number: Int, host: String? = nil) async throws -> [String: String] {
+        let output = try await runGH(
+            args: ["api", "repos/\(repo)/pulls/\(number)/files", "--paginate"],
+            host: host
+        )
+        guard let data = output.data(using: .utf8) else { return [:] }
+        let files = try JSONDecoder().decode([GHRESTFile].self, from: data)
+        var patches: [String: String] = [:]
+        for file in files {
+            if let patch = file.patch {
+                patches[file.filename] = patch
+            }
+        }
+        return patches
     }
 
     /// Extract the GitHub host from a PR URL (e.g., "https://ghe.spotify.net/..." → "ghe.spotify.net").
@@ -531,6 +559,14 @@ private struct GHComment: Decodable {
 
 private struct GHFile: Decodable {
     let path: String?
+    let additions: Int?
+    let deletions: Int?
+    let patch: String?
+}
+
+/// REST API response for /repos/:owner/:repo/pulls/:number/files
+private struct GHRESTFile: Decodable {
+    let filename: String
     let additions: Int?
     let deletions: Int?
     let patch: String?

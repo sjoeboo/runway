@@ -131,7 +131,7 @@ public struct TerminalTabView: View {
                 if !tab.isMain && tabs.count > 1 {
                     Button(action: { closeTab(tab.id) }) {
                         Image(systemName: "xmark")
-                            .font(.system(size: 8, weight: .bold))
+                            .font(.caption2.weight(.bold))
                             .foregroundColor(theme.chrome.textDim)
                     }
                     .buttonStyle(.plain)

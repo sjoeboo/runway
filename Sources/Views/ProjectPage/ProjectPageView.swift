@@ -23,6 +23,13 @@ public struct ProjectPageView: View {
     let onOpenIssue: (GitHubIssue) -> Void
     let onSelectPR: (PullRequest) -> Void
     let onRefreshPRs: () -> Void
+    var selectedPRID: String?
+    var prDetail: PRDetail?
+    var onApprovePR: ((PullRequest) -> Void)?
+    var onCommentPR: ((PullRequest, String) -> Void)?
+    var onRequestChangesPR: ((PullRequest, String) -> Void)?
+    var onMergePR: ((PullRequest, MergeStrategy) -> Void)?
+    var onToggleDraftPR: ((PullRequest) -> Void)?
     let onUpdateProject: (Project) -> Void
     let onDetectRepo: () async -> (repo: String, host: String?)?
     let onFetchLabels: () -> Void
@@ -43,6 +50,13 @@ public struct ProjectPageView: View {
         onOpenIssue: @escaping (GitHubIssue) -> Void,
         onSelectPR: @escaping (PullRequest) -> Void,
         onRefreshPRs: @escaping () -> Void,
+        selectedPRID: String? = nil,
+        prDetail: PRDetail? = nil,
+        onApprovePR: ((PullRequest) -> Void)? = nil,
+        onCommentPR: ((PullRequest, String) -> Void)? = nil,
+        onRequestChangesPR: ((PullRequest, String) -> Void)? = nil,
+        onMergePR: ((PullRequest, MergeStrategy) -> Void)? = nil,
+        onToggleDraftPR: ((PullRequest) -> Void)? = nil,
         onUpdateProject: @escaping (Project) -> Void,
         onDetectRepo: @escaping () async -> (repo: String, host: String?)?,
         onFetchLabels: @escaping () -> Void
@@ -57,6 +71,13 @@ public struct ProjectPageView: View {
         self.onOpenIssue = onOpenIssue
         self.onSelectPR = onSelectPR
         self.onRefreshPRs = onRefreshPRs
+        self.selectedPRID = selectedPRID
+        self.prDetail = prDetail
+        self.onApprovePR = onApprovePR
+        self.onCommentPR = onCommentPR
+        self.onRequestChangesPR = onRequestChangesPR
+        self.onMergePR = onMergePR
+        self.onToggleDraftPR = onToggleDraftPR
         self.onUpdateProject = onUpdateProject
         self.onDetectRepo = onDetectRepo
         self.onFetchLabels = onFetchLabels
@@ -77,10 +98,10 @@ public struct ProjectPageView: View {
             HStack(alignment: .center, spacing: 8) {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(project.name)
-                        .font(.system(size: 16, weight: .semibold))
+                        .font(.headline)
                     if !project.path.isEmpty {
                         Text(project.path)
-                            .font(.system(size: 11, design: .monospaced))
+                            .font(.system(.caption, design: .monospaced))
                             .foregroundColor(theme.chrome.textDim)
                             .lineLimit(1)
                     }
@@ -93,10 +114,10 @@ public struct ProjectPageView: View {
                     showSettings = true
                 } label: {
                     Image(systemName: "gearshape")
-                        .font(.system(size: 13))
+                        .font(.body)
                         .foregroundColor(theme.chrome.textDim)
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(IconButtonStyle())
                 .help("Project Settings")
             }
             .padding(.horizontal, 16)
@@ -146,7 +167,14 @@ public struct ProjectPageView: View {
                 ProjectPRsTab(
                     pullRequests: pullRequests,
                     onSelectPR: onSelectPR,
-                    onRefresh: onRefreshPRs
+                    onRefresh: onRefreshPRs,
+                    selectedPRID: selectedPRID,
+                    detail: prDetail,
+                    onApprove: onApprovePR,
+                    onComment: onCommentPR,
+                    onRequestChanges: onRequestChangesPR,
+                    onMerge: onMergePR,
+                    onToggleDraft: onToggleDraftPR
                 )
             }
         }
@@ -187,7 +215,7 @@ private struct TabButton: View {
             VStack(spacing: 4) {
                 HStack(spacing: 4) {
                     Text(title)
-                        .font(.system(size: 13))
+                        .font(.body)
                         .foregroundColor(isActive ? theme.chrome.text : theme.chrome.textDim)
 
                     Text("\(count)")

@@ -36,7 +36,7 @@ public struct TerminalSearchBar: View {
 
                 TextField("Find in terminal…", text: $searchText)
                     .textFieldStyle(.plain)
-                    .font(.system(size: 12))
+                    .font(.caption)
                     .focused($isFocused)
                     .onSubmit { onFindNext(searchText) }
 
