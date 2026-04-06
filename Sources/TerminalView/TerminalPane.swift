@@ -35,6 +35,9 @@ public struct TerminalPane: NSViewRepresentable {
             createTerminal()
         }
 
+        // Ensure scrollback is always upgraded, even for cached sessions
+        terminal.changeScrollback(10_000)
+
         container.embed(terminal)
         context.coordinator.terminal = terminal
 
@@ -64,6 +67,9 @@ public struct TerminalPane: NSViewRepresentable {
         MouseSelectionMonitor.shared.start()
 
         let terminal = LocalProcessTerminalView(frame: .zero)
+
+        // Increase scrollback from SwiftTerm's 500-line default
+        terminal.changeScrollback(10_000)
 
         // Font
         let fontSize = CGFloat(config.fontSize ?? 13)

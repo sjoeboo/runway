@@ -57,6 +57,7 @@ public actor TmuxSessionManager {
         args += [
             ";", "set-option", "-t", name, "status", "off",
             ";", "set-option", "-t", name, "mouse", "on",
+            ";", "set-option", "-t", name, "history-limit", "50000",
         ]
 
         try await runTmux(args: args)

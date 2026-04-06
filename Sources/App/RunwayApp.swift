@@ -17,6 +17,7 @@ struct RunwayApp: App {
         // the window, dock icon, and menu bar all appear.
         NSApplication.shared.setActivationPolicy(.regular)
         NSApplication.shared.activate(ignoringOtherApps: true)
+        AppIcon.install()
     }
 
     var body: some Scene {
@@ -61,6 +62,26 @@ struct RunwayApp: App {
             SettingsView()
                 .environment(store.themeManager)
         }
+
+        MenuBarExtra {
+            MenuBarView()
+                .environment(store)
+        } label: {
+            menuBarLabel
+        }
+    }
+
+    @ViewBuilder
+    private var menuBarLabel: some View {
+        let running = store.sessions.filter { $0.status == .running }.count
+        let waiting = store.sessions.filter { $0.status == .waiting }.count
+        let active = running + waiting
+
+        if active > 0 {
+            Label("\(active)", systemImage: "terminal.fill")
+        } else {
+            Image(systemName: "terminal")
+        }
     }
 }
 
@@ -93,10 +114,12 @@ struct ContentView: View {
             ) {
                 NewSessionDialog(
                     projects: store.projects,
-                    initialProjectID: store.newSessionProjectID
+                    initialProjectID: store.newSessionProjectID,
+                    parentID: store.newSessionParentID
                 ) { request in
                     Task { await store.handleNewSessionRequest(request) }
                     store.newSessionProjectID = nil
+                    store.newSessionParentID = nil
                 }
                 .theme(theme)
             }
@@ -224,6 +247,13 @@ struct ContentView: View {
 
     @ViewBuilder
     private var detail: some View {
+        detailContent
+            // Force re-render when selectionVersion changes (fixes nil→nil no-op on first launch)
+            .id(store.selectionVersion)
+    }
+
+    @ViewBuilder
+    private var detailContent: some View {
         switch store.currentView {
         case .sessions:
             if let sessionID = store.selectedSessionID,
@@ -232,6 +262,7 @@ struct ContentView: View {
                 SessionDetailView(
                     session: session,
                     linkedPR: store.sessionPRs[sessionID],
+                    onSelectPR: { pr in Task { await store.selectPR(pr) } },
                     showSendBar: Binding(
                         get: { store.showSendBar },
                         set: { store.showSendBar = $0 }
@@ -255,8 +286,15 @@ struct ContentView: View {
                         Task { await store.createIssue(forProject: projectID, title: title, body: body, labels: labels) }
                     },
                     onOpenIssue: { store.openIssueInBrowser($0) },
-                    onSelectPR: { pr in Task { await store.selectPR(pr) } },
+                    onSelectPR: { pr in Task { await store.selectPR(pr, navigate: false) } },
                     onRefreshPRs: { Task { await store.refreshPRsIfStale() } },
+                    selectedPRID: store.selectedPRID,
+                    prDetail: store.prDetail,
+                    onApprovePR: { pr in Task { await store.approvePR(pr) } },
+                    onCommentPR: { pr, body in Task { await store.commentOnPR(pr, body: body) } },
+                    onRequestChangesPR: { pr, body in Task { await store.requestChangesOnPR(pr, body: body) } },
+                    onMergePR: { pr, strategy in Task { await store.mergePR(pr, strategy: strategy) } },
+                    onToggleDraftPR: { pr in Task { await store.togglePRDraft(pr) } },
                     onUpdateProject: { store.updateProjectSettings($0) },
                     onDetectRepo: { await store.detectGHRepo(for: project) },
                     onFetchLabels: { Task { await store.fetchLabels(forProject: projectID) } }

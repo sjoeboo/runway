@@ -4,6 +4,7 @@ import Foundation
 public struct NewSessionRequest: Sendable {
     public let title: String
     public let projectID: String?
+    public let parentID: String?
     public let path: String
     public let tool: Tool
     public let useWorktree: Bool
@@ -13,6 +14,7 @@ public struct NewSessionRequest: Sendable {
     public init(
         title: String,
         projectID: String?,
+        parentID: String? = nil,
         path: String,
         tool: Tool,
         useWorktree: Bool,
@@ -21,6 +23,7 @@ public struct NewSessionRequest: Sendable {
     ) {
         self.title = title
         self.projectID = projectID
+        self.parentID = parentID
         self.path = path
         self.tool = tool
         self.useWorktree = useWorktree

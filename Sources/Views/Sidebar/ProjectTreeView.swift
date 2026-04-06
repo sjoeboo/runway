@@ -11,7 +11,7 @@ import Theme
 public protocol SidebarActions {
     func restartSession(id: String) async
     func deleteSession(id: String, deleteWorktree: Bool)
-    func newSession(projectID: String?)
+    func newSession(projectID: String?, parentID: String?)
     func newProject()
     func renameSession(id: String, title: String)
     func renameProject(id: String, name: String)
@@ -20,6 +20,7 @@ public protocol SidebarActions {
     func reorderProjects(fromOffsets: IndexSet, toOffset: Int)
     func selectProject(_ id: String?)
     func selectSession(_ id: String?)
+    func selectPR(_ pr: PullRequest?) async
 }
 
 /// Sidebar view showing the hierarchical project tree with sessions.
@@ -89,15 +90,26 @@ public struct ProjectTreeView: View {
 
             // Ungrouped sessions
             let ungrouped = sessionsByProject[""] ?? []
+            let ungroupedRoots = ungrouped.filter { $0.parentID == nil }
             if !ungrouped.isEmpty {
                 Section("Sessions") {
-                    ForEach(ungrouped) { session in
+                    ForEach(ungroupedRoots) { session in
                         SessionRowView(
                             session: session,
                             linkedPR: sessionPRs[session.id],
                             actions: actions
                         )
                         .tag(session.id)
+
+                        ForEach(ungrouped.filter { $0.parentID == session.id }) { child in
+                            SessionRowView(
+                                session: child,
+                                linkedPR: sessionPRs[child.id],
+                                actions: actions
+                            )
+                            .padding(.leading, 20)
+                            .tag(child.id)
+                        }
                     }
                     .onMove { fromOffsets, toOffset in
                         actions.reorderSessions(in: nil, fromOffsets: fromOffsets, toOffset: toOffset)
@@ -181,15 +193,34 @@ struct ProjectSection: View {
         self._isExpanded = AppStorage(wrappedValue: true, "project.expanded.\(project.id)")
     }
 
+    private var rootSessions: [Session] {
+        sessions.filter { $0.parentID == nil }
+    }
+
+    private func children(of sessionID: String) -> [Session] {
+        sessions.filter { $0.parentID == sessionID }
+    }
+
     var body: some View {
         DisclosureGroup(isExpanded: $isExpanded) {
-            ForEach(sessions) { session in
+            ForEach(rootSessions) { session in
                 SessionRowView(
                     session: session,
                     linkedPR: sessionPRs[session.id],
                     actions: actions
                 )
                 .tag(session.id)
+
+                // Child sessions indented under parent
+                ForEach(children(of: session.id)) { child in
+                    SessionRowView(
+                        session: child,
+                        linkedPR: sessionPRs[child.id],
+                        actions: actions
+                    )
+                    .padding(.leading, 20)
+                    .tag(child.id)
+                }
             }
             .onMove { fromOffsets, toOffset in
                 actions.reorderSessions(in: project.id, fromOffsets: fromOffsets, toOffset: toOffset)
@@ -219,10 +250,10 @@ struct ProjectSection: View {
 
                 if isHeaderHovered && !isRenaming {
                     Button {
-                        actions.newSession(projectID: project.id)
+                        actions.newSession(projectID: project.id, parentID: nil)
                     } label: {
                         Image(systemName: "plus")
-                            .font(.system(size: 12))
+                            .font(.caption)
                             .foregroundColor(theme.chrome.textDim)
                             .frame(width: 22, height: 22)
                     }
@@ -313,16 +344,14 @@ struct SessionRowView: View {
                 if let pr = linkedPR {
                     HStack(spacing: 4) {
                         Button {
-                            if let url = URL(string: pr.url) {
-                                NSWorkspace.shared.open(url)
-                            }
+                            Task { await actions.selectPR(pr) }
                         } label: {
                             Text("#\(pr.number)")
                                 .font(.caption2)
                                 .foregroundColor(pr.numberColor(chrome: theme.chrome))
                         }
-                        .buttonStyle(.plain)
-                        .help("Open PR #\(pr.number) in browser")
+                        .buttonStyle(LinkButtonStyle())
+                        .help("View PR #\(pr.number) details")
                         CheckSummaryBadge(checks: pr.checks)
                         ReviewDecisionBadge(decision: pr.reviewDecision, style: .iconOnly)
                         if pr.additions > 0 || pr.deletions > 0 {
@@ -336,7 +365,7 @@ struct SessionRowView: View {
                         }
                         if pr.isDraft {
                             Text("Draft")
-                                .font(.system(size: 8))
+                                .font(.caption2)
                                 .foregroundColor(theme.chrome.textDim)
                         }
                     }
@@ -350,7 +379,7 @@ struct SessionRowView: View {
                         Task { await actions.restartSession(id: session.id) }
                     } label: {
                         Image(systemName: "arrow.counterclockwise")
-                            .font(.system(size: 11))
+                            .font(.caption)
                             .foregroundColor(theme.chrome.textDim)
                             .frame(width: 22, height: 22)
                     }
@@ -361,7 +390,7 @@ struct SessionRowView: View {
                         showDeleteConfirmation = true
                     } label: {
                         Image(systemName: "trash")
-                            .font(.system(size: 11))
+                            .font(.caption)
                             .foregroundColor(theme.chrome.textDim)
                             .frame(width: 22, height: 22)
                     }
@@ -389,6 +418,12 @@ struct SessionRowView: View {
                 isRenaming = true
             } label: {
                 Label("Rename Session", systemImage: "pencil")
+            }
+
+            Button {
+                actions.newSession(projectID: session.projectID, parentID: session.id)
+            } label: {
+                Label("Spawn Sub-session", systemImage: "arrow.triangle.branch")
             }
 
             Divider()

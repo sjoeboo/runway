@@ -6,11 +6,13 @@ import Theme
 public struct SessionHeaderView: View {
     let session: Session
     var linkedPR: PullRequest?
+    var onSelectPR: ((PullRequest) -> Void)?
     @Environment(\.theme) private var theme
 
-    public init(session: Session, linkedPR: PullRequest? = nil) {
+    public init(session: Session, linkedPR: PullRequest? = nil, onSelectPR: ((PullRequest) -> Void)? = nil) {
         self.session = session
         self.linkedPR = linkedPR
+        self.onSelectPR = onSelectPR
     }
 
     public var body: some View {
@@ -68,7 +70,9 @@ public struct SessionHeaderView: View {
                             HStack(spacing: 8) {
                                 // PR number — opens in browser
                                 Button {
-                                    if let url = URL(string: pr.url) {
+                                    if let onSelectPR {
+                                        onSelectPR(pr)
+                                    } else if let url = URL(string: pr.url) {
                                         NSWorkspace.shared.open(url)
                                     }
                                 } label: {
@@ -77,8 +81,8 @@ public struct SessionHeaderView: View {
                                         .fontWeight(.medium)
                                         .foregroundColor(pr.numberColor(chrome: theme.chrome))
                                 }
-                                .buttonStyle(.plain)
-                                .help("Open PR in browser")
+                                .buttonStyle(LinkButtonStyle())
+                                .help(onSelectPR != nil ? "View PR details" : "Open PR in browser")
 
                                 // Check summary
                                 CheckSummaryBadge(checks: pr.checks, style: .inline)

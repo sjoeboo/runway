@@ -107,13 +107,13 @@ public struct DiffView: View {
                 Text(line.newLineNo.map { String($0) } ?? "")
                     .frame(width: 40, alignment: .trailing)
             }
-            .font(.system(size: 10, design: .monospaced))
+            .font(.system(.caption2, design: .monospaced))
             .foregroundColor(theme.chrome.comment)
             .padding(.trailing, 4)
 
             // Content
             Text(line.content)
-                .font(.system(size: 12, design: .monospaced))
+                .font(.system(.caption, design: .monospaced))
                 .foregroundColor(lineColor(line.type))
                 .frame(maxWidth: .infinity, alignment: .leading)
         }

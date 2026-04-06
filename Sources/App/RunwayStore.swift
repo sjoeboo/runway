@@ -20,6 +20,9 @@ public final class RunwayStore {
     var pullRequests: [PullRequest] = []
 
     var selectedSessionID: String?
+    /// Incremented on every selection change to force SwiftUI re-render
+    /// when selectedSessionID goes nil→nil (no-op for @Observable).
+    var selectionVersion: Int = 0
     var selectedPRID: String?
     var prDetail: PRDetail?
     var prFilter: PRFilter = .mine
@@ -29,6 +32,7 @@ public final class RunwayStore {
     var showNewSessionDialog: Bool = false
     var showNewProjectDialog: Bool = false
     var newSessionProjectID: String?
+    var newSessionParentID: String?
     var statusMessage: StatusMessage?
     var tmuxAvailable: Bool = false
     var showSendBar: Bool = false
@@ -48,7 +52,7 @@ public final class RunwayStore {
     // MARK: - Managers
     let themeManager: ThemeManager
     let database: Database?
-    let hookServer: HookServer
+    var hookServer: HookServer
     let statusDetector: StatusDetector
     let worktreeManager: WorktreeManager
     let prManager: PRManager
@@ -148,6 +152,10 @@ public final class RunwayStore {
         } catch {
             print("[Runway] Failed to load state: \(error)")
         }
+
+        // Background prefetch PRs so data is ready when user opens PR dashboard
+        loadCachedPRs()
+        Task { await fetchPRs() }
     }
 
     // MARK: - New Session Request (from dialog)
@@ -190,6 +198,7 @@ public final class RunwayStore {
             tool: request.tool,
             status: .starting,
             worktreeBranch: worktreeBranch,
+            parentID: request.parentID,
             permissionMode: resolvedMode
         )
 
@@ -375,11 +384,13 @@ public final class RunwayStore {
     public func selectProject(_ projectID: String?) {
         selectedProjectID = projectID
         selectedSessionID = nil
+        selectionVersion += 1
     }
 
     public func selectSession(_ sessionID: String?) {
         selectedSessionID = sessionID
         selectedProjectID = nil
+        selectionVersion += 1
         if currentView == .prs {
             currentView = .sessions
         }
@@ -437,6 +448,9 @@ public final class RunwayStore {
 
     // MARK: - Hook Server
 
+    /// Path to persist the hook server port across launches.
+    private static let portFilePath = "\(FileManager.default.homeDirectoryForCurrentUser.path)/.runway/hook_port"
+
     private func startHookServer() async {
         await hookServer.onEvent { [weak self] event in
             Task { @MainActor in
@@ -445,11 +459,37 @@ public final class RunwayStore {
         }
 
         do {
-            try await hookServer.start()
+            // Try to reuse the previous port so existing Claude sessions keep working
+            let previousPort = Self.loadPersistedPort()
+            if let previousPort {
+                hookServer = HookServer(port: previousPort)
+                await hookServer.onEvent { [weak self] event in
+                    Task { @MainActor in
+                        self?.handleHookEvent(event)
+                    }
+                }
+            }
 
-            // Always re-inject hooks — port is ephemeral, so previous hooks may point
-            // to a stale port from a prior launch.
+            do {
+                try await hookServer.start()
+            } catch {
+                // Previous port unavailable — fall back to ephemeral
+                if let previousPort {
+                    print("[Runway] Previous port \(previousPort) unavailable, using ephemeral")
+                    hookServer = HookServer()
+                    await hookServer.onEvent { [weak self] event in
+                        Task { @MainActor in
+                            self?.handleHookEvent(event)
+                        }
+                    }
+                    try await hookServer.start()
+                } else {
+                    throw error
+                }
+            }
+
             if let port = await hookServer.actualPort {
+                Self.persistPort(port)
                 try hookInjector.inject(port: port, force: true)
             } else {
                 print("[Runway] Hook server started but no port available")
@@ -459,8 +499,25 @@ public final class RunwayStore {
         }
     }
 
+    private static func loadPersistedPort() -> UInt16? {
+        guard let data = try? String(contentsOfFile: portFilePath, encoding: .utf8) else { return nil }
+        return UInt16(data.trimmingCharacters(in: .whitespacesAndNewlines))
+    }
+
+    private static func persistPort(_ port: UInt16) {
+        let dir = (portFilePath as NSString).deletingLastPathComponent
+        try? FileManager.default.createDirectory(atPath: dir, withIntermediateDirectories: true)
+        try? String(port).write(toFile: portFilePath, atomically: true, encoding: .utf8)
+    }
+
+    /// Tracks when each session last received a hook event.
+    /// Buffer polling defers to hook-based status within this cooldown window.
+    private var lastHookEventTime: [String: Date] = [:]
+    private let hookPriorityCooldown: TimeInterval = 10
+
     private func handleHookEvent(_ event: HookEvent) {
         print("[Runway] Hook event: \(event.event.rawValue) for session \(event.sessionID)")
+        lastHookEventTime[event.sessionID] = Date()
         switch event.event {
         case .sessionStart:
             updateSessionStatus(id: event.sessionID, status: .running)
@@ -494,6 +551,13 @@ public final class RunwayStore {
         for i in sessions.indices {
             let session = sessions[i]
             guard session.status != .stopped else { continue }
+
+            // Defer to hook-based status if a hook event arrived recently
+            if let lastHook = lastHookEventTime[session.id],
+                Date().timeIntervalSince(lastHook) < hookPriorityCooldown
+            {
+                continue
+            }
 
             // Read last 15 lines from the cached terminal view
             guard let terminal = TerminalSessionCache.shared.mainTerminal(forSessionID: session.id) else {
@@ -560,78 +624,83 @@ public final class RunwayStore {
         }
     }
 
-    /// Background-enrich PRs with detail data (checks, reviews, branches, diff counts).
-    /// Uses bounded concurrency via TaskGroup to avoid sequential subprocess calls.
-    /// Collects results into a local dictionary and merges in a single pass to avoid
-    /// index-mutation races and minimize SwiftUI re-renders.
+    /// Background-enrich PRs with checks and review decision only (not full detail).
+    /// Like Hangar, fetches only statusCheckRollup+reviewDecision — 1 subprocess per PR
+    /// instead of 2 (fetchDetail + REST files).
     private func enrichPRs() async {
-        // Snapshot PRs that need enrichment (by ID, not index)
         let toEnrich = pullRequests.filter { $0.checks.total == 0 }
         guard !toEnrich.isEmpty else {
-            // Still need to link sessions even if all PRs are enriched
             await linkSessionPRs()
             return
         }
 
-        // Fetch details concurrently with bounded parallelism
-        var enriched: [String: PRDetail] = [:]
-        await withTaskGroup(of: (String, PRDetail?).self) { group in
+        // Lightweight enrichment: checks + review decision only
+        var enriched: [String: PREnrichResult] = [:]
+        await withTaskGroup(of: (String, PREnrichResult?).self) { group in
             var inFlight = 0
             let maxConcurrency = 5
 
             for pr in toEnrich {
                 if inFlight >= maxConcurrency {
-                    if let (id, detail) = await group.next() {
-                        if let detail { enriched[id] = detail }
+                    if let (id, result) = await group.next() {
+                        if let result { enriched[id] = result }
                         inFlight -= 1
                     }
                 }
 
                 let host = prManager.hostFromURL(pr.url)
                 group.addTask { [prManager] in
-                    let detail = try? await prManager.fetchDetail(
+                    let result = try? await prManager.enrichChecks(
                         repo: pr.repo, number: pr.number, host: host
                     )
-                    return (pr.id, detail)
+                    return (pr.id, result)
                 }
                 inFlight += 1
             }
 
-            // Collect remaining results
-            for await (id, detail) in group {
-                if let detail { enriched[id] = detail }
+            for await (id, result) in group {
+                if let result { enriched[id] = result }
             }
         }
 
-        // Merge all enrichments in a single pass (one array mutation = one SwiftUI invalidation)
+        // Merge in a single pass
         var updated = pullRequests
         for i in updated.indices {
-            guard let detail = enriched[updated[i].id] else { continue }
-            updated[i].checks = detail.checks
-            updated[i].reviewDecision = detail.reviewDecision
-            if !detail.headBranch.isEmpty {
-                updated[i].headBranch = detail.headBranch
-                updated[i].baseBranch = detail.baseBranch
+            guard let result = enriched[updated[i].id] else { continue }
+            updated[i].checks = result.checks
+            updated[i].reviewDecision = result.reviewDecision
+            if !result.headBranch.isEmpty {
+                updated[i].headBranch = result.headBranch
+                updated[i].baseBranch = result.baseBranch
             }
-            updated[i].additions = detail.additions
-            updated[i].deletions = detail.deletions
-            updated[i].changedFiles = detail.changedFiles
+            updated[i].additions = result.additions
+            updated[i].deletions = result.deletions
+            updated[i].changedFiles = result.changedFiles
         }
         pullRequests = updated
 
-        // Cache enriched PRs to database
         try? database?.cachePRs(pullRequests)
         try? database?.cleanPRCache()
 
-        // Link PRs to sessions
         await linkSessionPRs()
     }
 
-    /// Link PRs to sessions by running gh pr view in each session's worktree directory.
+    /// Link PRs to sessions — concurrent, like Hangar.
     private func linkSessionPRs() async {
-        for session in sessions where session.worktreeBranch != nil {
-            if let pr = try? await prManager.fetchPRForWorktree(path: session.path) {
-                sessionPRs[session.id] = pr
+        let worktreeSessions = sessions.filter { $0.worktreeBranch != nil }
+        guard !worktreeSessions.isEmpty else { return }
+
+        await withTaskGroup(of: (String, PullRequest?).self) { group in
+            for session in worktreeSessions {
+                group.addTask { [prManager] in
+                    let pr = try? await prManager.fetchPRForWorktree(path: session.path)
+                    return (session.id, pr)
+                }
+            }
+            for await (sessionID, pr) in group {
+                if let pr {
+                    sessionPRs[sessionID] = pr
+                }
             }
         }
     }
@@ -642,14 +711,30 @@ public final class RunwayStore {
         await fetchPRs()
     }
 
-    func selectPR(_ pr: PullRequest?) async {
+    /// In-memory detail cache with 5-minute TTL (matches Hangar).
+    private var detailCache: [String: (detail: PRDetail, fetchedAt: Date)] = [:]
+    private let detailTTL: TimeInterval = 300
+
+    func selectPR(_ pr: PullRequest?, navigate: Bool = true) async {
         selectedPRID = pr?.id
         prDetail = nil
         guard let pr else { return }
 
+        if navigate {
+            currentView = .prs
+        }
+
+        // Check cache first
+        if let cached = detailCache[pr.id], Date().timeIntervalSince(cached.fetchedAt) < detailTTL {
+            prDetail = cached.detail
+            return
+        }
+
         do {
             let host = prManager.hostFromURL(pr.url)
-            prDetail = try await prManager.fetchDetail(repo: pr.repo, number: pr.number, host: host)
+            let detail = try await prManager.fetchDetail(repo: pr.repo, number: pr.number, host: host)
+            detailCache[pr.id] = (detail, Date())
+            prDetail = detail
         } catch {
             print("[Runway] Failed to fetch PR detail: \(error)")
         }
@@ -781,13 +866,19 @@ public final class RunwayStore {
 // MARK: - SidebarActions Conformance
 
 extension RunwayStore: SidebarActions {
-    public func newSession(projectID: String?) {
+    public func newSession(projectID: String?, parentID: String? = nil) {
         newSessionProjectID = projectID
+        newSessionParentID = parentID
         showNewSessionDialog = true
     }
 
     public func newProject() {
         showNewProjectDialog = true
+    }
+
+    // SidebarActions conformance — delegates to the full selectPR with navigate: true
+    public func selectPR(_ pr: PullRequest?) async {
+        await selectPR(pr, navigate: true)
     }
 }
 

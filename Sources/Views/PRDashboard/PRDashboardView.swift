@@ -84,16 +84,16 @@ public struct PRDashboardView: View {
                         Image(systemName: hideDrafts ? "eye.slash" : "eye")
                             .font(.caption)
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(IconButtonStyle())
                     .help(hideDrafts ? "Show drafts" : "Hide drafts")
-                    .padding(.trailing, 8)
+                    .padding(.trailing, 4)
 
                     Button(action: onRefresh) {
                         Image(systemName: "arrow.clockwise")
                             .font(.caption)
                     }
-                    .buttonStyle(.plain)
-                    .padding(.trailing, 12)
+                    .buttonStyle(IconButtonStyle())
+                    .padding(.trailing, 8)
                 }
                 .padding(.horizontal)
                 .padding(.vertical, 8)

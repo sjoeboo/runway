@@ -72,10 +72,13 @@ public struct StatusDetector: Sendable {
         "ctrl+c to interrupt",
         "esc to interrupt",
         "Ctrl+C to interrupt",
-        "tokens",
-        "cost:",
         "⎿",
         "Working...",
+        "Analyzing",
+        "Reading",
+        "Searching",
+        "Writing",
+        "Editing",
     ]
 
     private let waitingPatterns = [

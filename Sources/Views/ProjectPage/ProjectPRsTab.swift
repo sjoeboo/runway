@@ -8,6 +8,13 @@ public struct ProjectPRsTab: View {
     let pullRequests: [PullRequest]
     let onSelectPR: (PullRequest) -> Void
     let onRefresh: () -> Void
+    var selectedPRID: String?
+    var detail: PRDetail?
+    var onApprove: ((PullRequest) -> Void)?
+    var onComment: ((PullRequest, String) -> Void)?
+    var onRequestChanges: ((PullRequest, String) -> Void)?
+    var onMerge: ((PullRequest, MergeStrategy) -> Void)?
+    var onToggleDraft: ((PullRequest) -> Void)?
 
     @AppStorage("hideDrafts") private var hideDrafts: Bool = false
     @Environment(\.theme) private var theme
@@ -15,11 +22,29 @@ public struct ProjectPRsTab: View {
     public init(
         pullRequests: [PullRequest],
         onSelectPR: @escaping (PullRequest) -> Void,
-        onRefresh: @escaping () -> Void
+        onRefresh: @escaping () -> Void,
+        selectedPRID: String? = nil,
+        detail: PRDetail? = nil,
+        onApprove: ((PullRequest) -> Void)? = nil,
+        onComment: ((PullRequest, String) -> Void)? = nil,
+        onRequestChanges: ((PullRequest, String) -> Void)? = nil,
+        onMerge: ((PullRequest, MergeStrategy) -> Void)? = nil,
+        onToggleDraft: ((PullRequest) -> Void)? = nil
     ) {
         self.pullRequests = pullRequests
         self.onSelectPR = onSelectPR
         self.onRefresh = onRefresh
+        self.selectedPRID = selectedPRID
+        self.detail = detail
+        self.onApprove = onApprove
+        self.onComment = onComment
+        self.onRequestChanges = onRequestChanges
+        self.onMerge = onMerge
+        self.onToggleDraft = onToggleDraft
+    }
+
+    private var selectedPR: PullRequest? {
+        pullRequests.first(where: { $0.id == selectedPRID })
     }
 
     private var filteredPRs: [PullRequest] {
@@ -47,7 +72,7 @@ public struct ProjectPRsTab: View {
                     Image(systemName: hideDrafts ? "eye.slash" : "eye")
                         .font(.caption)
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(IconButtonStyle())
                 .help(hideDrafts ? "Show drafts" : "Hide drafts")
 
                 Button {
@@ -56,7 +81,7 @@ public struct ProjectPRsTab: View {
                     Image(systemName: "arrow.clockwise")
                         .font(.caption)
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(IconButtonStyle())
                 .help("Refresh pull requests")
             }
             .padding(.horizontal, 12)
@@ -66,6 +91,22 @@ public struct ProjectPRsTab: View {
 
             if filteredPRs.isEmpty {
                 emptyStateView
+            } else if let pr = selectedPR {
+                HStack(spacing: 0) {
+                    prList
+                        .frame(maxWidth: 320)
+                    Divider()
+                    PRDetailDrawer(
+                        pr: pr,
+                        detail: detail,
+                        onClose: { onSelectPR(pr) },
+                        onApprove: { onApprove?(pr) },
+                        onComment: { body in onComment?(pr, body) },
+                        onRequestChanges: { body in onRequestChanges?(pr, body) },
+                        onMerge: { strategy in onMerge?(pr, strategy) },
+                        onToggleDraft: { onToggleDraft?(pr) }
+                    )
+                }
             } else {
                 prList
             }

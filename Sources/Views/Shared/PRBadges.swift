@@ -147,11 +147,11 @@ public struct ReviewDecisionBadge: View {
         switch decision {
         case .approved:
             Image(systemName: "checkmark")
-                .font(.system(size: 8))
+                .font(.caption2)
                 .foregroundColor(theme.chrome.green)
         case .changesRequested:
             Image(systemName: "exclamationmark.triangle")
-                .font(.system(size: 8))
+                .font(.caption2)
                 .foregroundColor(theme.chrome.orange)
         case .pending, .none:
             EmptyView()
