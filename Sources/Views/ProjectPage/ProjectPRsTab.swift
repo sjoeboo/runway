@@ -168,6 +168,9 @@ private struct ProjectPRRowView: View {
                             .fontDesign(.monospaced)
                             .foregroundColor(theme.chrome.cyan)
                     }
+                    Text(pr.ageText)
+                        .font(.caption)
+                        .foregroundColor(theme.chrome.textDim)
                     CheckSummaryBadge(checks: pr.checks)
                     ReviewDecisionBadge(decision: pr.reviewDecision)
                 }
