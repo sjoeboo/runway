@@ -1,3 +1,4 @@
+import Foundation
 import Models
 import Testing
 
@@ -106,4 +107,22 @@ import Testing
 
     let fetched = try db.session(id: session.id)
     #expect(fetched?.prNumber == nil)
+}
+
+@Test func prCacheRoundTripsNewFields() throws {
+    let db = try Database(inMemory: true)
+
+    var pr = PullRequest(
+        number: 99, title: "Test", state: .open, headBranch: "feature", baseBranch: "main",
+        author: "alice", repo: "owner/repo"
+    )
+    pr.enrichedAt = Date()
+    pr.origin = [.mine, .reviewRequested]
+
+    try db.cachePR(pr)
+
+    let cached = try db.cachedPRs(maxAge: 3600)
+    #expect(cached.count == 1)
+    #expect(cached.first?.enrichedAt != nil)
+    #expect(cached.first?.origin == [.mine, .reviewRequested])
 }
