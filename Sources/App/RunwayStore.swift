@@ -52,7 +52,7 @@ public final class RunwayStore {
     // MARK: - Managers
     let themeManager: ThemeManager
     let database: Database?
-    let hookServer: HookServer
+    var hookServer: HookServer
     let statusDetector: StatusDetector
     let worktreeManager: WorktreeManager
     let prManager: PRManager
@@ -448,6 +448,9 @@ public final class RunwayStore {
 
     // MARK: - Hook Server
 
+    /// Path to persist the hook server port across launches.
+    private static let portFilePath = "\(FileManager.default.homeDirectoryForCurrentUser.path)/.runway/hook_port"
+
     private func startHookServer() async {
         await hookServer.onEvent { [weak self] event in
             Task { @MainActor in
@@ -456,11 +459,37 @@ public final class RunwayStore {
         }
 
         do {
-            try await hookServer.start()
+            // Try to reuse the previous port so existing Claude sessions keep working
+            let previousPort = Self.loadPersistedPort()
+            if let previousPort {
+                hookServer = HookServer(port: previousPort)
+                await hookServer.onEvent { [weak self] event in
+                    Task { @MainActor in
+                        self?.handleHookEvent(event)
+                    }
+                }
+            }
 
-            // Always re-inject hooks — port is ephemeral, so previous hooks may point
-            // to a stale port from a prior launch.
+            do {
+                try await hookServer.start()
+            } catch {
+                // Previous port unavailable — fall back to ephemeral
+                if let previousPort {
+                    print("[Runway] Previous port \(previousPort) unavailable, using ephemeral")
+                    hookServer = HookServer()
+                    await hookServer.onEvent { [weak self] event in
+                        Task { @MainActor in
+                            self?.handleHookEvent(event)
+                        }
+                    }
+                    try await hookServer.start()
+                } else {
+                    throw error
+                }
+            }
+
             if let port = await hookServer.actualPort {
+                Self.persistPort(port)
                 try hookInjector.inject(port: port, force: true)
             } else {
                 print("[Runway] Hook server started but no port available")
@@ -470,8 +499,25 @@ public final class RunwayStore {
         }
     }
 
+    private static func loadPersistedPort() -> UInt16? {
+        guard let data = try? String(contentsOfFile: portFilePath, encoding: .utf8) else { return nil }
+        return UInt16(data.trimmingCharacters(in: .whitespacesAndNewlines))
+    }
+
+    private static func persistPort(_ port: UInt16) {
+        let dir = (portFilePath as NSString).deletingLastPathComponent
+        try? FileManager.default.createDirectory(atPath: dir, withIntermediateDirectories: true)
+        try? String(port).write(toFile: portFilePath, atomically: true, encoding: .utf8)
+    }
+
+    /// Tracks when each session last received a hook event.
+    /// Buffer polling defers to hook-based status within this cooldown window.
+    private var lastHookEventTime: [String: Date] = [:]
+    private let hookPriorityCooldown: TimeInterval = 10
+
     private func handleHookEvent(_ event: HookEvent) {
         print("[Runway] Hook event: \(event.event.rawValue) for session \(event.sessionID)")
+        lastHookEventTime[event.sessionID] = Date()
         switch event.event {
         case .sessionStart:
             updateSessionStatus(id: event.sessionID, status: .running)
@@ -505,6 +551,13 @@ public final class RunwayStore {
         for i in sessions.indices {
             let session = sessions[i]
             guard session.status != .stopped else { continue }
+
+            // Defer to hook-based status if a hook event arrived recently
+            if let lastHook = lastHookEventTime[session.id],
+                Date().timeIntervalSince(lastHook) < hookPriorityCooldown
+            {
+                continue
+            }
 
             // Read last 15 lines from the cached terminal view
             guard let terminal = TerminalSessionCache.shared.mainTerminal(forSessionID: session.id) else {

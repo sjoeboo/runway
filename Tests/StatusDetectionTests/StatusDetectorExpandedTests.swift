@@ -6,16 +6,18 @@ import Testing
 
 // MARK: - Additional Claude Detection Patterns
 
-@Test func detectClaudeBusyTokenCount() {
+@Test func detectClaudeTokenCountNotBusy() {
+    // Token counts appear in completion summaries — should not trigger running status
     let detector = StatusDetector()
     let result = detector.detect(content: "Input: 5.2k tokens", tool: .claude)
-    #expect(result == .running)
+    #expect(result == nil)
 }
 
-@Test func detectClaudeBusyCostLine() {
+@Test func detectClaudeCostLineNotBusy() {
+    // Cost lines appear in completion summaries — should not trigger running status
     let detector = StatusDetector()
     let result = detector.detect(content: "cost: $0.0042", tool: .claude)
-    #expect(result == .running)
+    #expect(result == nil)
 }
 
 @Test func detectClaudeBusyWorkingMessage() {
