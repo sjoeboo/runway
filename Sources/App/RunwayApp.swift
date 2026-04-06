@@ -213,6 +213,7 @@ struct ContentView: View {
             projects: store.projects,
             sessions: store.sessions,
             sessionPRs: store.sessionPRs,
+            provisioningWorktreeIDs: store.provisioningWorktreeIDs,
             selectedSessionID: $store.selectedSessionID,
             searchQuery: $store.sidebarSearchQuery,
             focusSearch: $store.focusSidebarSearch,
