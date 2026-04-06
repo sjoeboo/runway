@@ -339,7 +339,7 @@ public struct PRDetailDrawer: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 12) {
                 if let body = detail?.body, !body.isEmpty {
-                    Text(stripHTML(body))
+                    markdownBody(body)
                         .font(.body)
                         .foregroundColor(theme.chrome.text)
                         .textSelection(.enabled)
@@ -504,7 +504,7 @@ public struct PRDetailDrawer: View {
                         .cornerRadius(4)
                 }
                 if !review.body.isEmpty {
-                    Text(review.body)
+                    markdownText(review.body)
                         .font(.body)
                         .foregroundColor(theme.chrome.text)
                 }
@@ -536,7 +536,7 @@ public struct PRDetailDrawer: View {
                         .foregroundColor(theme.chrome.accent)
                 }
             }
-            Text(comment.body)
+            markdownText(comment.body)
                 .font(.body)
                 .foregroundColor(theme.chrome.text)
                 .textSelection(.enabled)
@@ -577,6 +577,23 @@ public struct PRDetailDrawer: View {
                 .font(.caption)
                 .foregroundColor(theme.chrome.red)
         }
+    }
+
+    /// Render a markdown string as styled Text using AttributedString.
+    /// Falls back to plain text if markdown parsing fails.
+    private func markdownText(_ source: String) -> Text {
+        if let attributed = try? AttributedString(markdown: source, options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace)) {
+            return Text(attributed)
+        }
+        return Text(source)
+    }
+
+    /// Render a full markdown document (PR body — supports block elements like headings, lists).
+    private func markdownBody(_ source: String) -> Text {
+        if let attributed = try? AttributedString(markdown: source) {
+            return Text(attributed)
+        }
+        return Text(source)
     }
 
     private func stripHTML(_ html: String) -> String {
