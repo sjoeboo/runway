@@ -12,6 +12,55 @@ import Foundation
 /// release the cooperative thread while the subprocess runs.
 public enum ShellRunner {
 
+    /// Resolve the user's full PATH by running their login shell.
+    ///
+    /// macOS `.app` bundles launched from Finder/Dock inherit a minimal PATH
+    /// (`/usr/bin:/bin:/usr/sbin:/sbin`) from launchd. Tools installed via
+    /// Homebrew, MacPorts, nix, etc. aren't on this PATH, so `/usr/bin/env tmux`
+    /// (and `gh`, `claude`, etc.) fail with "No such file or directory".
+    ///
+    /// Call once at app startup. Uses `setenv` so all subsequent subprocess
+    /// launches — both inherited-env and `ProcessInfo.processInfo.environment` —
+    /// see the enriched PATH.
+    public static func enrichPath() {
+        let current = ProcessInfo.processInfo.environment["PATH"] ?? ""
+        // If common Homebrew paths are already present, we're running via
+        // `swift run` or the terminal — nothing to fix.
+        if current.contains("/opt/homebrew/bin") || current.contains("/usr/local/bin") {
+            return
+        }
+
+        let shell = ProcessInfo.processInfo.environment["SHELL"] ?? "/bin/zsh"
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: shell)
+        // -l = login shell (sources ~/.zprofile, ~/.zshenv → picks up PATH)
+        process.arguments = ["-l", "-c", "printf '%s' \"$PATH\""]
+        let pipe = Pipe()
+        process.standardOutput = pipe
+        process.standardError = FileHandle.nullDevice
+
+        guard (try? process.run()) != nil else {
+            applyFallbackPath(current)
+            return
+        }
+        process.waitUntilExit()
+
+        let data = pipe.fileHandleForReading.readDataToEndOfFile()
+        let resolved = String(data: data, encoding: .utf8) ?? ""
+
+        if process.terminationStatus == 0, !resolved.isEmpty {
+            setenv("PATH", resolved, 1)
+        } else {
+            applyFallbackPath(current)
+        }
+    }
+
+    private static func applyFallbackPath(_ current: String) {
+        let fallback =
+            "/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/usr/local/sbin:\(current)"
+        setenv("PATH", fallback, 1)
+    }
+
     /// Run a shell command and return its stdout output.
     ///
     /// - Parameters:

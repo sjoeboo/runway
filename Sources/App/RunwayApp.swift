@@ -12,6 +12,11 @@ struct RunwayApp: App {
     @State private var store = RunwayStore()
 
     init() {
+        // .app bundles from Finder/Dock inherit a minimal PATH from launchd.
+        // Enrich it with the user's login shell PATH so Homebrew tools
+        // (tmux, gh, claude, etc.) are found by /usr/bin/env.
+        ShellRunner.enrichPath()
+
         // SPM executables don't get a proper .app bundle, so macOS doesn't
         // activate them as GUI apps. Force regular activation policy so
         // the window, dock icon, and menu bar all appear.
@@ -29,6 +34,7 @@ struct RunwayApp: App {
                 .preferredColorScheme(store.themeManager.currentTheme.appearance == .dark ? .dark : .light)
         }
         .windowStyle(.titleBar)
+        .windowToolbarStyle(.unified)
         .defaultSize(width: 1200, height: 800)
         .commands {
             CommandGroup(after: .sidebar) {
