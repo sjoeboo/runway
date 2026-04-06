@@ -36,6 +36,45 @@ public actor WorktreeManager {
         return worktreePath
     }
 
+    /// Create a worktree for an existing branch (e.g., a PR's remote branch).
+    ///
+    /// Unlike `createWorktree()` which creates a new branch, this checks out
+    /// an existing branch. Fetches from origin first, then creates a tracking worktree.
+    /// Falls back to using an existing local branch if the tracking branch creation fails.
+    ///
+    /// - Parameters:
+    ///   - repoPath: Path to the main repository
+    ///   - branch: Name of the existing branch to check out
+    /// - Returns: Path to the created worktree directory
+    public func checkoutWorktree(
+        repoPath: String,
+        branch: String
+    ) async throws -> String {
+        let sanitized = sanitizeBranchName(branch)
+        let worktreePath = "\(repoPath)/.worktrees/\(sanitized)"
+
+        // Fetch the branch from origin (non-fatal if no remote)
+        try? await runGit(in: repoPath, args: ["fetch", "origin", branch])
+
+        // Try creating worktree tracking the remote branch
+        do {
+            try await runGit(
+                in: repoPath,
+                args: [
+                    "worktree", "add", "--track", "-b", sanitized, worktreePath, "origin/\(branch)",
+                ])
+        } catch {
+            // Fallback: local branch already exists — reuse it
+            try await runGit(
+                in: repoPath,
+                args: [
+                    "worktree", "add", worktreePath, sanitized,
+                ])
+        }
+
+        return worktreePath
+    }
+
     /// List all worktrees for a repository.
     public func listWorktrees(repoPath: String) async throws -> [WorktreeInfo] {
         let output = try await runGit(in: repoPath, args: ["worktree", "list", "--porcelain"])

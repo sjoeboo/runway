@@ -158,6 +158,39 @@ private func withTempGitRepo(_ body: (String) async throws -> Void) async throws
     }
 }
 
+@Test func checkoutExistingBranch() async throws {
+    try await withTempGitRepo { repoPath in
+        let manager = WorktreeManager()
+        let currentBranch = await manager.currentBranch(path: repoPath) ?? "main"
+
+        // Create a branch to simulate an existing remote branch
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/bin/sh")
+        process.arguments = ["-c", "git branch existing-feature"]
+        process.currentDirectoryURL = URL(fileURLWithPath: repoPath)
+        process.standardOutput = FileHandle.nullDevice
+        process.standardError = FileHandle.nullDevice
+        try process.run()
+        process.waitUntilExit()
+
+        try FileManager.default.createDirectory(
+            atPath: "\(repoPath)/.worktrees",
+            withIntermediateDirectories: true
+        )
+
+        let worktreePath = try await manager.checkoutWorktree(
+            repoPath: repoPath,
+            branch: "existing-feature"
+        )
+
+        #expect(FileManager.default.fileExists(atPath: worktreePath))
+
+        // Verify the worktree is on the correct branch
+        let branch = await manager.currentBranch(path: worktreePath)
+        #expect(branch == "existing-feature")
+    }
+}
+
 @Test func diffSummaryOnCleanRepo() async throws {
     try await withTempGitRepo { repoPath in
         let manager = WorktreeManager()
