@@ -1,3 +1,4 @@
+import Foundation
 import Models
 import SwiftUI
 import Theme
@@ -13,5 +14,16 @@ extension PullRequest {
         case .merged: return chrome.purple
         case .closed: return chrome.red
         }
+    }
+
+    nonisolated(unsafe) private static let ageFormatter: RelativeDateTimeFormatter = {
+        let formatter = RelativeDateTimeFormatter()
+        formatter.unitsStyle = .abbreviated
+        return formatter
+    }()
+
+    /// Human-readable age string relative to now, e.g. "3d ago" or "2h ago".
+    public var ageText: String {
+        Self.ageFormatter.localizedString(for: createdAt, relativeTo: Date())
     }
 }
