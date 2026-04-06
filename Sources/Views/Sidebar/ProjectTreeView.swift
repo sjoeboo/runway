@@ -30,6 +30,7 @@ public struct ProjectTreeView: View {
     let projects: [Project]
     let sessions: [Session]
     let sessionPRs: [String: PullRequest]
+    let provisioningWorktreeIDs: Set<String>
     let actions: SidebarActions
     @Binding var selectedSessionID: String?
     @Binding var searchQuery: String
@@ -41,6 +42,7 @@ public struct ProjectTreeView: View {
         projects: [Project],
         sessions: [Session],
         sessionPRs: [String: PullRequest] = [:],
+        provisioningWorktreeIDs: Set<String> = [],
         selectedSessionID: Binding<String?>,
         searchQuery: Binding<String>,
         focusSearch: Binding<Bool> = .constant(false),
@@ -49,6 +51,7 @@ public struct ProjectTreeView: View {
         self.projects = projects
         self.sessions = sessions
         self.sessionPRs = sessionPRs
+        self.provisioningWorktreeIDs = provisioningWorktreeIDs
         self._selectedSessionID = selectedSessionID
         self._searchQuery = searchQuery
         self._focusSearch = focusSearch
@@ -81,6 +84,7 @@ public struct ProjectTreeView: View {
                     project: project,
                     sessions: sessionsByProject[project.id] ?? [],
                     sessionPRs: sessionPRs,
+                    provisioningWorktreeIDs: provisioningWorktreeIDs,
                     actions: actions
                 )
             }
@@ -97,6 +101,7 @@ public struct ProjectTreeView: View {
                         SessionRowView(
                             session: session,
                             linkedPR: sessionPRs[session.id],
+                            isProvisioningWorktree: provisioningWorktreeIDs.contains(session.id),
                             actions: actions
                         )
                         .tag(session.id)
@@ -105,6 +110,7 @@ public struct ProjectTreeView: View {
                             SessionRowView(
                                 session: child,
                                 linkedPR: sessionPRs[child.id],
+                                isProvisioningWorktree: provisioningWorktreeIDs.contains(child.id),
                                 actions: actions
                             )
                             .padding(.leading, 20)
@@ -173,6 +179,7 @@ struct ProjectSection: View {
     let project: Project
     let sessions: [Session]
     let sessionPRs: [String: PullRequest]
+    let provisioningWorktreeIDs: Set<String>
     let actions: SidebarActions
     @AppStorage private var isExpanded: Bool
     @State private var isHeaderHovered = false
@@ -184,11 +191,13 @@ struct ProjectSection: View {
         project: Project,
         sessions: [Session],
         sessionPRs: [String: PullRequest],
+        provisioningWorktreeIDs: Set<String> = [],
         actions: SidebarActions
     ) {
         self.project = project
         self.sessions = sessions
         self.sessionPRs = sessionPRs
+        self.provisioningWorktreeIDs = provisioningWorktreeIDs
         self.actions = actions
         self._isExpanded = AppStorage(wrappedValue: true, "project.expanded.\(project.id)")
     }
@@ -207,6 +216,7 @@ struct ProjectSection: View {
                 SessionRowView(
                     session: session,
                     linkedPR: sessionPRs[session.id],
+                    isProvisioningWorktree: provisioningWorktreeIDs.contains(session.id),
                     actions: actions
                 )
                 .tag(session.id)
@@ -216,6 +226,7 @@ struct ProjectSection: View {
                     SessionRowView(
                         session: child,
                         linkedPR: sessionPRs[child.id],
+                        isProvisioningWorktree: provisioningWorktreeIDs.contains(child.id),
                         actions: actions
                     )
                     .padding(.leading, 20)
@@ -308,6 +319,7 @@ struct ProjectSection: View {
 struct SessionRowView: View {
     let session: Session
     var linkedPR: PullRequest?
+    var isProvisioningWorktree: Bool = false
     let actions: SidebarActions
     @State private var isHovered = false
     @State private var isRenaming = false
@@ -335,7 +347,15 @@ struct SessionRowView: View {
                         .font(.system(.body, design: .default))
                         .foregroundColor(theme.chrome.text)
                 }
-                if let branch = session.worktreeBranch {
+                if isProvisioningWorktree {
+                    HStack(spacing: 4) {
+                        ProgressView()
+                            .controlSize(.mini)
+                        Text("Creating worktree\u{2026}")
+                            .font(.caption)
+                            .foregroundColor(theme.chrome.textDim)
+                    }
+                } else if let branch = session.worktreeBranch {
                     Text(branch)
                         .font(.caption)
                         .foregroundColor(theme.chrome.textDim)

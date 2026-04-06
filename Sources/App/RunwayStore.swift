@@ -42,6 +42,9 @@ public final class RunwayStore {
     var sidebarSearchQuery: String = ""
     var focusSidebarSearch: Bool = false
 
+    /// Session IDs with in-progress worktree creation (transient, not persisted)
+    var provisioningWorktreeIDs: Set<String> = []
+
     /// Maps session ID → linked PullRequest (matched by worktree branch)
     var sessionPRs: [String: PullRequest] = [:]
 
@@ -166,26 +169,7 @@ public final class RunwayStore {
     // MARK: - New Session Request (from dialog)
 
     func handleNewSessionRequest(_ request: NewSessionRequest) async {
-        var sessionPath = request.path
-        var worktreeBranch: String? = nil
-
-        // Try to create worktree if requested (non-fatal — session still created on failure)
-        if request.useWorktree, let branchName = request.branchName, !branchName.isEmpty {
-            let project = projects.first(where: { $0.id == request.projectID })
-            let baseBranch = project?.defaultBranch ?? "main"
-
-            do {
-                sessionPath = try await worktreeManager.createWorktree(
-                    repoPath: request.path,
-                    branchName: branchName,
-                    baseBranch: baseBranch
-                )
-                worktreeBranch = branchName
-            } catch {
-                print("[Runway] Worktree creation failed, using project path: \(error)")
-                statusMessage = .error("Worktree failed: \(error.localizedDescription)")
-            }
-        }
+        let needsWorktree = request.useWorktree && !(request.branchName ?? "").isEmpty
 
         // Resolve permission mode: request > project override > default
         var resolvedMode = request.permissionMode
@@ -199,46 +183,15 @@ public final class RunwayStore {
         var session = Session(
             title: request.title,
             projectID: request.projectID,
-            path: sessionPath,
+            path: request.path,
             tool: request.tool,
             status: .starting,
-            worktreeBranch: worktreeBranch,
+            worktreeBranch: needsWorktree ? request.branchName : nil,
             parentID: request.parentID,
             permissionMode: resolvedMode
         )
 
-        // Create tmux session BEFORE adding to UI — TerminalPane needs it to exist
-        // when it tries to attach
-        if tmuxAvailable {
-            let tmuxName = "runway-\(session.id)"
-            let command: String?
-            if session.tool == .claude {
-                command = ([session.tool.command] + session.permissionMode.cliFlags).joined(separator: " ")
-            } else if session.tool != .shell {
-                command = session.tool.command
-            } else {
-                command = nil
-            }
-
-            do {
-                try await tmuxManager.createSession(
-                    name: tmuxName,
-                    workDir: sessionPath,
-                    command: command,
-                    env: [
-                        "RUNWAY_SESSION_ID": session.id,
-                        "RUNWAY_TITLE": session.title,
-                    ]
-                )
-                session.status = .running
-            } catch {
-                print("[Runway] Failed to create tmux session: \(error)")
-                statusMessage = .error("tmux session failed: \(error.localizedDescription)")
-                // Fall through — session still created, TerminalPane will use direct spawn fallback
-            }
-        }
-
-        // Now add to UI — tmux session is ready for TerminalPane to attach
+        // Add session to UI immediately so the user sees it right away
         sessions.append(session)
         do {
             try database?.saveSession(session)
@@ -247,6 +200,74 @@ public final class RunwayStore {
             statusMessage = .error("Failed to save session: \(error.localizedDescription)")
         }
         selectedSessionID = session.id
+
+        // If worktree needed, create it in the background then start the tmux session
+        if needsWorktree, let branchName = request.branchName {
+            let project = projects.first(where: { $0.id == request.projectID })
+            let baseBranch = project?.defaultBranch ?? "main"
+
+            provisioningWorktreeIDs.insert(session.id)
+
+            Task {
+                var sessionPath = request.path
+                do {
+                    sessionPath = try await worktreeManager.createWorktree(
+                        repoPath: request.path,
+                        branchName: branchName,
+                        baseBranch: baseBranch
+                    )
+                } catch {
+                    print("[Runway] Worktree creation failed, using project path: \(error)")
+                    statusMessage = .error("Worktree failed: \(error.localizedDescription)")
+                }
+
+                // Update session path (worktree path on success, project path on failure)
+                if let idx = sessions.firstIndex(where: { $0.id == session.id }) {
+                    sessions[idx].path = sessionPath
+                }
+                try? database?.updateSessionPath(id: session.id, path: sessionPath)
+
+                provisioningWorktreeIDs.remove(session.id)
+
+                // Now start the tmux session with the resolved path
+                await startTmuxSession(for: &session, path: sessionPath)
+            }
+        } else {
+            // No worktree needed — start tmux immediately
+            await startTmuxSession(for: &session, path: request.path)
+        }
+    }
+
+    /// Creates the tmux session and updates the session status to .running.
+    private func startTmuxSession(for session: inout Session, path: String) async {
+        guard tmuxAvailable else { return }
+
+        let tmuxName = "runway-\(session.id)"
+        let command: String?
+        if session.tool == .claude {
+            command = ([session.tool.command] + session.permissionMode.cliFlags).joined(separator: " ")
+        } else if session.tool != .shell {
+            command = session.tool.command
+        } else {
+            command = nil
+        }
+
+        do {
+            try await tmuxManager.createSession(
+                name: tmuxName,
+                workDir: path,
+                command: command,
+                env: [
+                    "RUNWAY_SESSION_ID": session.id,
+                    "RUNWAY_TITLE": session.title,
+                ]
+            )
+            updateSessionStatus(id: session.id, status: .running)
+        } catch {
+            print("[Runway] Failed to create tmux session: \(error)")
+            statusMessage = .error("tmux session failed: \(error.localizedDescription)")
+            // Fall through — session still exists, TerminalPane will use direct spawn fallback
+        }
     }
 
     // MARK: - Session Lifecycle

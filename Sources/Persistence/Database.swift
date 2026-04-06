@@ -227,6 +227,15 @@ public final class Database: Sendable {
         }
     }
 
+    public func updateSessionPath(id: String, path: String) throws {
+        try dbQueue.write { db in
+            try db.execute(
+                sql: "UPDATE sessions SET path = ?, lastAccessedAt = ? WHERE id = ?",
+                arguments: [path, Date(), id]
+            )
+        }
+    }
+
     public func updateSessionSortOrder(id: String, sortOrder: Int) throws {
         try dbQueue.write { db in
             try db.execute(
