@@ -255,6 +255,10 @@ class TerminalContainerView: NSView {
 /// Installs a local event monitor that intercepts Shift+Enter and sends
 /// the CSI u escape sequence (\e[13;2u) that Claude Code recognizes as
 /// "insert newline" instead of "submit".
+///
+/// Uses view hierarchy traversal instead of firstResponder to find the
+/// terminal — SwiftUI's NavigationSplitView intermittently steals first
+/// responder, which would cause the cast to fail silently.
 @MainActor
 class ShiftEnterMonitor {
     static let shared = ShiftEnterMonitor()
@@ -265,7 +269,12 @@ class ShiftEnterMonitor {
         monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
             // Shift+Enter (keyCode 36 with shift)
             if event.keyCode == 36 && event.modifierFlags.contains(.shift) {
-                if let terminal = NSApplication.shared.keyWindow?.firstResponder as? LocalProcessTerminalView {
+                guard let window = NSApplication.shared.keyWindow else { return event }
+                if let terminal = Self.findTerminalView(in: window.contentView) {
+                    // Restore first responder so subsequent keypresses go directly
+                    if !(window.firstResponder === terminal) {
+                        window.makeFirstResponder(terminal)
+                    }
                     terminal.send(txt: "\u{1B}[13;2u")
                     return nil  // consumed
                 }
@@ -277,6 +286,19 @@ class ShiftEnterMonitor {
     func stop() {
         if let m = monitor { NSEvent.removeMonitor(m) }
         monitor = nil
+    }
+
+    private static func findTerminalView(in view: NSView?) -> LocalProcessTerminalView? {
+        guard let view else { return nil }
+        if let terminal = view as? LocalProcessTerminalView {
+            return terminal
+        }
+        for subview in view.subviews {
+            if let found = findTerminalView(in: subview) {
+                return found
+            }
+        }
+        return nil
     }
 }
 
