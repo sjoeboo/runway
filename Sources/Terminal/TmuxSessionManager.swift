@@ -58,6 +58,10 @@ public actor TmuxSessionManager {
             ";", "set-option", "-t", name, "status", "off",
             ";", "set-option", "-t", name, "mouse", "on",
             ";", "set-option", "-t", name, "history-limit", "50000",
+            // Enable CSI u (extended keys) so modifiers like Shift+Enter
+            // pass through to the application inside tmux (e.g., Claude Code
+            // recognises \e[13;2u as "insert newline" rather than "submit").
+            ";", "set-option", "-t", name, "extended-keys", "on",
         ]
 
         try await runTmux(args: args)
