@@ -20,6 +20,8 @@ public struct PRDashboardView: View {
     var onUpdateBranch: ((PullRequest, Bool) -> Void)?
     var onSendToSession: ((PullRequest, String) -> Void)?
     var onReviewPR: ((PullRequest) -> Void)?
+    var onEnableAutoMerge: ((PullRequest, MergeStrategy) -> Void)?
+    var onDisableAutoMerge: ((PullRequest) -> Void)?
 
     @AppStorage("prListWidth") private var prListWidth: Double = 380
     @AppStorage("hideDrafts") private var hideDrafts: Bool = false
@@ -45,7 +47,9 @@ public struct PRDashboardView: View {
         onToggleDraft: ((PullRequest) -> Void)? = nil,
         onUpdateBranch: ((PullRequest, Bool) -> Void)? = nil,
         onSendToSession: ((PullRequest, String) -> Void)? = nil,
-        onReviewPR: ((PullRequest) -> Void)? = nil
+        onReviewPR: ((PullRequest) -> Void)? = nil,
+        onEnableAutoMerge: ((PullRequest, MergeStrategy) -> Void)? = nil,
+        onDisableAutoMerge: ((PullRequest) -> Void)? = nil
     ) {
         self.pullRequests = pullRequests
         self.selectedPRID = selectedPRID
@@ -63,6 +67,8 @@ public struct PRDashboardView: View {
         self.onUpdateBranch = onUpdateBranch
         self.onSendToSession = onSendToSession
         self.onReviewPR = onReviewPR
+        self.onEnableAutoMerge = onEnableAutoMerge
+        self.onDisableAutoMerge = onDisableAutoMerge
     }
 
     private var selectedPR: PullRequest? {
@@ -279,6 +285,12 @@ public struct PRDashboardView: View {
                     },
                     onSendToSession: onSendToSession.map { callback in
                         { context in callback(pr, context) }
+                    },
+                    onEnableAutoMerge: onEnableAutoMerge.map { callback in
+                        { strategy in callback(pr, strategy) }
+                    },
+                    onDisableAutoMerge: onDisableAutoMerge.map { callback in
+                        { callback(pr) }
                     }
                 )
                 .frame(maxWidth: .infinity)

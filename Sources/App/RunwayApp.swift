@@ -357,6 +357,8 @@ struct ContentView: View {
                     onToggleDraftPR: { pr in Task { await store.togglePRDraft(pr) } },
                     onUpdateBranchPR: { pr, rebase in Task { await store.updatePRBranch(pr, rebase: rebase) } },
                     onReviewPR: { pr in store.reviewPR(pr) },
+                    onEnableAutoMergePR: { pr, strategy in Task { await store.enableAutoMerge(pr, strategy: strategy) } },
+                    onDisableAutoMergePR: { pr in Task { await store.disableAutoMerge(pr) } },
                     onUpdateProject: { store.updateProjectSettings($0) },
                     onDetectRepo: { await store.detectGHRepo(for: project) },
                     onFetchLabels: { Task { await store.fetchLabels(forProject: projectID) } }
@@ -392,7 +394,9 @@ struct ContentView: View {
                         store.showSendBar = true
                     }
                 },
-                onReviewPR: { pr in store.reviewPR(pr) }
+                onReviewPR: { pr in store.reviewPR(pr) },
+                onEnableAutoMerge: { pr, strategy in Task { await store.enableAutoMerge(pr, strategy: strategy) } },
+                onDisableAutoMerge: { pr in Task { await store.disableAutoMerge(pr) } }
             )
         }
     }

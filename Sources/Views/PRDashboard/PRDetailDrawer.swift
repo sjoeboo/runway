@@ -14,6 +14,8 @@ public struct PRDetailDrawer: View {
     let onToggleDraft: () -> Void
     var onUpdateBranch: ((Bool) -> Void)?
     var onSendToSession: ((String) -> Void)?
+    var onEnableAutoMerge: ((MergeStrategy) -> Void)?
+    var onDisableAutoMerge: (() -> Void)?
 
     @State private var selectedTab: PRDetailTab = .overview
     @State private var sheetCommentText: String = ""
@@ -41,7 +43,9 @@ public struct PRDetailDrawer: View {
         onMerge: @escaping (MergeStrategy) -> Void = { _ in },
         onToggleDraft: @escaping () -> Void = {},
         onUpdateBranch: ((Bool) -> Void)? = nil,
-        onSendToSession: ((String) -> Void)? = nil
+        onSendToSession: ((String) -> Void)? = nil,
+        onEnableAutoMerge: ((MergeStrategy) -> Void)? = nil,
+        onDisableAutoMerge: (() -> Void)? = nil
     ) {
         self.pr = pr
         self.detail = detail
@@ -53,6 +57,8 @@ public struct PRDetailDrawer: View {
         self.onMerge = onMerge
         self.onToggleDraft = onToggleDraft
         self.onUpdateBranch = onUpdateBranch
+        self.onEnableAutoMerge = onEnableAutoMerge
+        self.onDisableAutoMerge = onDisableAutoMerge
     }
 
     public var body: some View {
@@ -164,6 +170,8 @@ public struct PRDetailDrawer: View {
                     }
                     .menuStyle(.borderedButton)
                     .controlSize(.small)
+
+                    autoMergeButton
                 }
 
                 if let onSendToSession {
@@ -244,6 +252,36 @@ public struct PRDetailDrawer: View {
             }
         }
         .padding(12)
+    }
+
+    @ViewBuilder
+    private var autoMergeButton: some View {
+        let isEnabled = detail?.autoMergeEnabled ?? pr.autoMergeEnabled
+        if isEnabled {
+            if let onDisableAutoMerge {
+                Button {
+                    onDisableAutoMerge()
+                } label: {
+                    Label("Auto-merge", systemImage: "bolt.circle.fill")
+                }
+                .controlSize(.small)
+                .tint(theme.chrome.green)
+                .help("Auto-merge is enabled — click to disable")
+            }
+        } else if let onEnableAutoMerge {
+            Menu {
+                ForEach(MergeStrategy.allCases, id: \.self) { strategy in
+                    Button(strategy.displayName) {
+                        onEnableAutoMerge(strategy)
+                    }
+                }
+            } label: {
+                Label("Auto-merge", systemImage: "bolt.circle")
+            }
+            .menuStyle(.borderedButton)
+            .controlSize(.small)
+            .help("Enable auto-merge when checks and reviews pass")
+        }
     }
 
     private func detailChecksBar(_ checks: CheckSummary) -> some View {

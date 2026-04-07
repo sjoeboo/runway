@@ -12,12 +12,14 @@ public struct PREnrichResult: Sendable {
     public var changedFiles: Int
     public var mergeable: MergeableState?
     public var mergeStateStatus: MergeStateStatus?
+    public var autoMergeEnabled: Bool
 
     public init(
         checks: CheckSummary = CheckSummary(), reviewDecision: ReviewDecision = .none,
         headBranch: String = "", baseBranch: String = "",
         additions: Int = 0, deletions: Int = 0, changedFiles: Int = 0,
-        mergeable: MergeableState? = nil, mergeStateStatus: MergeStateStatus? = nil
+        mergeable: MergeableState? = nil, mergeStateStatus: MergeStateStatus? = nil,
+        autoMergeEnabled: Bool = false
     ) {
         self.checks = checks
         self.reviewDecision = reviewDecision
@@ -28,6 +30,7 @@ public struct PREnrichResult: Sendable {
         self.changedFiles = changedFiles
         self.mergeable = mergeable
         self.mergeStateStatus = mergeStateStatus
+        self.autoMergeEnabled = autoMergeEnabled
     }
 }
 
@@ -117,7 +120,7 @@ public actor PRManager {
                 "pr", "view", "\(number)",
                 "--repo", repo,
                 "--json",
-                "statusCheckRollup,reviewDecision,headRefName,baseRefName,additions,deletions,changedFiles,mergeable,mergeStateStatus",
+                "statusCheckRollup,reviewDecision,headRefName,baseRefName,additions,deletions,changedFiles,mergeable,mergeStateStatus,autoMergeRequest",
             ], host: host)
         guard let data = output.data(using: .utf8) else {
             return PREnrichResult()
@@ -133,7 +136,7 @@ public actor PRManager {
                 "pr", "view", "\(number)",
                 "--repo", repo,
                 "--json",
-                "body,reviews,comments,files,statusCheckRollup,reviewDecision,headRefName,baseRefName,additions,deletions,changedFiles,mergeable,mergeStateStatus",
+                "body,reviews,comments,files,statusCheckRollup,reviewDecision,headRefName,baseRefName,additions,deletions,changedFiles,mergeable,mergeStateStatus,autoMergeRequest",
             ], host: host)
         var detail = try parsePRDetail(output)
 
@@ -228,6 +231,22 @@ public actor PRManager {
     public func merge(repo: String, number: Int, strategy: MergeStrategy = .squash, host: String? = nil) async throws {
         try await runGH(
             args: ["pr", "merge", "\(number)", "--repo", repo, strategy.cliFlag, "--delete-branch"],
+            host: host
+        )
+    }
+
+    /// Enable auto-merge on a PR with the specified strategy.
+    public func enableAutoMerge(repo: String, number: Int, strategy: MergeStrategy = .squash, host: String? = nil) async throws {
+        try await runGH(
+            args: ["pr", "merge", "\(number)", "--repo", repo, strategy.cliFlag, "--auto"],
+            host: host
+        )
+    }
+
+    /// Disable auto-merge on a PR.
+    public func disableAutoMerge(repo: String, number: Int, host: String? = nil) async throws {
+        try await runGH(
+            args: ["pr", "merge", "\(number)", "--repo", repo, "--disable-auto"],
             host: host
         )
     }
@@ -556,6 +575,7 @@ private struct GHPRDetailResponse: Decodable {
     let changedFiles: Int?
     let mergeable: String?
     let mergeStateStatus: String?
+    let autoMergeRequest: GHAutoMergeRequest?
 
     func toPRDetail() -> PRDetail {
         let rollup = statusCheckRollup ?? []
@@ -594,7 +614,8 @@ private struct GHPRDetailResponse: Decodable {
             deletions: deletions ?? 0,
             changedFiles: changedFiles ?? 0,
             mergeable: MergeableState(rawValue: mergeable ?? ""),
-            mergeStateStatus: MergeStateStatus(rawValue: mergeStateStatus ?? "")
+            mergeStateStatus: MergeStateStatus(rawValue: mergeStateStatus ?? ""),
+            autoMergeEnabled: autoMergeRequest != nil
         )
     }
 
@@ -674,6 +695,7 @@ private struct GHEnrichResponse: Decodable {
     let changedFiles: Int?
     let mergeable: String?
     let mergeStateStatus: String?
+    let autoMergeRequest: GHAutoMergeRequest?
 
     func toEnrichResult() -> PREnrichResult {
         let checks = parseChecks(statusCheckRollup ?? [])
@@ -689,9 +711,16 @@ private struct GHEnrichResponse: Decodable {
             headBranch: headRefName ?? "", baseBranch: baseRefName ?? "",
             additions: additions ?? 0, deletions: deletions ?? 0, changedFiles: changedFiles ?? 0,
             mergeable: MergeableState(rawValue: mergeable ?? ""),
-            mergeStateStatus: MergeStateStatus(rawValue: mergeStateStatus ?? "")
+            mergeStateStatus: MergeStateStatus(rawValue: mergeStateStatus ?? ""),
+            autoMergeEnabled: autoMergeRequest != nil
         )
     }
+}
+
+/// Auto-merge request — presence indicates auto-merge is enabled.
+private struct GHAutoMergeRequest: Decodable {
+    let enabledAt: String?
+    let mergeMethod: String?
 }
 
 private struct GHFile: Decodable {

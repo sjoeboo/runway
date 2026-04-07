@@ -17,6 +17,8 @@ public struct ProjectPRsTab: View {
     var onToggleDraft: ((PullRequest) -> Void)?
     var onUpdateBranch: ((PullRequest, Bool) -> Void)?
     var onReviewPR: ((PullRequest) -> Void)?
+    var onEnableAutoMerge: ((PullRequest, MergeStrategy) -> Void)?
+    var onDisableAutoMerge: ((PullRequest) -> Void)?
 
     @AppStorage("hideDrafts") private var hideDrafts: Bool = false
     @Environment(\.theme) private var theme
@@ -33,7 +35,9 @@ public struct ProjectPRsTab: View {
         onMerge: ((PullRequest, MergeStrategy) -> Void)? = nil,
         onToggleDraft: ((PullRequest) -> Void)? = nil,
         onUpdateBranch: ((PullRequest, Bool) -> Void)? = nil,
-        onReviewPR: ((PullRequest) -> Void)? = nil
+        onReviewPR: ((PullRequest) -> Void)? = nil,
+        onEnableAutoMerge: ((PullRequest, MergeStrategy) -> Void)? = nil,
+        onDisableAutoMerge: ((PullRequest) -> Void)? = nil
     ) {
         self.pullRequests = pullRequests
         self.onSelectPR = onSelectPR
@@ -47,6 +51,8 @@ public struct ProjectPRsTab: View {
         self.onToggleDraft = onToggleDraft
         self.onUpdateBranch = onUpdateBranch
         self.onReviewPR = onReviewPR
+        self.onEnableAutoMerge = onEnableAutoMerge
+        self.onDisableAutoMerge = onDisableAutoMerge
     }
 
     private var selectedPR: PullRequest? {
@@ -113,6 +119,12 @@ public struct ProjectPRsTab: View {
                         onToggleDraft: { onToggleDraft?(pr) },
                         onUpdateBranch: onUpdateBranch.map { callback in
                             { rebase in callback(pr, rebase) }
+                        },
+                        onEnableAutoMerge: onEnableAutoMerge.map { callback in
+                            { strategy in callback(pr, strategy) }
+                        },
+                        onDisableAutoMerge: onDisableAutoMerge.map { callback in
+                            { callback(pr) }
                         }
                     )
                 }

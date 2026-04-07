@@ -787,6 +787,7 @@ public final class RunwayStore {
         pr.changedFiles = result.changedFiles
         pr.mergeable = result.mergeable
         pr.mergeStateStatus = result.mergeStateStatus
+        pr.autoMergeEnabled = result.autoMergeEnabled
         pr.enrichedAt = Date()
     }
 
@@ -994,6 +995,28 @@ public final class RunwayStore {
             await refreshPRAfterAction(pr)
         } catch {
             statusMessage = .error("Draft toggle failed: \(error.localizedDescription)")
+        }
+    }
+
+    func enableAutoMerge(_ pr: PullRequest, strategy: MergeStrategy = .squash) async {
+        let host = prManager.hostFromURL(pr.url)
+        do {
+            try await prManager.enableAutoMerge(repo: pr.repo, number: pr.number, strategy: strategy, host: host)
+            statusMessage = .success("Auto-merge enabled for #\(pr.number)")
+            await refreshPRAfterAction(pr)
+        } catch {
+            statusMessage = .error("Auto-merge failed: \(error.localizedDescription)")
+        }
+    }
+
+    func disableAutoMerge(_ pr: PullRequest) async {
+        let host = prManager.hostFromURL(pr.url)
+        do {
+            try await prManager.disableAutoMerge(repo: pr.repo, number: pr.number, host: host)
+            statusMessage = .success("Auto-merge disabled for #\(pr.number)")
+            await refreshPRAfterAction(pr)
+        } catch {
+            statusMessage = .error("Disable auto-merge failed: \(error.localizedDescription)")
         }
     }
 
