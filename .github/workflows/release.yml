@@ -86,8 +86,11 @@ jobs:
           # Verify archive exists
           ls -la "$ARCHIVE"
 
-          # sign_update reads SPARKLE_PRIVATE_KEY from the environment
-          SIGN_OUTPUT=$("${{ steps.sparkle.outputs.bin }}/sign_update" "$ARCHIVE")
+          # Write key to temp file — sign_update requires --ed-key-file on CI (no Keychain)
+          KEY_FILE=$(mktemp)
+          printenv SPARKLE_PRIVATE_KEY > "$KEY_FILE"
+          SIGN_OUTPUT=$("${{ steps.sparkle.outputs.bin }}/sign_update" "$ARCHIVE" --ed-key-file "$KEY_FILE")
+          rm -f "$KEY_FILE"
           echo "signature=$SIGN_OUTPUT" >> "$GITHUB_OUTPUT"
           echo "Signed: $SIGN_OUTPUT"
 
@@ -104,10 +107,17 @@ jobs:
           mkdir -p /tmp/appcast-archives
           cp "build/Runway-${VERSION}-universal.app.zip" /tmp/appcast-archives/
 
+          # Write key to temp file — no Keychain on CI
+          KEY_FILE=$(mktemp)
+          printenv SPARKLE_PRIVATE_KEY > "$KEY_FILE"
+
           "${{ steps.sparkle.outputs.bin }}/generate_appcast" \
+            --ed-key-file "$KEY_FILE" \
             --download-url-prefix "https://github.com/${REPO}/releases/download/${TAG}/" \
             --link "https://github.com/${REPO}/releases" \
             /tmp/appcast-archives/
+
+          rm -f "$KEY_FILE"
 
           cp /tmp/appcast-archives/appcast.xml build/appcast.xml
           echo "Generated appcast.xml"
