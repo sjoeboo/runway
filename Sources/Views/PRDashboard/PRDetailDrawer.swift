@@ -312,6 +312,9 @@ public struct PRDetailDrawer: View {
         switch tab {
         case .overview:
             return "Overview"
+        case .checks:
+            let checks = detail?.checks ?? pr.checks
+            return checks.total > 0 ? "Checks (\(checks.total))" : "Checks"
         case .diff:
             let count = detail?.files.count ?? pr.changedFiles
             return count > 0 ? "Diff (\(count))" : "Diff"
@@ -328,6 +331,8 @@ public struct PRDetailDrawer: View {
         switch selectedTab {
         case .overview:
             overviewTab
+        case .checks:
+            checksTab
         case .diff:
             diffTab
         case .conversation:
@@ -351,6 +356,101 @@ public struct PRDetailDrawer: View {
             }
             .padding(12)
             .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+
+    private var checksTab: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 2) {
+                if let runs = detail?.checkRuns, !runs.isEmpty {
+                    // Summary bar at top
+                    let checks = detail?.checks ?? pr.checks
+                    detailChecksBar(checks)
+                        .padding(.bottom, 8)
+
+                    ForEach(runs) { run in
+                        checkRunRow(run)
+                    }
+                } else {
+                    let checks = detail?.checks ?? pr.checks
+                    if checks.total > 0 {
+                        // Have summary counts but no individual runs yet
+                        detailChecksBar(checks)
+                            .padding(.bottom, 8)
+                        Text("Loading check details…")
+                            .foregroundStyle(.secondary)
+                            .italic()
+                    } else {
+                        EmptyStateView(
+                            title: "No Checks",
+                            subtitle: "No CI checks are configured for this PR",
+                            systemImage: "checkmark.shield"
+                        )
+                    }
+                }
+            }
+            .padding(12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+
+    private func checkRunRow(_ run: CheckRun) -> some View {
+        HStack(spacing: 8) {
+            checkStatusIcon(run.status)
+                .frame(width: 16)
+
+            Text(run.name)
+                .font(.callout)
+                .lineLimit(1)
+                .truncationMode(.middle)
+
+            Spacer()
+
+            Text(run.status.label)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            if let urlString = run.detailsURL, let url = URL(string: urlString) {
+                Button {
+                    NSWorkspace.shared.open(url)
+                } label: {
+                    Image(systemName: "arrow.up.right.square")
+                        .font(.caption)
+                        .foregroundColor(theme.chrome.accent)
+                }
+                .buttonStyle(.plain)
+                .help("Open check details")
+            }
+        }
+        .padding(.vertical, 6)
+        .padding(.horizontal, 8)
+        .background(checkRunBackground(run.status))
+        .cornerRadius(6)
+    }
+
+    @ViewBuilder
+    private func checkStatusIcon(_ status: CheckStatus) -> some View {
+        switch status {
+        case .passed:
+            Image(systemName: "checkmark.circle.fill")
+                .foregroundColor(theme.chrome.green)
+        case .failed:
+            Image(systemName: "xmark.circle.fill")
+                .foregroundColor(theme.chrome.red)
+        case .pending:
+            Image(systemName: "clock.fill")
+                .foregroundColor(theme.chrome.yellow)
+        }
+    }
+
+    private func checkRunBackground(_ status: CheckStatus) -> some View {
+        switch status {
+        case .failed:
+            return theme.chrome.red.opacity(0.08)
+        case .pending:
+            return theme.chrome.yellow.opacity(0.05)
+        case .passed:
+            return theme.chrome.surface.opacity(1.0)
         }
     }
 
@@ -608,6 +708,7 @@ public struct PRDetailDrawer: View {
 
 enum PRDetailTab: String, CaseIterable {
     case overview
+    case checks
     case diff
     case conversation
 }
