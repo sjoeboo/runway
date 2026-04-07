@@ -212,7 +212,7 @@ private func withTempGitRepo(_ body: (String) async throws -> Void) async throws
     }
 }
 
-@Test func pruneWorktreesRemovesStaleLockfile() async throws {
+@Test func pruneWorktreesRemovesStaleReference() async throws {
     try await withTempGitRepo { repoPath in
         let manager = WorktreeManager()
         let currentBranch = await manager.currentBranch(path: repoPath) ?? "main"
