@@ -36,6 +36,12 @@ public struct HookInjector: Sendable {
         let dir = configDir ?? defaultClaudeConfigDir()
         let settingsPath = "\(dir)/settings.json"
 
+        return try withSettingsLock(path: settingsPath) {
+            try _inject(port: port, settingsPath: settingsPath, configDir: dir, force: force)
+        }
+    }
+
+    private func _inject(port: UInt16, settingsPath: String, configDir dir: String, force: Bool) throws -> Bool {
         // Read existing settings (or start fresh)
         var rawSettings = try readSettings(at: settingsPath)
 
@@ -80,18 +86,20 @@ public struct HookInjector: Sendable {
         let dir = configDir ?? defaultClaudeConfigDir()
         let settingsPath = "\(dir)/settings.json"
 
-        var rawSettings = try readSettings(at: settingsPath)
-        guard var hooks = rawSettings["hooks"] as? [String: Any] else { return }
+        try withSettingsLock(path: settingsPath) {
+            var rawSettings = try readSettings(at: settingsPath)
+            guard var hooks = rawSettings["hooks"] as? [String: Any] else { return }
 
-        removeExistingHooks(from: &hooks)
+            removeExistingHooks(from: &hooks)
 
-        if hooks.isEmpty {
-            rawSettings.removeValue(forKey: "hooks")
-        } else {
-            rawSettings["hooks"] = hooks
+            if hooks.isEmpty {
+                rawSettings.removeValue(forKey: "hooks")
+            } else {
+                rawSettings["hooks"] = hooks
+            }
+
+            try writeSettings(rawSettings, to: settingsPath, configDir: dir)
         }
-
-        try writeSettings(rawSettings, to: settingsPath, configDir: dir)
     }
 
     /// Check if hooks are currently installed.
@@ -135,6 +143,20 @@ public struct HookInjector: Sendable {
         )
 
         try data.write(to: URL(fileURLWithPath: path), options: .atomic)
+    }
+
+    /// Acquire an exclusive advisory lock on settings.json for the duration of a closure.
+    /// Prevents race conditions with Claude Code or other processes writing concurrently.
+    private func withSettingsLock<T>(path: String, body: () throws -> T) throws -> T {
+        let lockPath = path + ".lock"
+        let lockFD = open(lockPath, O_CREAT | O_WRONLY, 0o644)
+        guard lockFD >= 0 else { return try body() }
+        defer {
+            flock(lockFD, LOCK_UN)
+            close(lockFD)
+        }
+        flock(lockFD, LOCK_EX)
+        return try body()
     }
 
     private func httpHooksInstalled(in hooks: [String: Any], url: String?) -> Bool {

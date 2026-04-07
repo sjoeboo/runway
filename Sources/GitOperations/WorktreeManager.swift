@@ -64,6 +64,12 @@ public actor WorktreeManager {
                     "worktree", "add", "--track", "-b", sanitized, worktreePath, "origin/\(branch)",
                 ])
         } catch {
+            // Clean up partial directory from failed attempt before retry
+            if FileManager.default.fileExists(atPath: worktreePath) {
+                try? FileManager.default.removeItem(atPath: worktreePath)
+                // Prune stale worktree references
+                try? await runGit(in: repoPath, args: ["worktree", "prune"])
+            }
             // Fallback: local branch already exists — reuse it
             try await runGit(
                 in: repoPath,

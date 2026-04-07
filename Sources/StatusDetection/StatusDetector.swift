@@ -122,24 +122,52 @@ public struct StatusDetector: Sendable {
     // MARK: - ANSI Stripping
 
     /// Strip ANSI escape sequences from terminal output.
-    /// Optimized O(n) implementation (ported from Hangar's fixed O(n) version).
+    /// Handles CSI sequences (ESC[...letter), OSC sequences (ESC]...BEL/ST),
+    /// and other escape types. O(n) state machine.
     private func stripANSI(_ input: String) -> String {
+        enum State { case normal, escSeen, inCSI, inOSC }
         var result = ""
         result.reserveCapacity(input.count)
-        var inEscape = false
+        var state = State.normal
 
         for char in input {
-            if inEscape {
-                if char.isLetter || char == "m" || char == "H" || char == "J" || char == "K" {
-                    inEscape = false
+            switch state {
+            case .normal:
+                if char == "\u{1B}" {
+                    state = .escSeen
+                } else if char == "\u{07}" {
+                    // Stray BEL — skip
+                } else {
+                    result.append(char)
                 }
-                continue
+            case .escSeen:
+                // Character immediately after ESC determines sequence type
+                if char == "[" {
+                    state = .inCSI
+                } else if char == "]" {
+                    state = .inOSC
+                } else if char.isLetter {
+                    // Two-character escape (e.g., ESC M) — done
+                    state = .normal
+                } else {
+                    // Other escape introducer — treat as CSI-like
+                    state = .inCSI
+                }
+            case .inCSI:
+                // CSI terminates on a letter (final byte 0x40-0x7E)
+                if char.isLetter || char == "m" || char == "H" || char == "J" || char == "K" || char == "~" {
+                    state = .normal
+                }
+            case .inOSC:
+                // OSC terminates on BEL or ST (ESC \)
+                if char == "\u{07}" {
+                    state = .normal
+                } else if char == "\u{1B}" {
+                    // Could be start of ST (ESC \) — peek handled: next char
+                    // will be '\' which terminates, or another escape starts
+                    state = .escSeen
+                }
             }
-            if char == "\u{1B}" {
-                inEscape = true
-                continue
-            }
-            result.append(char)
         }
         return result
     }

@@ -173,34 +173,31 @@ public struct TerminalTabView: View {
     private func tabButton(_ tab: TerminalTab) -> some View {
         let isSelected = tab.id == selectedTabID
 
-        return Button {
-            selectedTabID = tab.id
-        } label: {
-            HStack(spacing: 4) {
-                if tab.isMain {
-                    Image(systemName: "terminal")
-                        .font(.caption2)
-                }
-                Text(tab.title)
-                    .font(.caption)
-                    .lineLimit(1)
-
-                if !tab.isMain && tabs.count > 1 {
-                    Button(action: { closeTab(tab.id) }) {
-                        Image(systemName: "xmark")
-                            .font(.caption2.weight(.bold))
-                            .foregroundColor(theme.chrome.textDim)
-                    }
-                    .buttonStyle(.plain)
-                }
+        return HStack(spacing: 4) {
+            if tab.isMain {
+                Image(systemName: "terminal")
+                    .font(.caption2)
             }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 5)
-            .background(isSelected ? theme.chrome.background : theme.chrome.surface)
-            .foregroundColor(isSelected ? theme.chrome.text : theme.chrome.textDim)
-            .cornerRadius(4)
+            Text(tab.title)
+                .font(.caption)
+                .lineLimit(1)
+
+            if !tab.isMain && tabs.count > 1 {
+                Button(action: { closeTab(tab.id) }) {
+                    Image(systemName: "xmark")
+                        .font(.caption2.weight(.bold))
+                        .foregroundColor(theme.chrome.textDim)
+                }
+                .buttonStyle(.plain)
+            }
         }
-        .buttonStyle(.plain)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 5)
+        .background(isSelected ? theme.chrome.background : theme.chrome.surface)
+        .foregroundColor(isSelected ? theme.chrome.text : theme.chrome.textDim)
+        .cornerRadius(4)
+        .contentShape(Rectangle())
+        .onTapGesture { selectedTabID = tab.id }
     }
 
     // MARK: - Tab Management

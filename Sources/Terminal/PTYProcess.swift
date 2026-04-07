@@ -74,6 +74,14 @@ public final class PTYProcess: @unchecked Sendable {
                 _exit(1)
             }
 
+            // Close inherited file descriptors (database, sockets, hook server port)
+            // to prevent the child from holding parent resources open.
+            // FDs 0-2 (stdin/stdout/stderr) are the PTY slave, keep those.
+            let maxFD = getdtablesize()
+            for fd in Int32(3)..<maxFD {
+                close(fd)
+            }
+
             // Set environment
             for (key, value) in env {
                 setenv(key, value, 1)

@@ -22,7 +22,6 @@ public final class RunwayStore {
     var selectedSessionID: String?
     /// Incremented on every selection change to force SwiftUI re-render
     /// when selectedSessionID goes nil→nil (no-op for @Observable).
-    var selectionVersion: Int = 0
     var selectedPRID: String?
     var prDetail: PRDetail?
     var prTab: PRTab = .mine
@@ -569,7 +568,6 @@ public final class RunwayStore {
     public func selectProject(_ projectID: String?) {
         selectedProjectID = projectID
         selectedSessionID = nil
-        selectionVersion += 1
         if currentView == .prs {
             currentView = .sessions
         }
@@ -578,7 +576,6 @@ public final class RunwayStore {
     public func selectSession(_ sessionID: String?) {
         selectedSessionID = sessionID
         selectedProjectID = nil
-        selectionVersion += 1
         if currentView == .prs {
             currentView = .sessions
         }

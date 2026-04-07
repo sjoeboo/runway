@@ -322,8 +322,6 @@ struct ContentView: View {
     @ViewBuilder
     private var detail: some View {
         detailContent
-            // Force re-render when selectionVersion changes (fixes nil→nil no-op on first launch)
-            .id(store.selectionVersion)
             .onChange(of: store.selectedSessionID) { _, newValue in
                 // When a session is selected (e.g. via List selection binding),
                 // clear selectedProjectID so the session detail takes priority.
@@ -429,7 +427,9 @@ struct ContentView: View {
             } else {
                 EmptyStateView(
                     title: "No Session Selected",
-                    subtitle: "Select a session from the sidebar or press ⌘N to create one"
+                    subtitle: "Select a session from the sidebar or press ⌘N to create one",
+                    actionTitle: store.projects.isEmpty ? "Add Your First Project" : nil,
+                    onAction: store.projects.isEmpty ? { store.showNewProjectDialog = true } : nil
                 )
             }
         case .prs:

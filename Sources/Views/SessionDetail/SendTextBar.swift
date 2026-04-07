@@ -21,9 +21,14 @@ public struct SendTextBar: View {
     public var body: some View {
         if isVisible {
             HStack(spacing: 8) {
-                Image(systemName: "text.cursor")
-                    .foregroundColor(theme.chrome.accent)
-                    .font(.caption)
+                HStack(spacing: 4) {
+                    Image(systemName: "text.cursor")
+                        .foregroundColor(theme.chrome.accent)
+                        .font(.caption)
+                    Text("Claude")
+                        .font(.caption2)
+                        .foregroundColor(theme.chrome.textDim)
+                }
 
                 TextField("Send to session…", text: $text)
                     .textFieldStyle(.plain)

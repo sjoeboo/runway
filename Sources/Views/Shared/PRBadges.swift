@@ -232,6 +232,7 @@ public struct SessionStatusIndicator: View {
 
     public var body: some View {
         indicator
+            .help(accessibilityLabel)
             .accessibilityLabel(accessibilityLabel)
     }
 

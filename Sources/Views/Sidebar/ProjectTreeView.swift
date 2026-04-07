@@ -186,6 +186,7 @@ struct ProjectSection: View {
     @State private var isHeaderHovered = false
     @State private var isRenaming = false
     @State private var editName: String = ""
+    @State private var showDeleteConfirmation = false
     @Environment(\.theme) private var theme
 
     init(
@@ -307,10 +308,22 @@ struct ProjectSection: View {
             Divider()
 
             Button(role: .destructive) {
-                actions.deleteProject(id: project.id)
+                showDeleteConfirmation = true
             } label: {
                 Label("Remove Project", systemImage: "folder.badge.minus")
             }
+        }
+        .confirmationDialog(
+            "Remove \"\(project.name)\"?",
+            isPresented: $showDeleteConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button("Remove Project and Sessions", role: .destructive) {
+                actions.deleteProject(id: project.id)
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This will remove the project and all its sessions from Runway. Worktrees on disk will not be deleted.")
         }
     }
 }
@@ -429,9 +442,6 @@ struct SessionRowView: View {
             }
         }
         .padding(.vertical, 4)
-        .onTapGesture {
-            actions.selectSession(session.id)
-        }
         .onHover { hovering in
             isHovered = hovering
         }
