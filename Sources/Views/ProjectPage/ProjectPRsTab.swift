@@ -21,6 +21,7 @@ public struct ProjectPRsTab: View {
     var onDisableAutoMerge: ((PullRequest) -> Void)?
 
     @AppStorage("hideDrafts") private var hideDrafts: Bool = false
+    @AppStorage("projectPRListWidth") private var projectPRListWidth: Double = 320
     @Environment(\.theme) private var theme
 
     public init(
@@ -106,8 +107,8 @@ public struct ProjectPRsTab: View {
             } else if let pr = selectedPR {
                 HStack(spacing: 0) {
                     prList
-                        .frame(maxWidth: 320)
-                    Divider()
+                        .frame(maxWidth: CGFloat(projectPRListWidth))
+                    ResizableDivider(width: $projectPRListWidth)
                     PRDetailDrawer(
                         pr: pr,
                         detail: detail,
