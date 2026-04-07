@@ -128,25 +128,25 @@ public struct ProjectTreeView: View {
         .safeAreaInset(edge: .top) {
             HStack(spacing: 6) {
                 Image(systemName: "magnifyingglass")
-                    .font(.caption)
+                    .font(.callout)
                     .foregroundColor(theme.chrome.textDim)
                 TextField("Search sessions…", text: $searchQuery)
                     .textFieldStyle(.plain)
-                    .font(.caption)
+                    .font(.callout)
                     .focused($isSearchFocused)
                 if !searchQuery.isEmpty {
                     Button {
                         searchQuery = ""
                     } label: {
                         Image(systemName: "xmark.circle.fill")
-                            .font(.caption2)
+                            .font(.caption)
                             .foregroundColor(theme.chrome.textDim)
                     }
                     .buttonStyle(.plain)
                 }
             }
             .padding(.horizontal, 12)
-            .padding(.vertical, 6)
+            .padding(.vertical, 8)
             .background(theme.chrome.surface)
         }
         .onChange(of: focusSearch) { _, focused in
@@ -161,14 +161,14 @@ public struct ProjectTreeView: View {
                     actions.newProject()
                 } label: {
                     Label("Add Project", systemImage: "folder.badge.plus")
-                        .font(.caption)
+                        .font(.callout)
                         .foregroundColor(theme.chrome.textDim)
                 }
                 .buttonStyle(.plain)
                 Spacer()
             }
             .padding(.horizontal, 16)
-            .padding(.vertical, 8)
+            .padding(.vertical, 10)
             .background(theme.chrome.surface)
         }
     }
@@ -260,14 +260,15 @@ struct ProjectSection: View {
                 }
                 Spacer()
 
-                if isHeaderHovered && !isRenaming {
+                if !isRenaming {
                     Button {
                         actions.newSession(projectID: project.id, parentID: nil)
                     } label: {
                         Image(systemName: "plus")
-                            .font(.caption)
-                            .foregroundColor(theme.chrome.textDim)
-                            .frame(width: 22, height: 22)
+                            .font(.callout)
+                            .foregroundColor(isHeaderHovered ? theme.chrome.text : theme.chrome.textDim)
+                            .frame(width: 26, height: 26)
+                            .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
                     .help("New session in \(project.name)")
@@ -346,7 +347,7 @@ struct SessionRowView: View {
                 } else {
                     Text(session.title)
                         .font(.system(.body, design: .default))
-                        .foregroundColor(theme.chrome.text)
+                        .foregroundStyle(.primary)
                 }
                 if isProvisioningWorktree {
                     HStack(spacing: 4) {
@@ -354,12 +355,12 @@ struct SessionRowView: View {
                             .controlSize(.mini)
                         Text("Creating worktree\u{2026}")
                             .font(.caption)
-                            .foregroundColor(theme.chrome.textDim)
+                            .foregroundStyle(.secondary)
                     }
                 } else if let branch = session.worktreeBranch {
                     Text(branch)
                         .font(.caption)
-                        .foregroundColor(theme.chrome.textDim)
+                        .foregroundStyle(.secondary)
                 }
                 // Linked PR info
                 if let pr = linkedPR {
@@ -387,7 +388,7 @@ struct SessionRowView: View {
                         if pr.isDraft {
                             Text("Draft")
                                 .font(.caption2)
-                                .foregroundColor(theme.chrome.textDim)
+                                .foregroundStyle(.secondary)
                         }
                     }
                 }
@@ -395,14 +396,14 @@ struct SessionRowView: View {
             Spacer()
 
             if isHovered {
-                HStack(spacing: 2) {
+                HStack(spacing: 4) {
                     Button {
                         Task { await actions.restartSession(id: session.id) }
                     } label: {
                         Image(systemName: "arrow.counterclockwise")
-                            .font(.caption)
-                            .foregroundColor(theme.chrome.textDim)
-                            .frame(width: 22, height: 22)
+                            .font(.callout)
+                            .foregroundStyle(.secondary)
+                            .frame(width: 26, height: 26)
                     }
                     .buttonStyle(.plain)
                     .help("Restart session")
@@ -411,9 +412,9 @@ struct SessionRowView: View {
                         showDeleteConfirmation = true
                     } label: {
                         Image(systemName: "trash")
-                            .font(.caption)
-                            .foregroundColor(theme.chrome.textDim)
-                            .frame(width: 22, height: 22)
+                            .font(.callout)
+                            .foregroundStyle(.secondary)
+                            .frame(width: 26, height: 26)
                     }
                     .buttonStyle(.plain)
                     .help("Delete session")
@@ -427,7 +428,7 @@ struct SessionRowView: View {
                     .cornerRadius(4)
             }
         }
-        .padding(.vertical, 2)
+        .padding(.vertical, 4)
         .onTapGesture {
             actions.selectSession(session.id)
         }

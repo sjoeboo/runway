@@ -259,16 +259,16 @@ public final class RunwayStore {
                 provisioningWorktreeIDs.remove(session.id)
 
                 // Now start the tmux session with the resolved path
-                await startTmuxSession(for: &session, path: sessionPath)
+                await startTmuxSession(for: &session, path: sessionPath, initialPrompt: request.initialPrompt)
             }
         } else {
             // No worktree needed — start tmux immediately
-            await startTmuxSession(for: &session, path: request.path)
+            await startTmuxSession(for: &session, path: request.path, initialPrompt: request.initialPrompt)
         }
     }
 
     /// Creates the tmux session and updates the session status to .running.
-    private func startTmuxSession(for session: inout Session, path: String) async {
+    private func startTmuxSession(for session: inout Session, path: String, initialPrompt: String? = nil) async {
         guard tmuxAvailable else {
             updateSessionStatus(id: session.id, status: .error)
             statusMessage = .error("tmux not found — install it with: brew install tmux")
@@ -296,6 +296,11 @@ public final class RunwayStore {
                 ]
             )
             updateSessionStatus(id: session.id, status: .running)
+
+            if let prompt = initialPrompt, !prompt.isEmpty {
+                try? await Task.sleep(for: .milliseconds(500))
+                try? await tmuxManager.sendText(sessionName: tmuxName, text: prompt)
+            }
         } catch {
             print("[Runway] Failed to create tmux session: \(error)")
             updateSessionStatus(id: session.id, status: .error)

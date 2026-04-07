@@ -42,12 +42,12 @@ public struct CheckSummaryBadge: View {
                             .foregroundColor(theme.chrome.yellow)
                     }
                 }
-                .font(style == .compact ? .caption2 : .caption2)
+                .font(style == .compact ? .caption : .caption)
                 Text("\(checks.passed)/\(checks.total)")
-                    .font(style == .compact ? .caption2 : .caption)
-                    .foregroundColor(style == .compact ? nil : theme.chrome.textDim)
+                    .font(style == .compact ? .caption : .callout)
+                    .foregroundStyle(style == .compact ? .secondary : .secondary)
             }
-            .font(style == .compact ? .caption2 : nil)
+            .font(style == .compact ? .caption : nil)
         }
     }
 }
@@ -98,15 +98,15 @@ public struct ReviewDecisionBadge: View {
         switch decision {
         case .approved:
             Label("Approved", systemImage: "checkmark")
-                .font(.caption2)
+                .font(.caption)
                 .foregroundColor(theme.chrome.green)
         case .changesRequested:
             Label("Changes", systemImage: "exclamationmark.triangle")
-                .font(.caption2)
+                .font(.caption)
                 .foregroundColor(theme.chrome.orange)
         case .pending:
             Label("Review", systemImage: "clock")
-                .font(.caption2)
+                .font(.caption)
                 .foregroundColor(theme.chrome.yellow)
         case .none:
             EmptyView()
@@ -131,10 +131,10 @@ public struct ReviewDecisionBadge: View {
 
     private func capsuleText(_ text: String, color: Color) -> some View {
         Text(text)
-            .font(.caption2)
+            .font(.caption)
             .fontWeight(.medium)
             .foregroundColor(color)
-            .padding(.horizontal, 5)
+            .padding(.horizontal, 6)
             .padding(.vertical, 2)
             .background(color.opacity(0.15))
             .clipShape(Capsule())
@@ -147,11 +147,11 @@ public struct ReviewDecisionBadge: View {
         switch decision {
         case .approved:
             Image(systemName: "checkmark")
-                .font(.caption2)
+                .font(.caption)
                 .foregroundColor(theme.chrome.green)
         case .changesRequested:
             Image(systemName: "exclamationmark.triangle")
-                .font(.caption2)
+                .font(.caption)
                 .foregroundColor(theme.chrome.orange)
         case .pending, .none:
             EmptyView()
