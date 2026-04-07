@@ -10,7 +10,7 @@ let package = Package(
         .executable(name: "Runway", targets: ["App"]),
     ],
     dependencies: [
-        .package(url: "https://github.com/groue/GRDB.swift.git", from: "7.4.0"),
+        .package(url: "https://github.com/groue/GRDB.swift.git", from: "7.10.0"),
         .package(url: "https://github.com/migueldeicaza/SwiftTerm.git", revision: "b6ce28a"),
         .package(url: "https://github.com/sparkle-project/Sparkle", from: "2.0.0"),
     ],
