@@ -7,6 +7,8 @@ public struct DiffView: View {
     let files: [DiffFile]
     @State private var expandedFiles: Set<String>
     @Environment(\.theme) private var theme
+    @AppStorage("terminalFontFamily") private var fontFamily: String = "MesloLGS Nerd Font"
+    @AppStorage("terminalFontSize") private var fontSize: Double = 13
 
     public init(files: [DiffFile]) {
         self.files = files
@@ -35,7 +37,7 @@ public struct DiffView: View {
                 }
             }
         }
-        .font(.system(.body, design: .monospaced))
+        .font(.custom(fontFamily, size: fontSize))
     }
 
     private var diffSummary: some View {
@@ -47,7 +49,7 @@ public struct DiffView: View {
             Text("-\(totalDeletions)")
                 .foregroundColor(theme.chrome.red)
         }
-        .font(.caption)
+        .font(.custom(fontFamily, size: fontSize - 1))
         .padding(8)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(theme.chrome.surface)
@@ -66,7 +68,7 @@ public struct DiffView: View {
                     .foregroundColor(theme.chrome.textDim)
 
                     Text(file.path)
-                        .font(.system(.caption, design: .monospaced))
+                        .font(.custom(fontFamily, size: fontSize - 1))
                         .foregroundColor(theme.chrome.text)
 
                     Spacer()
@@ -77,7 +79,7 @@ public struct DiffView: View {
                         Text("-\(file.deletions)")
                             .foregroundColor(theme.chrome.red)
                     }
-                    .font(.caption2)
+                    .font(.custom(fontFamily, size: fontSize - 2))
                 }
                 .padding(.horizontal, 8)
                 .padding(.vertical, 6)
@@ -107,13 +109,13 @@ public struct DiffView: View {
                 Text(line.newLineNo.map { String($0) } ?? "")
                     .frame(width: 40, alignment: .trailing)
             }
-            .font(.system(.caption2, design: .monospaced))
+            .font(.custom(fontFamily, size: fontSize - 2))
             .foregroundColor(theme.chrome.comment)
             .padding(.trailing, 4)
 
             // Content
             Text(line.content)
-                .font(.system(.caption, design: .monospaced))
+                .font(.custom(fontFamily, size: fontSize))
                 .foregroundColor(lineColor(line.type))
                 .frame(maxWidth: .infinity, alignment: .leading)
         }

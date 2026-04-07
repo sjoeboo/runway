@@ -56,14 +56,14 @@ private struct DirectoryRow: View {
             Button(action: { isExpanded.toggle() }) {
                 HStack(spacing: 4) {
                     Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
-                        .font(.system(size: 9))
+                        .font(.system(size: 10))
                         .foregroundColor(theme.chrome.textDim)
-                        .frame(width: 12)
+                        .frame(width: 14)
                     Image(systemName: "folder.fill")
-                        .font(.caption)
+                        .font(.callout)
                         .foregroundColor(theme.chrome.accent)
                     Text(name)
-                        .font(.system(.callout, design: .monospaced))
+                        .font(.system(.body, design: .monospaced))
                         .foregroundColor(theme.chrome.textDim)
                         .lineLimit(1)
                     Spacer()
@@ -114,13 +114,13 @@ private struct FileRow: View {
         Button(action: onSelect) {
             HStack(spacing: 4) {
                 Text(change.status.rawValue)
-                    .font(.system(.caption, design: .monospaced))
+                    .font(.system(.callout, design: .monospaced))
                     .fontWeight(.bold)
                     .foregroundColor(statusColor)
-                    .frame(width: 16)
+                    .frame(width: 18)
 
                 Text(filename)
-                    .font(.system(.callout, design: .monospaced))
+                    .font(.system(.body, design: .monospaced))
                     .foregroundColor(change.status == .deleted ? theme.chrome.textDim : theme.chrome.text)
                     .strikethrough(change.status == .deleted)
                     .lineLimit(1)
@@ -137,7 +137,7 @@ private struct FileRow: View {
                             .foregroundColor(theme.chrome.red)
                     }
                 }
-                .font(.system(.caption, design: .monospaced))
+                .font(.system(.callout, design: .monospaced))
             }
             .padding(.vertical, 3)
             .padding(.horizontal, 8)

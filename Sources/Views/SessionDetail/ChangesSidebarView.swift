@@ -53,7 +53,7 @@ struct ChangesSidebarView: View {
             Text("-\(totalDeletions)")
                 .foregroundColor(theme.chrome.red)
         }
-        .font(.callout)
+        .font(.body)
         .foregroundColor(theme.chrome.textDim)
         .padding(.horizontal, 10)
         .padding(.vertical, 5)
