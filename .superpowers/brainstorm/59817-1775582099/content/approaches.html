@@ -1,0 +1,65 @@
+<h2>Changes Sidebar — Architecture Approaches</h2>
+<p class="subtitle">How to structure the right sidebar within the existing NavigationSplitView layout</p>
+
+<div class="options">
+  <div class="option" data-choice="a" onclick="toggleSelect(this)" style="border-left: 3px solid #4ade80;">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>HSplitView Inside Detail <span style="color:#4ade80;font-size:0.8em;">★ Recommended</span></h3>
+      <p>Wrap the session detail area in an <code>HStack</code> with a <code>ResizableDivider</code> and the changes panel. The right sidebar lives <strong>inside</strong> the NavigationSplitView detail column.</p>
+      <div class="pros-cons">
+        <div class="pros"><h4>Pros</h4><ul>
+          <li>Uses existing ResizableDivider component</li>
+          <li>Sidebar state is per-session (natural)</li>
+          <li>No changes to NavigationSplitView structure</li>
+          <li>Consistent with how the left sidebar already works</li>
+        </ul></div>
+        <div class="cons"><h4>Cons</h4><ul>
+          <li>Detail column needs layout rework</li>
+          <li>Animation must be manually implemented</li>
+        </ul></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="b" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>NavigationSplitView 3-Column</h3>
+      <p>Switch from 2-column to 3-column <code>NavigationSplitView</code> (sidebar / content / supplementary). The changes panel becomes the third column.</p>
+      <div class="pros-cons">
+        <div class="pros"><h4>Pros</h4><ul>
+          <li>Native macOS inspector/supplementary column pattern</li>
+          <li>Built-in collapse/expand behavior</li>
+          <li>System-consistent animations</li>
+        </ul></div>
+        <div class="cons"><h4>Cons</h4><ul>
+          <li>3-column NavigationSplitView has rigid width constraints</li>
+          <li>Supplementary column always on right — can't scope to sessions only</li>
+          <li>Major refactor of the window layout</li>
+          <li>Column visibility API is limited in SwiftUI</li>
+        </ul></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="c" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>Overlay Panel with Animation</h3>
+      <p>The changes panel slides in from the right as an overlay on top of the detail view (like Xcode's inspectors), without resizing the terminal.</p>
+      <div class="pros-cons">
+        <div class="pros"><h4>Pros</h4><ul>
+          <li>Terminal doesn't reflow when panel opens</li>
+          <li>Simple slide-in/out animation</li>
+          <li>No layout restructuring needed</li>
+        </ul></div>
+        <div class="cons"><h4>Cons</h4><ul>
+          <li>Obscures terminal content underneath</li>
+          <li>Not resizable (fixed width or percentage)</li>
+          <li>Feels less native — more like a mobile pattern</li>
+        </ul></div>
+      </div>
+    </div>
+  </div>
+</div>
