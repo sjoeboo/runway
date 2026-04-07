@@ -48,8 +48,8 @@ jobs:
       - name: Download Sparkle
         id: sparkle
         run: |
-          SPARKLE_VERSION="2.7.5"
-          curl -L -o /tmp/Sparkle.tar.xz "https://github.com/sparkle-project/Sparkle/releases/download/${SPARKLE_VERSION}/Sparkle-${SPARKLE_VERSION}.tar.xz"
+          SPARKLE_VERSION="2.7.3"
+          curl -fL -o /tmp/Sparkle.tar.xz "https://github.com/sparkle-project/Sparkle/releases/download/${SPARKLE_VERSION}/Sparkle-${SPARKLE_VERSION}.tar.xz"
           mkdir -p /tmp/sparkle
           tar -xf /tmp/Sparkle.tar.xz -C /tmp/sparkle
           echo "bin=/tmp/sparkle/bin" >> "$GITHUB_OUTPUT"
