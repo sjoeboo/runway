@@ -87,6 +87,7 @@ struct RunwayApp: App {
         } label: {
             menuBarLabel
         }
+        .menuBarExtraStyle(.window)
     }
 
     @ViewBuilder

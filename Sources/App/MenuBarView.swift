@@ -1,6 +1,7 @@
 import Models
 import Sparkle
 import SwiftUI
+import Views
 
 /// Mini status view shown in the macOS menu bar extra.
 struct MenuBarView: View {
@@ -20,98 +21,163 @@ struct MenuBarView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
+            // Active sessions
             if activeSessions.isEmpty {
-                Text("No active sessions")
-                    .foregroundColor(.secondary)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 8)
+                HStack(spacing: 6) {
+                    Image(systemName: "moon.zzz")
+                        .foregroundColor(.secondary)
+                        .font(.caption)
+                    Text("No active sessions")
+                        .foregroundColor(.secondary)
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
             } else {
-                Text("Active")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                    .padding(.horizontal, 12)
-                    .padding(.top, 8)
-                    .padding(.bottom, 4)
+                sectionHeader("Active", icon: "bolt.fill")
 
                 ForEach(activeSessions) { session in
-                    sessionButton(session)
+                    sessionRow(session)
                 }
             }
 
             Divider()
                 .padding(.vertical, 4)
 
-            Text("Recent")
-                .font(.caption)
-                .foregroundColor(.secondary)
-                .padding(.horizontal, 12)
-                .padding(.bottom, 4)
+            // Recent sessions
+            sectionHeader("Recent", icon: "clock")
 
             ForEach(recentSessions) { session in
-                sessionButton(session)
+                sessionRow(session)
             }
 
             Divider()
                 .padding(.vertical, 4)
 
-            Button("New Session…") {
+            // Actions
+            actionButton("New Session…", icon: "plus.circle") {
                 store.showNewSessionDialog = true
                 NSApplication.shared.activate(ignoringOtherApps: true)
             }
-            .padding(.horizontal, 12)
-            .padding(.bottom, 4)
 
             if let updater {
-                CheckForUpdatesView(updater: updater)
-                    .padding(.horizontal, 12)
-                    .padding(.bottom, 4)
+                actionButton("Check for Updates…", icon: "arrow.triangle.2.circlepath") {
+                    updater.checkForUpdates()
+                }
             }
 
-            Button("Open Runway") {
+            actionButton("Open Runway", icon: "macwindow") {
                 NSApplication.shared.activate(ignoringOtherApps: true)
             }
-            .padding(.horizontal, 12)
-            .padding(.bottom, 8)
+
+            Divider()
+                .padding(.vertical, 4)
+
+            actionButton("Quit Runway", icon: "power") {
+                NSApplication.shared.terminate(nil)
+            }
         }
-        .frame(minWidth: 220)
+        .padding(.vertical, 4)
+        .frame(minWidth: 240)
     }
 
-    private func sessionButton(_ session: Session) -> some View {
+    // MARK: - Components
+
+    private func sectionHeader(_ title: String, icon: String) -> some View {
+        HStack(spacing: 4) {
+            Image(systemName: icon)
+                .font(.caption2)
+            Text(title)
+                .font(.caption)
+                .fontWeight(.medium)
+        }
+        .foregroundColor(.secondary)
+        .padding(.horizontal, 12)
+        .padding(.top, 6)
+        .padding(.bottom, 4)
+    }
+
+    private func sessionRow(_ session: Session) -> some View {
         Button {
             store.selectedSessionID = session.id
             store.currentView = .sessions
             NSApplication.shared.activate(ignoringOtherApps: true)
         } label: {
             HStack(spacing: 6) {
-                statusDot(session.status)
-                Text(session.title)
-                    .lineLimit(1)
+                SessionStatusIndicator(status: session.status, size: 8)
+
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(session.title)
+                        .lineLimit(1)
+                        .font(.callout)
+
+                    if let projectName = projectName(for: session) {
+                        Text(projectName)
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                            .lineLimit(1)
+                    }
+                }
+
                 Spacer()
-                Text(session.status.rawValue)
-                    .font(.caption2)
-                    .foregroundColor(.secondary)
+
+                statusLabel(session.status)
             }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 4)
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .padding(.horizontal, 12)
-        .padding(.vertical, 3)
+    }
+
+    private func actionButton(_ title: String, icon: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: 6) {
+                Image(systemName: icon)
+                    .frame(width: 16)
+                    .font(.callout)
+                Text(title)
+                    .font(.callout)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 3)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
     }
 
     @ViewBuilder
-    private func statusDot(_ status: SessionStatus) -> some View {
+    private func statusLabel(_ status: SessionStatus) -> some View {
         switch status {
         case .running:
-            Circle().fill(.green).frame(width: 6, height: 6)
+            capsuleBadge("Running", fg: .white, bg: .green)
         case .waiting:
-            Circle().fill(.yellow).frame(width: 6, height: 6)
-        case .error:
-            Circle().fill(.red).frame(width: 6, height: 6)
-        case .idle:
-            Circle().stroke(Color.secondary, lineWidth: 1).frame(width: 6, height: 6)
+            capsuleBadge("Waiting", fg: .white, bg: .orange)
         case .starting:
-            Circle().fill(.blue).frame(width: 6, height: 6)
+            capsuleBadge("Starting", fg: .white, bg: .blue)
+        case .error:
+            capsuleBadge("Error", fg: .white, bg: .red)
+        case .idle:
+            capsuleBadge("Idle", fg: .secondary, bg: Color.secondary.opacity(0.15))
         case .stopped:
-            Circle().fill(Color.secondary.opacity(0.4)).frame(width: 6, height: 6)
+            capsuleBadge("Stopped", fg: .secondary, bg: Color.secondary.opacity(0.15))
         }
+    }
+
+    private func capsuleBadge(_ text: String, fg: Color, bg: Color) -> some View {
+        Text(text)
+            .font(.caption2)
+            .fontWeight(.semibold)
+            .foregroundColor(fg)
+            .padding(.horizontal, 6)
+            .padding(.vertical, 2)
+            .background(bg)
+            .clipShape(Capsule())
+    }
+
+    // MARK: - Helpers
+
+    private func projectName(for session: Session) -> String? {
+        guard let projectID = session.projectID else { return nil }
+        return store.projects.first { $0.id == projectID }?.name
     }
 }
