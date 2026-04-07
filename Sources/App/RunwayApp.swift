@@ -27,7 +27,7 @@ struct RunwayApp: App {
         // activate them as GUI apps. Force regular activation policy so
         // the window, dock icon, and menu bar all appear.
         NSApplication.shared.setActivationPolicy(.regular)
-        NSApplication.shared.activate(ignoringOtherApps: true)
+        NSApplication.shared.activate()
         AppIcon.install()
     }
 
@@ -389,6 +389,7 @@ struct ContentView: View {
             {
                 SessionDetailView(
                     session: session,
+                    tmuxManager: store.tmuxManager,
                     linkedPR: store.sessionPRs[sessionID],
                     onSelectPR: { pr in Task { await store.selectPR(pr) } },
                     showSendBar: Binding(

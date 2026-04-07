@@ -56,7 +56,7 @@ struct MenuBarView: View {
             // Actions
             actionButton("New Session…", icon: "plus.circle") {
                 store.showNewSessionDialog = true
-                NSApplication.shared.activate(ignoringOtherApps: true)
+                NSApplication.shared.activate()
             }
 
             if let updater {
@@ -66,7 +66,7 @@ struct MenuBarView: View {
             }
 
             actionButton("Open Runway", icon: "macwindow") {
-                NSApplication.shared.activate(ignoringOtherApps: true)
+                NSApplication.shared.activate()
             }
 
             Divider()
@@ -100,7 +100,7 @@ struct MenuBarView: View {
         Button {
             store.selectedSessionID = session.id
             store.currentView = .sessions
-            NSApplication.shared.activate(ignoringOtherApps: true)
+            NSApplication.shared.activate()
         } label: {
             HStack(spacing: 6) {
                 SessionStatusIndicator(status: session.status, size: 8)

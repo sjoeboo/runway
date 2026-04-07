@@ -626,39 +626,29 @@ public final class RunwayStore {
     private static let portFilePath = "\(FileManager.default.homeDirectoryForCurrentUser.path)/.runway/hook_port"
 
     private func startHookServer() async {
-        await hookServer.onEvent { [weak self] event in
-            Task { @MainActor in
-                self?.handleHookEvent(event)
-            }
-        }
-
         do {
-            // Try to reuse the previous port so existing Claude sessions keep working
+            // Determine which port to try first, then create the definitive server.
             let previousPort = Self.loadPersistedPort()
+
             if let previousPort {
                 hookServer = HookServer(port: previousPort)
-                await hookServer.onEvent { [weak self] event in
-                    Task { @MainActor in
-                        self?.handleHookEvent(event)
-                    }
-                }
-            }
-
-            do {
-                try await hookServer.start()
-            } catch {
-                // Previous port unavailable — fall back to ephemeral
-                if let previousPort {
+                do {
+                    try await hookServer.start()
+                } catch {
+                    // Previous port unavailable — fall back to ephemeral
                     print("[Runway] Previous port \(previousPort) unavailable, using ephemeral")
                     hookServer = HookServer()
-                    await hookServer.onEvent { [weak self] event in
-                        Task { @MainActor in
-                            self?.handleHookEvent(event)
-                        }
-                    }
                     try await hookServer.start()
-                } else {
-                    throw error
+                }
+            } else {
+                // No saved port — use ephemeral
+                try await hookServer.start()
+            }
+
+            // Register the event handler exactly once on the final, started server.
+            await hookServer.onEvent { [weak self] event in
+                Task { @MainActor in
+                    self?.handleHookEvent(event)
                 }
             }
 

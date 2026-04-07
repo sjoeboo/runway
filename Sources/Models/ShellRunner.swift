@@ -98,27 +98,32 @@ public enum ShellRunner {
         process.standardOutput = stdoutPipe
         process.standardError = stderrPipe
 
-        // Read stdout/stderr data before waiting — prevents pipe buffer deadlocks
-        // when the child writes more than 64KB to stderr while stdout pipe is full.
-        let stdoutHandle = stdoutPipe.fileHandleForReading
-        let stderrHandle = stderrPipe.fileHandleForReading
-
         try process.run()
 
+        // Drain both pipes concurrently to prevent pipe buffer deadlocks.
+        // If a child writes >64KB to stdout or stderr, it blocks until the
+        // pipe is drained. Reading only after termination creates a deadlock
+        // because the child can't exit until the pipe is consumed.
+        async let stdoutData = Task.detached {
+            stdoutPipe.fileHandleForReading.readDataToEndOfFile()
+        }.value
+        async let stderrData = Task.detached {
+            stderrPipe.fileHandleForReading.readDataToEndOfFile()
+        }.value
+
         // Use terminationHandler + continuation to avoid blocking the cooperative thread pool.
-        // This is the key difference from the old waitUntilExit() pattern.
         let terminationStatus: Int32 = try await withCheckedThrowingContinuation { continuation in
             process.terminationHandler = { proc in
                 continuation.resume(returning: proc.terminationStatus)
             }
         }
 
-        let stdoutData = stdoutHandle.readDataToEndOfFile()
-        let output = String(data: stdoutData, encoding: .utf8) ?? ""
+        let stdout = await stdoutData
+        let stderr = await stderrData
+        let output = String(data: stdout, encoding: .utf8) ?? ""
 
         if terminationStatus != 0 {
-            let stderrData = stderrHandle.readDataToEndOfFile()
-            let errOutput = String(data: stderrData, encoding: .utf8) ?? ""
+            let errOutput = String(data: stderr, encoding: .utf8) ?? ""
             throw ShellError.commandFailed(
                 executable: executable,
                 args: args,

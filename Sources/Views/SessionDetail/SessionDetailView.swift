@@ -1,10 +1,12 @@
 import Models
 import SwiftUI
+import Terminal
 import TerminalView
 import Theme
 
 public struct SessionDetailView: View {
     let session: Session
+    let tmuxManager: TmuxSessionManager
     var linkedPR: PullRequest?
     var onSelectPR: ((PullRequest) -> Void)?
     @Binding var showSendBar: Bool
@@ -24,6 +26,7 @@ public struct SessionDetailView: View {
 
     public init(
         session: Session,
+        tmuxManager: TmuxSessionManager,
         linkedPR: PullRequest? = nil,
         onSelectPR: ((PullRequest) -> Void)? = nil,
         showSendBar: Binding<Bool>,
@@ -40,6 +43,7 @@ public struct SessionDetailView: View {
         onToggleChanges: (() -> Void)? = nil
     ) {
         self.session = session
+        self.tmuxManager = tmuxManager
         self.linkedPR = linkedPR
         self.onSelectPR = onSelectPR
         self._showSendBar = showSendBar
@@ -117,6 +121,7 @@ public struct SessionDetailView: View {
         } else {
             TerminalTabView(
                 session: session,
+                tmuxManager: tmuxManager,
                 showSearch: $showTerminalSearch,
                 splitHorizontalTrigger: $splitHorizontalTrigger,
                 splitVerticalTrigger: $splitVerticalTrigger
