@@ -142,12 +142,16 @@ struct ContentView: View {
                 NewSessionDialog(
                     projects: store.projects,
                     initialProjectID: store.newSessionProjectID,
-                    parentID: store.newSessionParentID
-                ) { request in
-                    Task { await store.handleNewSessionRequest(request) }
-                    store.newSessionProjectID = nil
-                    store.newSessionParentID = nil
-                }
+                    parentID: store.newSessionParentID,
+                    onCreate: { request in
+                        Task { await store.handleNewSessionRequest(request) }
+                        store.newSessionProjectID = nil
+                        store.newSessionParentID = nil
+                    },
+                    onCreateReview: { request in
+                        try await store.handleReviewSessionRequest(request)
+                    }
+                )
                 .theme(theme)
             }
             .sheet(
