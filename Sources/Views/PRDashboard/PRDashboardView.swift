@@ -17,8 +17,11 @@ public struct PRDashboardView: View {
     var onRequestChanges: ((PullRequest, String) -> Void)?
     var onMerge: ((PullRequest, MergeStrategy) -> Void)?
     var onToggleDraft: ((PullRequest) -> Void)?
+    var onUpdateBranch: ((PullRequest, Bool) -> Void)?
     var onSendToSession: ((PullRequest, String) -> Void)?
     var onReviewPR: ((PullRequest) -> Void)?
+    var onEnableAutoMerge: ((PullRequest, MergeStrategy) -> Void)?
+    var onDisableAutoMerge: ((PullRequest) -> Void)?
 
     @AppStorage("prListWidth") private var prListWidth: Double = 380
     @AppStorage("hideDrafts") private var hideDrafts: Bool = false
@@ -42,8 +45,11 @@ public struct PRDashboardView: View {
         onRequestChanges: ((PullRequest, String) -> Void)? = nil,
         onMerge: ((PullRequest, MergeStrategy) -> Void)? = nil,
         onToggleDraft: ((PullRequest) -> Void)? = nil,
+        onUpdateBranch: ((PullRequest, Bool) -> Void)? = nil,
         onSendToSession: ((PullRequest, String) -> Void)? = nil,
-        onReviewPR: ((PullRequest) -> Void)? = nil
+        onReviewPR: ((PullRequest) -> Void)? = nil,
+        onEnableAutoMerge: ((PullRequest, MergeStrategy) -> Void)? = nil,
+        onDisableAutoMerge: ((PullRequest) -> Void)? = nil
     ) {
         self.pullRequests = pullRequests
         self.selectedPRID = selectedPRID
@@ -58,8 +64,11 @@ public struct PRDashboardView: View {
         self.onRequestChanges = onRequestChanges
         self.onMerge = onMerge
         self.onToggleDraft = onToggleDraft
+        self.onUpdateBranch = onUpdateBranch
         self.onSendToSession = onSendToSession
         self.onReviewPR = onReviewPR
+        self.onEnableAutoMerge = onEnableAutoMerge
+        self.onDisableAutoMerge = onDisableAutoMerge
     }
 
     private var selectedPR: PullRequest? {
@@ -271,8 +280,17 @@ public struct PRDashboardView: View {
                     onRequestChanges: { body in onRequestChanges?(pr, body) },
                     onMerge: { strategy in onMerge?(pr, strategy) },
                     onToggleDraft: { onToggleDraft?(pr) },
+                    onUpdateBranch: onUpdateBranch.map { callback in
+                        { rebase in callback(pr, rebase) }
+                    },
                     onSendToSession: onSendToSession.map { callback in
                         { context in callback(pr, context) }
+                    },
+                    onEnableAutoMerge: onEnableAutoMerge.map { callback in
+                        { strategy in callback(pr, strategy) }
+                    },
+                    onDisableAutoMerge: onDisableAutoMerge.map { callback in
+                        { callback(pr) }
                     }
                 )
                 .frame(maxWidth: .infinity)

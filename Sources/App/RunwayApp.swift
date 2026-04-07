@@ -87,6 +87,7 @@ struct RunwayApp: App {
         } label: {
             menuBarLabel
         }
+        .menuBarExtraStyle(.window)
     }
 
     @ViewBuilder
@@ -365,7 +366,10 @@ struct ContentView: View {
                     onRequestChangesPR: { pr, body in Task { await store.requestChangesOnPR(pr, body: body) } },
                     onMergePR: { pr, strategy in Task { await store.mergePR(pr, strategy: strategy) } },
                     onToggleDraftPR: { pr in Task { await store.togglePRDraft(pr) } },
+                    onUpdateBranchPR: { pr, rebase in Task { await store.updatePRBranch(pr, rebase: rebase) } },
                     onReviewPR: { pr in store.reviewPR(pr) },
+                    onEnableAutoMergePR: { pr, strategy in Task { await store.enableAutoMerge(pr, strategy: strategy) } },
+                    onDisableAutoMergePR: { pr in Task { await store.disableAutoMerge(pr) } },
                     onUpdateProject: { store.updateProjectSettings($0) },
                     onDetectRepo: { await store.detectGHRepo(for: project) },
                     onFetchLabels: { Task { await store.fetchLabels(forProject: projectID) } }
@@ -394,13 +398,16 @@ struct ContentView: View {
                 onRequestChanges: { pr, body in Task { await store.requestChangesOnPR(pr, body: body) } },
                 onMerge: { pr, strategy in Task { await store.mergePR(pr, strategy: strategy) } },
                 onToggleDraft: { pr in Task { await store.togglePRDraft(pr) } },
+                onUpdateBranch: { pr, rebase in Task { await store.updatePRBranch(pr, rebase: rebase) } },
                 onSendToSession: { pr, _ in
                     if let sessionID = store.sessionPRs.first(where: { $0.value.id == pr.id })?.key {
                         store.selectSession(sessionID)
                         store.showSendBar = true
                     }
                 },
-                onReviewPR: { pr in store.reviewPR(pr) }
+                onReviewPR: { pr in store.reviewPR(pr) },
+                onEnableAutoMerge: { pr, strategy in Task { await store.enableAutoMerge(pr, strategy: strategy) } },
+                onDisableAutoMerge: { pr in Task { await store.disableAutoMerge(pr) } }
             )
         }
     }

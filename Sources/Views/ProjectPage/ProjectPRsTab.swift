@@ -15,7 +15,10 @@ public struct ProjectPRsTab: View {
     var onRequestChanges: ((PullRequest, String) -> Void)?
     var onMerge: ((PullRequest, MergeStrategy) -> Void)?
     var onToggleDraft: ((PullRequest) -> Void)?
+    var onUpdateBranch: ((PullRequest, Bool) -> Void)?
     var onReviewPR: ((PullRequest) -> Void)?
+    var onEnableAutoMerge: ((PullRequest, MergeStrategy) -> Void)?
+    var onDisableAutoMerge: ((PullRequest) -> Void)?
 
     @AppStorage("hideDrafts") private var hideDrafts: Bool = false
     @Environment(\.theme) private var theme
@@ -31,7 +34,10 @@ public struct ProjectPRsTab: View {
         onRequestChanges: ((PullRequest, String) -> Void)? = nil,
         onMerge: ((PullRequest, MergeStrategy) -> Void)? = nil,
         onToggleDraft: ((PullRequest) -> Void)? = nil,
-        onReviewPR: ((PullRequest) -> Void)? = nil
+        onUpdateBranch: ((PullRequest, Bool) -> Void)? = nil,
+        onReviewPR: ((PullRequest) -> Void)? = nil,
+        onEnableAutoMerge: ((PullRequest, MergeStrategy) -> Void)? = nil,
+        onDisableAutoMerge: ((PullRequest) -> Void)? = nil
     ) {
         self.pullRequests = pullRequests
         self.onSelectPR = onSelectPR
@@ -43,7 +49,10 @@ public struct ProjectPRsTab: View {
         self.onRequestChanges = onRequestChanges
         self.onMerge = onMerge
         self.onToggleDraft = onToggleDraft
+        self.onUpdateBranch = onUpdateBranch
         self.onReviewPR = onReviewPR
+        self.onEnableAutoMerge = onEnableAutoMerge
+        self.onDisableAutoMerge = onDisableAutoMerge
     }
 
     private var selectedPR: PullRequest? {
@@ -107,7 +116,16 @@ public struct ProjectPRsTab: View {
                         onComment: { body in onComment?(pr, body) },
                         onRequestChanges: { body in onRequestChanges?(pr, body) },
                         onMerge: { strategy in onMerge?(pr, strategy) },
-                        onToggleDraft: { onToggleDraft?(pr) }
+                        onToggleDraft: { onToggleDraft?(pr) },
+                        onUpdateBranch: onUpdateBranch.map { callback in
+                            { rebase in callback(pr, rebase) }
+                        },
+                        onEnableAutoMerge: onEnableAutoMerge.map { callback in
+                            { strategy in callback(pr, strategy) }
+                        },
+                        onDisableAutoMerge: onDisableAutoMerge.map { callback in
+                            { callback(pr) }
+                        }
                     )
                 }
             } else {

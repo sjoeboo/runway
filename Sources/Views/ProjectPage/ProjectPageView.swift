@@ -39,7 +39,10 @@ public struct ProjectPageView: View {
     var onRequestChangesPR: ((PullRequest, String) -> Void)?
     var onMergePR: ((PullRequest, MergeStrategy) -> Void)?
     var onToggleDraftPR: ((PullRequest) -> Void)?
+    var onUpdateBranchPR: ((PullRequest, Bool) -> Void)?
     var onReviewPR: ((PullRequest) -> Void)?
+    var onEnableAutoMergePR: ((PullRequest, MergeStrategy) -> Void)?
+    var onDisableAutoMergePR: ((PullRequest) -> Void)?
     let onUpdateProject: (Project) -> Void
     let onDetectRepo: () async -> (repo: String, host: String?)?
     let onFetchLabels: () -> Void
@@ -76,7 +79,10 @@ public struct ProjectPageView: View {
         onRequestChangesPR: ((PullRequest, String) -> Void)? = nil,
         onMergePR: ((PullRequest, MergeStrategy) -> Void)? = nil,
         onToggleDraftPR: ((PullRequest) -> Void)? = nil,
+        onUpdateBranchPR: ((PullRequest, Bool) -> Void)? = nil,
         onReviewPR: ((PullRequest) -> Void)? = nil,
+        onEnableAutoMergePR: ((PullRequest, MergeStrategy) -> Void)? = nil,
+        onDisableAutoMergePR: ((PullRequest) -> Void)? = nil,
         onUpdateProject: @escaping (Project) -> Void,
         onDetectRepo: @escaping () async -> (repo: String, host: String?)?,
         onFetchLabels: @escaping () -> Void
@@ -107,7 +113,10 @@ public struct ProjectPageView: View {
         self.onRequestChangesPR = onRequestChangesPR
         self.onMergePR = onMergePR
         self.onToggleDraftPR = onToggleDraftPR
+        self.onUpdateBranchPR = onUpdateBranchPR
         self.onReviewPR = onReviewPR
+        self.onEnableAutoMergePR = onEnableAutoMergePR
+        self.onDisableAutoMergePR = onDisableAutoMergePR
         self.onUpdateProject = onUpdateProject
         self.onDetectRepo = onDetectRepo
         self.onFetchLabels = onFetchLabels
@@ -214,7 +223,10 @@ public struct ProjectPageView: View {
                     onRequestChanges: onRequestChangesPR,
                     onMerge: onMergePR,
                     onToggleDraft: onToggleDraftPR,
-                    onReviewPR: onReviewPR
+                    onUpdateBranch: onUpdateBranchPR,
+                    onReviewPR: onReviewPR,
+                    onEnableAutoMerge: onEnableAutoMergePR,
+                    onDisableAutoMerge: onDisableAutoMergePR
                 )
             }
         }

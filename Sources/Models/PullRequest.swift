@@ -21,6 +21,9 @@ public struct PullRequest: Identifiable, Codable, Sendable {
     public var updatedAt: Date
     public var enrichedAt: Date?
     public var origin: Set<PROrigin>
+    public var mergeable: MergeableState?
+    public var mergeStateStatus: MergeStateStatus?
+    public var autoMergeEnabled: Bool
 
     public init(
         number: Int,
@@ -40,7 +43,10 @@ public struct PullRequest: Identifiable, Codable, Sendable {
         createdAt: Date = Date(),
         updatedAt: Date = Date(),
         enrichedAt: Date? = nil,
-        origin: Set<PROrigin> = []
+        origin: Set<PROrigin> = [],
+        mergeable: MergeableState? = nil,
+        mergeStateStatus: MergeStateStatus? = nil,
+        autoMergeEnabled: Bool = false
     ) {
         self.id = "\(repo)#\(number)"
         self.number = number
@@ -61,6 +67,9 @@ public struct PullRequest: Identifiable, Codable, Sendable {
         self.updatedAt = updatedAt
         self.enrichedAt = enrichedAt
         self.origin = origin
+        self.mergeable = mergeable
+        self.mergeStateStatus = mergeStateStatus
+        self.autoMergeEnabled = autoMergeEnabled
     }
 
     public var needsEnrichment: Bool {
@@ -83,6 +92,24 @@ public enum PRState: String, Codable, Sendable {
     case draft = "DRAFT"
     case merged = "MERGED"
     case closed = "CLOSED"
+}
+
+// MARK: - Mergeable State
+
+public enum MergeableState: String, Codable, Sendable {
+    case mergeable = "MERGEABLE"
+    case conflicting = "CONFLICTING"
+    case unknown = "UNKNOWN"
+}
+
+public enum MergeStateStatus: String, Codable, Sendable {
+    case clean = "CLEAN"
+    case dirty = "DIRTY"
+    case blocked = "BLOCKED"
+    case behind = "BEHIND"
+    case unstable = "UNSTABLE"
+    case hasHooks = "HAS_HOOKS"
+    case unknown = "UNKNOWN"
 }
 
 // MARK: - Merge Strategy
@@ -136,6 +163,36 @@ public struct CheckSummary: Codable, Sendable {
     public var hasFailed: Bool { failed > 0 }
 }
 
+// MARK: - Check Run (individual check detail)
+
+public struct CheckRun: Identifiable, Codable, Sendable {
+    public let id: String
+    public var name: String
+    public var status: CheckStatus
+    public var detailsURL: String?
+
+    public init(name: String, status: CheckStatus, detailsURL: String? = nil) {
+        self.id = name
+        self.name = name
+        self.status = status
+        self.detailsURL = detailsURL
+    }
+}
+
+public enum CheckStatus: String, Codable, Sendable {
+    case passed
+    case failed
+    case pending
+
+    public var label: String {
+        switch self {
+        case .passed: "Passed"
+        case .failed: "Failed"
+        case .pending: "Pending"
+        }
+    }
+}
+
 // MARK: - PR Detail (lazy-loaded)
 
 public struct PRDetail: Codable, Sendable {
@@ -144,12 +201,16 @@ public struct PRDetail: Codable, Sendable {
     public var comments: [PRComment]
     public var files: [PRFileChange]
     public var checks: CheckSummary
+    public var checkRuns: [CheckRun]
     public var reviewDecision: ReviewDecision
     public var headBranch: String
     public var baseBranch: String
     public var additions: Int
     public var deletions: Int
     public var changedFiles: Int
+    public var mergeable: MergeableState?
+    public var mergeStateStatus: MergeStateStatus?
+    public var autoMergeEnabled: Bool
 
     public init(
         body: String = "",
@@ -157,24 +218,32 @@ public struct PRDetail: Codable, Sendable {
         comments: [PRComment] = [],
         files: [PRFileChange] = [],
         checks: CheckSummary = CheckSummary(),
+        checkRuns: [CheckRun] = [],
         reviewDecision: ReviewDecision = .none,
         headBranch: String = "",
         baseBranch: String = "",
         additions: Int = 0,
         deletions: Int = 0,
-        changedFiles: Int = 0
+        changedFiles: Int = 0,
+        mergeable: MergeableState? = nil,
+        mergeStateStatus: MergeStateStatus? = nil,
+        autoMergeEnabled: Bool = false
     ) {
         self.body = body
         self.reviews = reviews
         self.comments = comments
         self.files = files
         self.checks = checks
+        self.checkRuns = checkRuns
         self.reviewDecision = reviewDecision
         self.headBranch = headBranch
         self.baseBranch = baseBranch
         self.additions = additions
         self.deletions = deletions
         self.changedFiles = changedFiles
+        self.mergeable = mergeable
+        self.mergeStateStatus = mergeStateStatus
+        self.autoMergeEnabled = autoMergeEnabled
     }
 }
 
