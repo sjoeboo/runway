@@ -218,7 +218,7 @@ public final class RunwayStore {
         let ownedPaths = Set(
             sessions
                 .filter { $0.worktreeBranch != nil }
-                .map { $0.path }
+                .flatMap { [$0.path, URL(fileURLWithPath: $0.path).resolvingSymlinksInPath().path] }
         )
 
         var removedCount = 0
