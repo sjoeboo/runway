@@ -276,7 +276,7 @@ public struct PRDashboardView: View {
 
             // Right: PR detail drawer
             if let pr = selectedPR {
-                Divider()
+                ResizableDivider(width: $prListWidth)
                 PRDetailDrawer(
                     pr: pr,
                     detail: detail,
