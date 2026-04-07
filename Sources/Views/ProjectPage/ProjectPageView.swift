@@ -20,7 +20,16 @@ public struct ProjectPageView: View {
     let isLoadingIssues: Bool
     let onRefreshIssues: () -> Void
     let onCreateIssue: (String, String, [String]) -> Void
-    let onOpenIssue: (GitHubIssue) -> Void
+    let onSelectIssue: (GitHubIssue?) -> Void
+    var selectedIssueID: String?
+    var issueDetail: IssueDetail?
+    var isLoadingIssueDetail: Bool = false
+    var onCommentOnIssue: ((GitHubIssue, String) -> Void)?
+    var onCloseIssue: ((GitHubIssue, CloseReason) -> Void)?
+    var onReopenIssue: ((GitHubIssue) -> Void)?
+    var onEditIssue: ((GitHubIssue, String?, String?) -> Void)?
+    var onUpdateIssueLabels: ((GitHubIssue, [String], [String]) -> Void)?
+    var onUpdateIssueAssignees: ((GitHubIssue, [String], [String]) -> Void)?
     let onSelectPR: (PullRequest) -> Void
     let onRefreshPRs: () -> Void
     var selectedPRID: String?
@@ -48,7 +57,16 @@ public struct ProjectPageView: View {
         isLoadingIssues: Bool,
         onRefreshIssues: @escaping () -> Void,
         onCreateIssue: @escaping (String, String, [String]) -> Void,
-        onOpenIssue: @escaping (GitHubIssue) -> Void,
+        onSelectIssue: @escaping (GitHubIssue?) -> Void,
+        selectedIssueID: String? = nil,
+        issueDetail: IssueDetail? = nil,
+        isLoadingIssueDetail: Bool = false,
+        onCommentOnIssue: ((GitHubIssue, String) -> Void)? = nil,
+        onCloseIssue: ((GitHubIssue, CloseReason) -> Void)? = nil,
+        onReopenIssue: ((GitHubIssue) -> Void)? = nil,
+        onEditIssue: ((GitHubIssue, String?, String?) -> Void)? = nil,
+        onUpdateIssueLabels: ((GitHubIssue, [String], [String]) -> Void)? = nil,
+        onUpdateIssueAssignees: ((GitHubIssue, [String], [String]) -> Void)? = nil,
         onSelectPR: @escaping (PullRequest) -> Void,
         onRefreshPRs: @escaping () -> Void,
         selectedPRID: String? = nil,
@@ -70,7 +88,16 @@ public struct ProjectPageView: View {
         self.isLoadingIssues = isLoadingIssues
         self.onRefreshIssues = onRefreshIssues
         self.onCreateIssue = onCreateIssue
-        self.onOpenIssue = onOpenIssue
+        self.onSelectIssue = onSelectIssue
+        self.selectedIssueID = selectedIssueID
+        self.issueDetail = issueDetail
+        self.isLoadingIssueDetail = isLoadingIssueDetail
+        self.onCommentOnIssue = onCommentOnIssue
+        self.onCloseIssue = onCloseIssue
+        self.onReopenIssue = onReopenIssue
+        self.onEditIssue = onEditIssue
+        self.onUpdateIssueLabels = onUpdateIssueLabels
+        self.onUpdateIssueAssignees = onUpdateIssueAssignees
         self.onSelectPR = onSelectPR
         self.onRefreshPRs = onRefreshPRs
         self.selectedPRID = selectedPRID
@@ -163,8 +190,17 @@ public struct ProjectPageView: View {
                     issuesEnabled: project.issuesEnabled,
                     onRefresh: onRefreshIssues,
                     onCreate: onCreateIssue,
-                    onOpenIssue: onOpenIssue,
-                    onFetchLabels: onFetchLabels
+                    onSelectIssue: onSelectIssue,
+                    onFetchLabels: onFetchLabels,
+                    selectedIssueID: selectedIssueID,
+                    issueDetail: issueDetail,
+                    isLoadingDetail: isLoadingIssueDetail,
+                    onComment: onCommentOnIssue,
+                    onCloseIssue: onCloseIssue,
+                    onReopen: onReopenIssue,
+                    onEdit: onEditIssue,
+                    onUpdateLabels: onUpdateIssueLabels,
+                    onUpdateAssignees: onUpdateIssueAssignees
                 )
             case .prs:
                 ProjectPRsTab(

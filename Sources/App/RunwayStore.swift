@@ -973,12 +973,6 @@ public final class RunwayStore {
         }
     }
 
-    func openIssueInBrowser(_ issue: GitHubIssue) {
-        if let url = URL(string: issue.url) {
-            NSWorkspace.shared.open(url)
-        }
-    }
-
     func selectIssue(_ issue: GitHubIssue?) async {
         selectedIssueID = issue?.id
         issueDetail = nil

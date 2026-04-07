@@ -344,7 +344,18 @@ struct ContentView: View {
                     onCreateIssue: { title, body, labels in
                         Task { await store.createIssue(forProject: projectID, title: title, body: body, labels: labels) }
                     },
-                    onOpenIssue: { store.openIssueInBrowser($0) },
+                    onSelectIssue: { issue in Task { await store.selectIssue(issue) } },
+                    selectedIssueID: store.selectedIssueID,
+                    issueDetail: store.issueDetail,
+                    isLoadingIssueDetail: store.isLoadingIssueDetail,
+                    onCommentOnIssue: { issue, body in Task { await store.commentOnIssue(issue, body: body) } },
+                    onCloseIssue: { issue, reason in Task { await store.closeIssue(issue, reason: reason) } },
+                    onReopenIssue: { issue in Task { await store.reopenIssue(issue) } },
+                    onEditIssue: { issue, title, body in Task { await store.editIssue(issue, title: title, body: body) } },
+                    onUpdateIssueLabels: { issue, add, remove in Task { await store.updateIssueLabels(issue, add: add, remove: remove) } },
+                    onUpdateIssueAssignees: { issue, add, remove in
+                        Task { await store.updateIssueAssignees(issue, add: add, remove: remove) }
+                    },
                     onSelectPR: { pr in Task { await store.selectPR(pr, navigate: false) } },
                     onRefreshPRs: { Task { await store.refreshPRsIfStale() } },
                     selectedPRID: store.selectedPRID,
