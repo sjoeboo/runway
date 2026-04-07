@@ -12,6 +12,7 @@ public struct PRDetailDrawer: View {
     let onRequestChanges: (String) -> Void
     let onMerge: (MergeStrategy) -> Void
     let onToggleDraft: () -> Void
+    var onUpdateBranch: ((Bool) -> Void)?
     var onSendToSession: ((String) -> Void)?
 
     @State private var selectedTab: PRDetailTab = .overview
@@ -39,6 +40,7 @@ public struct PRDetailDrawer: View {
         onRequestChanges: @escaping (String) -> Void = { _ in },
         onMerge: @escaping (MergeStrategy) -> Void = { _ in },
         onToggleDraft: @escaping () -> Void = {},
+        onUpdateBranch: ((Bool) -> Void)? = nil,
         onSendToSession: ((String) -> Void)? = nil
     ) {
         self.pr = pr
@@ -50,6 +52,7 @@ public struct PRDetailDrawer: View {
         self.onRequestChanges = onRequestChanges
         self.onMerge = onMerge
         self.onToggleDraft = onToggleDraft
+        self.onUpdateBranch = onUpdateBranch
     }
 
     public var body: some View {
@@ -264,26 +267,43 @@ public struct PRDetailDrawer: View {
     @ViewBuilder
     private func mergeStatusBadge(mergeable: MergeableState?, status: MergeStateStatus?) -> some View {
         if pr.state == .open {
-            HStack(spacing: 4) {
-                if mergeable == .conflicting {
-                    Label("Merge conflicts", systemImage: "exclamationmark.triangle.fill")
-                        .foregroundColor(theme.chrome.red)
-                } else if status == .behind {
-                    Label("Behind base branch", systemImage: "arrow.down.circle")
-                        .foregroundColor(theme.chrome.orange)
-                } else if status == .blocked {
-                    Label("Merging blocked", systemImage: "hand.raised.fill")
-                        .foregroundColor(theme.chrome.yellow)
-                } else if status == .unstable {
-                    Label("Checks failing", systemImage: "exclamationmark.circle")
-                        .foregroundColor(theme.chrome.orange)
-                } else if mergeable == .mergeable && (status == .clean || status == .hasHooks) {
-                    Label("Ready to merge", systemImage: "checkmark.circle.fill")
-                        .foregroundColor(theme.chrome.green)
+            HStack(spacing: 8) {
+                HStack(spacing: 4) {
+                    if mergeable == .conflicting {
+                        Label("Merge conflicts", systemImage: "exclamationmark.triangle.fill")
+                            .foregroundColor(theme.chrome.red)
+                    } else if status == .behind {
+                        Label("Behind base branch", systemImage: "arrow.down.circle")
+                            .foregroundColor(theme.chrome.orange)
+                    } else if status == .blocked {
+                        Label("Merging blocked", systemImage: "hand.raised.fill")
+                            .foregroundColor(theme.chrome.yellow)
+                    } else if status == .unstable {
+                        Label("Checks failing", systemImage: "exclamationmark.circle")
+                            .foregroundColor(theme.chrome.orange)
+                    } else if mergeable == .mergeable && (status == .clean || status == .hasHooks) {
+                        Label("Ready to merge", systemImage: "checkmark.circle.fill")
+                            .foregroundColor(theme.chrome.green)
+                    }
+                }
+                .font(.callout)
+
+                if let onUpdateBranch, needsBranchUpdate(mergeable: mergeable, status: status) {
+                    Menu {
+                        Button("Merge base into branch") { onUpdateBranch(false) }
+                        Button("Rebase onto base") { onUpdateBranch(true) }
+                    } label: {
+                        Label("Update branch", systemImage: "arrow.triangle.2.circlepath")
+                    }
+                    .menuStyle(.borderedButton)
+                    .controlSize(.small)
                 }
             }
-            .font(.callout)
         }
+    }
+
+    private func needsBranchUpdate(mergeable: MergeableState?, status: MergeStateStatus?) -> Bool {
+        status == .behind || mergeable == .conflicting || status == .dirty
     }
 
     private func detailReviewBadge(_ decision: ReviewDecision) -> some View {

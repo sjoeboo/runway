@@ -15,6 +15,7 @@ public struct ProjectPRsTab: View {
     var onRequestChanges: ((PullRequest, String) -> Void)?
     var onMerge: ((PullRequest, MergeStrategy) -> Void)?
     var onToggleDraft: ((PullRequest) -> Void)?
+    var onUpdateBranch: ((PullRequest, Bool) -> Void)?
     var onReviewPR: ((PullRequest) -> Void)?
 
     @AppStorage("hideDrafts") private var hideDrafts: Bool = false
@@ -31,6 +32,7 @@ public struct ProjectPRsTab: View {
         onRequestChanges: ((PullRequest, String) -> Void)? = nil,
         onMerge: ((PullRequest, MergeStrategy) -> Void)? = nil,
         onToggleDraft: ((PullRequest) -> Void)? = nil,
+        onUpdateBranch: ((PullRequest, Bool) -> Void)? = nil,
         onReviewPR: ((PullRequest) -> Void)? = nil
     ) {
         self.pullRequests = pullRequests
@@ -43,6 +45,7 @@ public struct ProjectPRsTab: View {
         self.onRequestChanges = onRequestChanges
         self.onMerge = onMerge
         self.onToggleDraft = onToggleDraft
+        self.onUpdateBranch = onUpdateBranch
         self.onReviewPR = onReviewPR
     }
 
@@ -107,7 +110,10 @@ public struct ProjectPRsTab: View {
                         onComment: { body in onComment?(pr, body) },
                         onRequestChanges: { body in onRequestChanges?(pr, body) },
                         onMerge: { strategy in onMerge?(pr, strategy) },
-                        onToggleDraft: { onToggleDraft?(pr) }
+                        onToggleDraft: { onToggleDraft?(pr) },
+                        onUpdateBranch: onUpdateBranch.map { callback in
+                            { rebase in callback(pr, rebase) }
+                        }
                     )
                 }
             } else {

@@ -232,6 +232,15 @@ public actor PRManager {
         )
     }
 
+    /// Update a PR branch with the latest base branch (merge or rebase).
+    public func updateBranch(repo: String, number: Int, rebase: Bool = false, host: String? = nil) async throws {
+        var args = ["pr", "update-branch", "\(number)", "--repo", repo]
+        if rebase {
+            args.append("--rebase")
+        }
+        try await runGH(args: args, host: host)
+    }
+
     /// Toggle draft state. `gh pr ready` to mark ready; GraphQL mutation to convert to draft.
     public func toggleDraft(repo: String, number: Int, makeDraft: Bool, host: String? = nil) async throws {
         if makeDraft {

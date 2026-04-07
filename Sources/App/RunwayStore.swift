@@ -960,6 +960,17 @@ public final class RunwayStore {
         }
     }
 
+    func updatePRBranch(_ pr: PullRequest, rebase: Bool = false) async {
+        let host = prManager.hostFromURL(pr.url)
+        do {
+            try await prManager.updateBranch(repo: pr.repo, number: pr.number, rebase: rebase, host: host)
+            statusMessage = .success("Updated #\(pr.number) with latest \(pr.baseBranch)")
+            await reEnrichPR(pr)
+        } catch {
+            statusMessage = .error("Branch update failed: \(error.localizedDescription)")
+        }
+    }
+
     func togglePRDraft(_ pr: PullRequest) async {
         let host = prManager.hostFromURL(pr.url)
         do {
