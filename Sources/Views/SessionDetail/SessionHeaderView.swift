@@ -48,8 +48,9 @@ public struct SessionHeaderView: View {
                         if onToggleChanges != nil {
                             Button(action: { onToggleChanges?() }) {
                                 Image(systemName: "doc.text.magnifyingglass")
-                                    .font(.caption)
+                                    .font(.callout)
                                     .foregroundColor(changesVisible ? theme.chrome.accent : theme.chrome.textDim)
+                                    .frame(width: 24, height: 24)
                             }
                             .buttonStyle(.plain)
                             .help("Toggle changes sidebar (⌘3)")

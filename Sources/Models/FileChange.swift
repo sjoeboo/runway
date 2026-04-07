@@ -80,14 +80,18 @@ public enum FileTreeNode: Identifiable, Sendable {
 
 // MARK: - Tree Builder
 
-public func buildFileTree(_ changes: [FileChange]) -> [FileTreeNode] {
+/// Builds a tree of FileTreeNode from a flat list of FileChange.
+/// Preserves original FileChange paths so `fileDiff()` receives the full path.
+public func buildFileTree(_ changes: [FileChange], prefix: String = "") -> [FileTreeNode] {
     guard !changes.isEmpty else { return [] }
 
     var rootFiles: [FileChange] = []
     var dirGroups: [String: [FileChange]] = [:]
 
     for change in changes {
-        let parts = change.path.split(separator: "/", maxSplits: 1)
+        // Get path relative to current prefix for grouping
+        let relativePath = String(change.path.dropFirst(prefix.count))
+        let parts = relativePath.split(separator: "/", maxSplits: 1)
         if parts.count == 1 {
             rootFiles.append(change)
         } else {
@@ -100,11 +104,8 @@ public func buildFileTree(_ changes: [FileChange]) -> [FileTreeNode] {
 
     for dir in dirGroups.keys.sorted() {
         guard let children = dirGroups[dir] else { continue }
-        let stripped = children.map { fc in
-            let rest = String(fc.path.drop(while: { $0 != "/" }).dropFirst())
-            return FileChange(path: rest, status: fc.status, additions: fc.additions, deletions: fc.deletions)
-        }
-        let subtree = buildFileTree(stripped)
+        let newPrefix = prefix + dir + "/"
+        let subtree = buildFileTree(children, prefix: newPrefix)
         let adds = children.reduce(0) { $0 + $1.additions }
         let dels = children.reduce(0) { $0 + $1.deletions }
 
