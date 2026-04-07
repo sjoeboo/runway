@@ -43,7 +43,18 @@ public struct TerminalTabView: View {
             Divider()
 
             // Terminal for selected tab
-            if tabs.isEmpty {
+            if tabs.isEmpty, session.status == .error || session.status == .stopped {
+                Spacer()
+                VStack(spacing: 8) {
+                    Image(systemName: "exclamationmark.triangle")
+                        .font(.title2)
+                        .foregroundColor(theme.chrome.textDim)
+                    Text(session.status == .error ? "Session failed to start" : "Session stopped")
+                        .font(.caption)
+                        .foregroundColor(theme.chrome.textDim)
+                }
+                Spacer()
+            } else if tabs.isEmpty {
                 Spacer()
                 ProgressView("Connecting to session\u{2026}")
                     .font(.caption)
@@ -90,7 +101,9 @@ public struct TerminalTabView: View {
             // Wait for the tmux session to be created before attaching.
             // TerminalPane calls `tmux attach-session` immediately, so we
             // must not initialize tabs until the tmux session actually exists.
-            if tabs.isEmpty, newStatus != .starting {
+            // Only .running, .idle, and .waiting indicate a live tmux session —
+            // .error and .stopped mean creation failed or the session is gone.
+            if tabs.isEmpty, newStatus.tmuxSessionExpected {
                 initializeTabs()
             }
         }
@@ -163,9 +176,10 @@ public struct TerminalTabView: View {
     /// Only initialize tabs once the tmux session exists.
     /// New sessions start as .starting and transition to .running once tmux is created.
     /// Restored sessions are .idle (tmux alive) or .stopped (tmux gone).
-    /// We must NOT attach during .starting — the tmux session doesn't exist yet.
+    /// Only attach when status indicates a live tmux session — .starting means
+    /// it hasn't been created yet, .error/.stopped mean it's gone.
     private func initializeTabsIfReady() {
-        guard session.status != .starting else { return }
+        guard session.status.tmuxSessionExpected else { return }
         initializeTabs()
     }
 

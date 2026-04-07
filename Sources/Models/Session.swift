@@ -92,6 +92,16 @@ public enum SessionStatus: String, Codable, Sendable, CaseIterable {
     case idle
     case error
     case stopped
+
+    /// Whether a tmux session is expected to exist for this status.
+    /// Used to guard TerminalPane from attempting `tmux attach-session`
+    /// when the tmux session hasn't been created yet or is already gone.
+    public var tmuxSessionExpected: Bool {
+        switch self {
+        case .running, .idle, .waiting: true
+        case .starting, .error, .stopped: false
+        }
+    }
 }
 
 // MARK: - Tool
