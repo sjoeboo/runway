@@ -785,6 +785,8 @@ public final class RunwayStore {
         pr.additions = result.additions
         pr.deletions = result.deletions
         pr.changedFiles = result.changedFiles
+        pr.mergeable = result.mergeable
+        pr.mergeStateStatus = result.mergeStateStatus
         pr.enrichedAt = Date()
     }
 

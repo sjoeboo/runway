@@ -119,6 +119,11 @@ public struct PRDetailDrawer: View {
                 detailReviewBadge(reviewStatus)
             }
 
+            // Merge status
+            let mergeable = detail?.mergeable ?? pr.mergeable
+            let mergeStatus = detail?.mergeStateStatus ?? pr.mergeStateStatus
+            mergeStatusBadge(mergeable: mergeable, status: mergeStatus)
+
             // Action bar
             HStack(spacing: 8) {
                 Button("Approve") { onApprove() }
@@ -254,6 +259,31 @@ public struct PRDetailDrawer: View {
             }
         }
         .font(.callout)
+    }
+
+    @ViewBuilder
+    private func mergeStatusBadge(mergeable: MergeableState?, status: MergeStateStatus?) -> some View {
+        if pr.state == .open {
+            HStack(spacing: 4) {
+                if mergeable == .conflicting {
+                    Label("Merge conflicts", systemImage: "exclamationmark.triangle.fill")
+                        .foregroundColor(theme.chrome.red)
+                } else if status == .behind {
+                    Label("Behind base branch", systemImage: "arrow.down.circle")
+                        .foregroundColor(theme.chrome.orange)
+                } else if status == .blocked {
+                    Label("Merging blocked", systemImage: "hand.raised.fill")
+                        .foregroundColor(theme.chrome.yellow)
+                } else if status == .unstable {
+                    Label("Checks failing", systemImage: "exclamationmark.circle")
+                        .foregroundColor(theme.chrome.orange)
+                } else if mergeable == .mergeable && (status == .clean || status == .hasHooks) {
+                    Label("Ready to merge", systemImage: "checkmark.circle.fill")
+                        .foregroundColor(theme.chrome.green)
+                }
+            }
+            .font(.callout)
+        }
     }
 
     private func detailReviewBadge(_ decision: ReviewDecision) -> some View {

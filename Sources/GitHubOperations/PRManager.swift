@@ -10,11 +10,14 @@ public struct PREnrichResult: Sendable {
     public var additions: Int
     public var deletions: Int
     public var changedFiles: Int
+    public var mergeable: MergeableState?
+    public var mergeStateStatus: MergeStateStatus?
 
     public init(
         checks: CheckSummary = CheckSummary(), reviewDecision: ReviewDecision = .none,
         headBranch: String = "", baseBranch: String = "",
-        additions: Int = 0, deletions: Int = 0, changedFiles: Int = 0
+        additions: Int = 0, deletions: Int = 0, changedFiles: Int = 0,
+        mergeable: MergeableState? = nil, mergeStateStatus: MergeStateStatus? = nil
     ) {
         self.checks = checks
         self.reviewDecision = reviewDecision
@@ -23,6 +26,8 @@ public struct PREnrichResult: Sendable {
         self.additions = additions
         self.deletions = deletions
         self.changedFiles = changedFiles
+        self.mergeable = mergeable
+        self.mergeStateStatus = mergeStateStatus
     }
 }
 
@@ -112,7 +117,7 @@ public actor PRManager {
                 "pr", "view", "\(number)",
                 "--repo", repo,
                 "--json",
-                "statusCheckRollup,reviewDecision,headRefName,baseRefName,additions,deletions,changedFiles",
+                "statusCheckRollup,reviewDecision,headRefName,baseRefName,additions,deletions,changedFiles,mergeable,mergeStateStatus",
             ], host: host)
         guard let data = output.data(using: .utf8) else {
             return PREnrichResult()
@@ -128,7 +133,7 @@ public actor PRManager {
                 "pr", "view", "\(number)",
                 "--repo", repo,
                 "--json",
-                "body,reviews,comments,files,statusCheckRollup,reviewDecision,headRefName,baseRefName,additions,deletions,changedFiles",
+                "body,reviews,comments,files,statusCheckRollup,reviewDecision,headRefName,baseRefName,additions,deletions,changedFiles,mergeable,mergeStateStatus",
             ], host: host)
         var detail = try parsePRDetail(output)
 
@@ -540,6 +545,8 @@ private struct GHPRDetailResponse: Decodable {
     let additions: Int?
     let deletions: Int?
     let changedFiles: Int?
+    let mergeable: String?
+    let mergeStateStatus: String?
 
     func toPRDetail() -> PRDetail {
         let rollup = statusCheckRollup ?? []
@@ -576,7 +583,9 @@ private struct GHPRDetailResponse: Decodable {
             baseBranch: baseRefName ?? "",
             additions: additions ?? 0,
             deletions: deletions ?? 0,
-            changedFiles: changedFiles ?? 0
+            changedFiles: changedFiles ?? 0,
+            mergeable: MergeableState(rawValue: mergeable ?? ""),
+            mergeStateStatus: MergeStateStatus(rawValue: mergeStateStatus ?? "")
         )
     }
 
@@ -654,6 +663,8 @@ private struct GHEnrichResponse: Decodable {
     let additions: Int?
     let deletions: Int?
     let changedFiles: Int?
+    let mergeable: String?
+    let mergeStateStatus: String?
 
     func toEnrichResult() -> PREnrichResult {
         let checks = parseChecks(statusCheckRollup ?? [])
@@ -667,7 +678,9 @@ private struct GHEnrichResponse: Decodable {
         return PREnrichResult(
             checks: checks, reviewDecision: review,
             headBranch: headRefName ?? "", baseBranch: baseRefName ?? "",
-            additions: additions ?? 0, deletions: deletions ?? 0, changedFiles: changedFiles ?? 0
+            additions: additions ?? 0, deletions: deletions ?? 0, changedFiles: changedFiles ?? 0,
+            mergeable: MergeableState(rawValue: mergeable ?? ""),
+            mergeStateStatus: MergeStateStatus(rawValue: mergeStateStatus ?? "")
         )
     }
 }
