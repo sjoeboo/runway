@@ -335,7 +335,7 @@ public final class Database: Sendable {
     }
 
     /// Clear expired PR cache entries.
-    public func cleanPRCache(maxAge: TimeInterval = 3600) throws {
+    public func cleanPRCache(maxAge: TimeInterval = 86400) throws {
         let cutoff = Date().addingTimeInterval(-maxAge)
         try dbQueue.write { db in
             try db.execute(sql: "DELETE FROM pr_cache WHERE fetchedAt < ?", arguments: [cutoff])
@@ -378,7 +378,7 @@ public final class Database: Sendable {
     }
 
     /// Clear expired issue cache entries.
-    public func cleanIssueCache(maxAge: TimeInterval = 3600) throws {
+    public func cleanIssueCache(maxAge: TimeInterval = 86400) throws {
         let cutoff = Date().addingTimeInterval(-maxAge)
         try dbQueue.write { db in
             try db.execute(sql: "DELETE FROM issue_cache WHERE fetchedAt < ?", arguments: [cutoff])
