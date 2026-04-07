@@ -245,7 +245,10 @@ public final class RunwayStore {
             }
 
             for orphan in orphans {
-                let branchName = URL(fileURLWithPath: orphan.path).lastPathComponent
+                let branchName =
+                    orphan.branch.isEmpty
+                    ? URL(fileURLWithPath: orphan.path).lastPathComponent
+                    : orphan.branch
                 let merged =
                     (try? await worktreeManager.isBranchMerged(
                         repoPath: project.path, branch: branchName, into: project.defaultBranch
@@ -258,7 +261,10 @@ public final class RunwayStore {
                         deleteBranch: merged
                     )
                     removedCount += 1
-                    if !merged { preservedBranches += 1 }
+                    if !merged {
+                        preservedBranches += 1
+                        print("[Runway] Preserved unmerged branch for orphaned worktree: \(orphan.path)")
+                    }
                 } catch {
                     print("[Runway] Failed to remove orphaned worktree \(orphan.path): \(error)")
                 }
