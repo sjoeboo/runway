@@ -125,13 +125,40 @@ sed -e "s/__VERSION__/$VERSION/g" \
 cp "$PROJECT_DIR/images/Runway.icns" "$RESOURCES/Runway.icns"
 cp "$PROJECT_DIR/images/App-icon-1024.png" "$RESOURCES/App-icon-1024.png"
 
+# Embed Sparkle.framework (SPM builds it as a dynamic framework)
+FRAMEWORKS="$CONTENTS/Frameworks"
+mkdir -p "$FRAMEWORKS"
+
+# Sparkle is an xcframework binary — SPM extracts it to .build/artifacts/
+SPARKLE_FW=$(find "$PROJECT_DIR/.build/artifacts" -path "*/macos-*/Sparkle.framework" -type d | head -1)
+
+if [[ -n "$SPARKLE_FW" && -d "$SPARKLE_FW" ]]; then
+    echo "    Embedding Sparkle.framework from $SPARKLE_FW"
+    cp -a "$SPARKLE_FW" "$FRAMEWORKS/"
+else
+    echo "Warning: Sparkle.framework not found in build artifacts" >&2
+fi
+
+# Add rpath so the binary finds frameworks in Contents/Frameworks/
+# SPM sets @loader_path but not the standard Frameworks rpath
+install_name_tool -add_rpath @executable_path/../Frameworks "$MACOS/$APP_NAME" 2>/dev/null || true
+
 # Ad-hoc code sign with entitlements (required on Apple Silicon).
 # --options runtime enables the Hardened Runtime so macOS respects the
 # entitlements (inherit, JIT, unsigned memory) needed for spawning
 # shell subprocesses with proper file-system access.
 echo "==> Code signing..."
 ENTITLEMENTS="$SCRIPT_DIR/Runway.entitlements"
-codesign --force --sign - --deep --options runtime --entitlements "$ENTITLEMENTS" "$APP_BUNDLE"
+
+# Sign embedded frameworks first — they must match the app's signing identity.
+# Sparkle.framework ships with its own signature (different Team ID), which
+# causes dyld to reject it when loaded by an ad-hoc signed app.
+find "$FRAMEWORKS" -name "*.framework" -type d | while read fw; do
+    codesign --force --sign - --options runtime "$fw"
+done
+
+# Then sign the app bundle itself
+codesign --force --sign - --options runtime --entitlements "$ENTITLEMENTS" "$APP_BUNDLE"
 
 echo "==> Done: $APP_BUNDLE (version $VERSION)"
 echo ""
