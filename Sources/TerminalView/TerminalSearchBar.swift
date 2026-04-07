@@ -6,24 +6,39 @@ import SwiftUI
 ///
 /// Wraps SwiftTerm's built-in `findNext`/`findPrevious` which handle
 /// selection highlighting and scroll-to-match automatically.
+/// Shows match feedback: "No results" with red tint when nothing found,
+/// or "N matches" when results exist.
 public struct TerminalSearchBar: View {
     @Binding var isVisible: Bool
-    let onFindNext: (String) -> Void
-    let onFindPrevious: (String) -> Void
+    /// Returns true if a match was found.
+    let onFindNext: (String) -> Bool
+    /// Returns true if a match was found.
+    let onFindPrevious: (String) -> Bool
+    /// Returns total match count for the given term, or nil if unavailable.
+    let onCountMatches: ((String) -> Int?)?
     let onDismiss: () -> Void
 
     @State private var searchText: String = ""
+    @State private var searchState: SearchFeedback = .idle
     @FocusState private var isFocused: Bool
+
+    enum SearchFeedback: Equatable {
+        case idle
+        case found(count: Int?)
+        case notFound
+    }
 
     public init(
         isVisible: Binding<Bool>,
-        onFindNext: @escaping (String) -> Void,
-        onFindPrevious: @escaping (String) -> Void,
+        onFindNext: @escaping (String) -> Bool,
+        onFindPrevious: @escaping (String) -> Bool,
+        onCountMatches: ((String) -> Int?)? = nil,
         onDismiss: @escaping () -> Void
     ) {
         self._isVisible = isVisible
         self.onFindNext = onFindNext
         self.onFindPrevious = onFindPrevious
+        self.onCountMatches = onCountMatches
         self.onDismiss = onDismiss
     }
 
@@ -32,27 +47,45 @@ public struct TerminalSearchBar: View {
             HStack(spacing: 6) {
                 Image(systemName: "magnifyingglass")
                     .font(.caption)
-                    .foregroundColor(.secondary)
+                    .foregroundColor(searchState == .notFound ? .red : .secondary)
 
                 TextField("Find in terminal…", text: $searchText)
                     .textFieldStyle(.plain)
                     .font(.caption)
                     .focused($isFocused)
-                    .onSubmit { onFindNext(searchText) }
+                    .onSubmit { performSearch(forward: true) }
+                    .onChange(of: searchText) { _, newValue in
+                        if newValue.isEmpty {
+                            searchState = .idle
+                        }
+                    }
 
-                Button(action: { onFindPrevious(searchText) }) {
+                // Match feedback label
+                if case .found(let count) = searchState {
+                    if let count {
+                        Text("\(count) match\(count == 1 ? "" : "es")")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                    }
+                } else if searchState == .notFound {
+                    Text("No results")
+                        .font(.caption2)
+                        .foregroundColor(.red)
+                }
+
+                Button(action: { performSearch(forward: false) }) {
                     Image(systemName: "chevron.up")
                         .font(.caption2.weight(.semibold))
                 }
                 .buttonStyle(.plain)
-                .disabled(searchText.isEmpty)
+                .disabled(searchText.isEmpty || searchState == .notFound)
 
-                Button(action: { onFindNext(searchText) }) {
+                Button(action: { performSearch(forward: true) }) {
                     Image(systemName: "chevron.down")
                         .font(.caption2.weight(.semibold))
                 }
                 .buttonStyle(.plain)
-                .disabled(searchText.isEmpty)
+                .disabled(searchText.isEmpty || searchState == .notFound)
 
                 Button(action: dismiss) {
                     Image(systemName: "xmark")
@@ -73,8 +106,20 @@ public struct TerminalSearchBar: View {
         }
     }
 
+    private func performSearch(forward: Bool) {
+        guard !searchText.isEmpty else { return }
+        let found = forward ? onFindNext(searchText) : onFindPrevious(searchText)
+        if found {
+            let count = onCountMatches?(searchText)
+            searchState = .found(count: count)
+        } else {
+            searchState = .notFound
+        }
+    }
+
     private func dismiss() {
         searchText = ""
+        searchState = .idle
         onDismiss()
         isVisible = false
     }

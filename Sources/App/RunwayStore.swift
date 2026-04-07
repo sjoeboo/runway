@@ -332,7 +332,7 @@ public final class RunwayStore {
             provisioningWorktreeIDs.insert(session.id)
 
             Task {
-                var sessionPath = request.path
+                let sessionPath: String
                 do {
                     sessionPath = try await worktreeManager.createWorktree(
                         repoPath: request.path,
@@ -340,11 +340,13 @@ public final class RunwayStore {
                         baseBranch: baseBranch
                     )
                 } catch {
-                    print("[Runway] Worktree creation failed, using project path: \(error)")
-                    statusMessage = .error("Worktree failed: \(error.localizedDescription)")
+                    print("[Runway] Worktree creation failed: \(error)")
+                    provisioningWorktreeIDs.remove(session.id)
+                    updateSessionStatus(id: session.id, status: .error)
+                    statusMessage = .error("Worktree failed — session cannot start without branch isolation: \(error.localizedDescription)")
+                    return
                 }
 
-                // Update session path (worktree path on success, project path on failure)
                 if let idx = sessions.firstIndex(where: { $0.id == session.id }) {
                     sessions[idx].path = sessionPath
                 }

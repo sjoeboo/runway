@@ -213,7 +213,7 @@ struct ProjectSection: View {
     }
 
     var body: some View {
-        DisclosureGroup(isExpanded: $isExpanded) {
+        Section(isExpanded: $isExpanded) {
             ForEach(rootSessions) { session in
                 SessionRowView(
                     session: session,
@@ -238,7 +238,7 @@ struct ProjectSection: View {
             .onMove { fromOffsets, toOffset in
                 actions.reorderSessions(in: project.id, fromOffsets: fromOffsets, toOffset: toOffset)
             }
-        } label: {
+        } header: {
             HStack(spacing: 4) {
                 if isRenaming {
                     TextField("Project name", text: $editName)
@@ -255,6 +255,8 @@ struct ProjectSection: View {
                     Text(project.name)
                         .font(.system(.subheadline, weight: .semibold))
                         .foregroundColor(theme.chrome.text)
+                        .accessibilityLabel("Project: \(project.name)")
+                        .accessibilityHint("Tap to open project settings")
                         .onTapGesture {
                             actions.selectProject(project.id)
                         }

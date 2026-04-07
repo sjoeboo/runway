@@ -1,4 +1,5 @@
 import Models
+import SwiftTerm
 import SwiftUI
 import Terminal
 import TerminalView
@@ -82,14 +83,20 @@ public struct TerminalTabView: View {
                     TerminalSearchBar(
                         isVisible: $showSearch,
                         onFindNext: { term in
-                            guard !term.isEmpty else { return }
-                            TerminalSessionCache.shared.existing(sessionID: session.id, tabID: tab.id)?
-                                .findNext(term)
+                            guard !term.isEmpty else { return false }
+                            return TerminalSessionCache.shared.existing(sessionID: session.id, tabID: tab.id)?
+                                .findNext(term) ?? false
                         },
                         onFindPrevious: { term in
-                            guard !term.isEmpty else { return }
-                            TerminalSessionCache.shared.existing(sessionID: session.id, tabID: tab.id)?
-                                .findPrevious(term)
+                            guard !term.isEmpty else { return false }
+                            return TerminalSessionCache.shared.existing(sessionID: session.id, tabID: tab.id)?
+                                .findPrevious(term) ?? false
+                        },
+                        onCountMatches: { term in
+                            guard !term.isEmpty,
+                                let terminal = TerminalSessionCache.shared.existing(sessionID: session.id, tabID: tab.id)
+                            else { return nil }
+                            return countMatches(term, in: terminal)
                         },
                         onDismiss: {
                             TerminalSessionCache.shared.existing(sessionID: session.id, tabID: tab.id)?
@@ -369,5 +376,22 @@ public struct TerminalTabView: View {
         if selectedTabID == id {
             selectedTabID = tabs.first?.id
         }
+    }
+
+    /// Count occurrences of a search term in the terminal buffer text.
+    private func countMatches(_ term: String, in terminalView: LocalProcessTerminalView) -> Int {
+        let data = terminalView.getTerminal().getBufferAsData()
+        guard let text = String(data: data, encoding: .utf8) else { return 0 }
+
+        // Case-insensitive count to match SwiftTerm's default SearchOptions
+        let searchTerm = term.lowercased()
+        let searchIn = text.lowercased()
+        var count = 0
+        var searchRange = searchIn.startIndex..<searchIn.endIndex
+        while let range = searchIn.range(of: searchTerm, range: searchRange) {
+            count += 1
+            searchRange = range.upperBound..<searchIn.endIndex
+        }
+        return count
     }
 }
