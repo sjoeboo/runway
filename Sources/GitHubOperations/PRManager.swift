@@ -10,11 +10,14 @@ public struct PREnrichResult: Sendable {
     public var additions: Int
     public var deletions: Int
     public var changedFiles: Int
+    public var mergeable: MergeableState?
+    public var mergeStateStatus: MergeStateStatus?
 
     public init(
         checks: CheckSummary = CheckSummary(), reviewDecision: ReviewDecision = .none,
         headBranch: String = "", baseBranch: String = "",
-        additions: Int = 0, deletions: Int = 0, changedFiles: Int = 0
+        additions: Int = 0, deletions: Int = 0, changedFiles: Int = 0,
+        mergeable: MergeableState? = nil, mergeStateStatus: MergeStateStatus? = nil
     ) {
         self.checks = checks
         self.reviewDecision = reviewDecision
@@ -23,6 +26,8 @@ public struct PREnrichResult: Sendable {
         self.additions = additions
         self.deletions = deletions
         self.changedFiles = changedFiles
+        self.mergeable = mergeable
+        self.mergeStateStatus = mergeStateStatus
     }
 }
 
@@ -112,7 +117,7 @@ public actor PRManager {
                 "pr", "view", "\(number)",
                 "--repo", repo,
                 "--json",
-                "statusCheckRollup,reviewDecision,headRefName,baseRefName,additions,deletions,changedFiles",
+                "statusCheckRollup,reviewDecision,headRefName,baseRefName,additions,deletions,changedFiles,mergeable,mergeStateStatus",
             ], host: host)
         guard let data = output.data(using: .utf8) else {
             return PREnrichResult()
@@ -128,7 +133,7 @@ public actor PRManager {
                 "pr", "view", "\(number)",
                 "--repo", repo,
                 "--json",
-                "body,reviews,comments,files,statusCheckRollup,reviewDecision,headRefName,baseRefName,additions,deletions,changedFiles",
+                "body,reviews,comments,files,statusCheckRollup,reviewDecision,headRefName,baseRefName,additions,deletions,changedFiles,mergeable,mergeStateStatus",
             ], host: host)
         var detail = try parsePRDetail(output)
 
@@ -225,6 +230,15 @@ public actor PRManager {
             args: ["pr", "merge", "\(number)", "--repo", repo, strategy.cliFlag, "--delete-branch"],
             host: host
         )
+    }
+
+    /// Update a PR branch with the latest base branch (merge or rebase).
+    public func updateBranch(repo: String, number: Int, rebase: Bool = false, host: String? = nil) async throws {
+        var args = ["pr", "update-branch", "\(number)", "--repo", repo]
+        if rebase {
+            args.append("--rebase")
+        }
+        try await runGH(args: args, host: host)
     }
 
     /// Toggle draft state. `gh pr ready` to mark ready; GraphQL mutation to convert to draft.
@@ -540,9 +554,13 @@ private struct GHPRDetailResponse: Decodable {
     let additions: Int?
     let deletions: Int?
     let changedFiles: Int?
+    let mergeable: String?
+    let mergeStateStatus: String?
 
     func toPRDetail() -> PRDetail {
-        let checks = parseChecks(statusCheckRollup ?? [])
+        let rollup = statusCheckRollup ?? []
+        let checks = parseChecks(rollup)
+        let runs = parseCheckRuns(rollup)
 
         let review: ReviewDecision
         switch reviewDecision?.uppercased() {
@@ -568,22 +586,34 @@ private struct GHPRDetailResponse: Decodable {
             comments: mappedComments,
             files: mappedFiles,
             checks: checks,
+            checkRuns: runs,
             reviewDecision: review,
             headBranch: headRefName ?? "",
             baseBranch: baseRefName ?? "",
             additions: additions ?? 0,
             deletions: deletions ?? 0,
-            changedFiles: changedFiles ?? 0
+            changedFiles: changedFiles ?? 0,
+            mergeable: MergeableState(rawValue: mergeable ?? ""),
+            mergeStateStatus: MergeStateStatus(rawValue: mergeStateStatus ?? "")
         )
     }
 
 }
 
 private struct GHCheck: Decodable {
-    let name: String?
+    let name: String?  // CheckRun display name
+    let context: String?  // StatusContext display name
     let status: String?
     let conclusion: String?
     let state: String?  // For StatusContext type checks
+    let detailsUrl: String?  // CheckRun detail link
+    let targetUrl: String?  // StatusContext detail link
+
+    /// Display name — CheckRun uses `name`, StatusContext uses `context`.
+    var displayName: String? { name ?? context }
+
+    /// URL to the check's detail page (works for both CheckRun and StatusContext).
+    var url: String? { detailsUrl ?? targetUrl }
 }
 
 private struct GHReview: Decodable {
@@ -642,6 +672,8 @@ private struct GHEnrichResponse: Decodable {
     let additions: Int?
     let deletions: Int?
     let changedFiles: Int?
+    let mergeable: String?
+    let mergeStateStatus: String?
 
     func toEnrichResult() -> PREnrichResult {
         let checks = parseChecks(statusCheckRollup ?? [])
@@ -655,7 +687,9 @@ private struct GHEnrichResponse: Decodable {
         return PREnrichResult(
             checks: checks, reviewDecision: review,
             headBranch: headRefName ?? "", baseBranch: baseRefName ?? "",
-            additions: additions ?? 0, deletions: deletions ?? 0, changedFiles: changedFiles ?? 0
+            additions: additions ?? 0, deletions: deletions ?? 0, changedFiles: changedFiles ?? 0,
+            mergeable: MergeableState(rawValue: mergeable ?? ""),
+            mergeStateStatus: MergeStateStatus(rawValue: mergeStateStatus ?? "")
         )
     }
 }
@@ -669,32 +703,59 @@ private struct GHFile: Decodable {
 
 // MARK: - Shared Helpers
 
+private func classifyCheck(_ check: GHCheck) -> CheckStatus {
+    let status = check.status?.uppercased() ?? ""
+    let conclusion = check.conclusion?.uppercased() ?? ""
+    let checkState = check.state?.uppercased() ?? ""
+
+    if status == "COMPLETED" {
+        if conclusion == "SUCCESS" || conclusion == "NEUTRAL" || conclusion == "SKIPPED" {
+            return .passed
+        } else if conclusion == "FAILURE" || conclusion == "TIMED_OUT" || conclusion == "CANCELLED" {
+            return .failed
+        } else {
+            return .pending
+        }
+    } else if checkState == "SUCCESS" {
+        return .passed
+    } else if checkState == "FAILURE" || checkState == "ERROR" {
+        return .failed
+    } else {
+        return .pending
+    }
+}
+
 private func parseChecks(_ checks: [GHCheck]) -> CheckSummary {
     var passed = 0
     var failed = 0
     var pending = 0
     for check in checks {
-        let status = check.status?.uppercased() ?? ""
-        let conclusion = check.conclusion?.uppercased() ?? ""
-        let checkState = check.state?.uppercased() ?? ""
-
-        if status == "COMPLETED" {
-            if conclusion == "SUCCESS" || conclusion == "NEUTRAL" || conclusion == "SKIPPED" {
-                passed += 1
-            } else if conclusion == "FAILURE" || conclusion == "TIMED_OUT" || conclusion == "CANCELLED" {
-                failed += 1
-            } else {
-                pending += 1
-            }
-        } else if checkState == "SUCCESS" {
-            passed += 1
-        } else if checkState == "FAILURE" || checkState == "ERROR" {
-            failed += 1
-        } else {
-            pending += 1
+        switch classifyCheck(check) {
+        case .passed: passed += 1
+        case .failed: failed += 1
+        case .pending: pending += 1
         }
     }
     return CheckSummary(passed: passed, failed: failed, pending: pending)
+}
+
+private func parseCheckRuns(_ checks: [GHCheck]) -> [CheckRun] {
+    checks.compactMap { check in
+        guard let name = check.displayName, !name.isEmpty else { return nil }
+        return CheckRun(
+            name: name,
+            status: classifyCheck(check),
+            detailsURL: check.url
+        )
+    }
+    .sorted { lhs, rhs in
+        // Failed first, then pending, then passed
+        let order: [CheckStatus] = [.failed, .pending, .passed]
+        let li = order.firstIndex(of: lhs.status) ?? 2
+        let ri = order.firstIndex(of: rhs.status) ?? 2
+        if li != ri { return li < ri }
+        return lhs.name.localizedCaseInsensitiveCompare(rhs.name) == .orderedAscending
+    }
 }
 
 /// REST API response for /repos/:owner/:repo/pulls/:number/files
