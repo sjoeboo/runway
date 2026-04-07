@@ -12,6 +12,7 @@ let package = Package(
     dependencies: [
         .package(url: "https://github.com/groue/GRDB.swift.git", from: "7.4.0"),
         .package(url: "https://github.com/migueldeicaza/SwiftTerm.git", from: "1.2.0"),
+        .package(url: "https://github.com/sparkle-project/Sparkle", from: "2.0.0"),
     ],
     targets: [
         // MARK: - App Entry Point
@@ -27,6 +28,7 @@ let package = Package(
                 "StatusDetection",
                 "Theme",
                 "Views",
+                .product(name: "Sparkle", package: "Sparkle"),
             ],
             path: "Sources/App"
         ),
@@ -107,6 +109,7 @@ let package = Package(
                 "GitHubOperations",
                 "StatusDetection",
                 "Theme",
+                .product(name: "Sparkle", package: "Sparkle"),
             ],
             path: "Sources/Views"
         ),

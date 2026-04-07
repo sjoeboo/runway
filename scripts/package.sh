@@ -1,12 +1,15 @@
 #!/bin/bash
 # Package Runway as a macOS .app bundle
 #
-# Usage: ./scripts/package.sh [--release] [--universal] [--version <ver>]
+# Usage: ./scripts/package.sh [--release] [--universal] [--version <ver>] [--build-number <n>]
 #
 # Flags:
-#   --release     Build with optimizations (-c release)
-#   --universal   Build arm64 + x86_64 and merge with lipo
-#   --version X   Stamp version X into Info.plist (default: 0.0.0-dev)
+#   --release              Build with optimizations (-c release)
+#   --universal            Build arm64 + x86_64 and merge with lipo
+#   --version X            Stamp version X into Info.plist (default: 0.0.0-dev)
+#   --build-number N       Numeric build number for CFBundleVersion (default: git commit count)
+#   --sparkle-feed-url U   Sparkle appcast feed URL
+#   --sparkle-public-key K Sparkle EdDSA public key (base64)
 #
 # Creates: build/Runway.app
 
@@ -26,6 +29,9 @@ BUILD_CONFIG="debug"
 SWIFT_CONFIG_FLAGS=()
 UNIVERSAL=false
 VERSION="0.0.0-dev"
+BUILD_NUMBER=""
+SPARKLE_FEED_URL=""
+SPARKLE_PUBLIC_KEY=""
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -42,6 +48,18 @@ while [[ $# -gt 0 ]]; do
             VERSION="$2"
             shift 2
             ;;
+        --build-number)
+            BUILD_NUMBER="$2"
+            shift 2
+            ;;
+        --sparkle-feed-url)
+            SPARKLE_FEED_URL="$2"
+            shift 2
+            ;;
+        --sparkle-public-key)
+            SPARKLE_PUBLIC_KEY="$2"
+            shift 2
+            ;;
         *)
             echo "Unknown flag: $1" >&2
             exit 1
@@ -49,7 +67,12 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-echo "==> Building Runway ($BUILD_CONFIG, universal=$UNIVERSAL, version=$VERSION)..."
+# Default build number: git commit count (monotonically increasing)
+if [[ -z "$BUILD_NUMBER" ]]; then
+    BUILD_NUMBER=$(git rev-list --count HEAD 2>/dev/null || echo "1")
+fi
+
+echo "==> Building Runway ($BUILD_CONFIG, universal=$UNIVERSAL, version=$VERSION, build=$BUILD_NUMBER)..."
 cd "$PROJECT_DIR"
 
 if $UNIVERSAL; then
@@ -91,8 +114,12 @@ mkdir -p "$MACOS" "$RESOURCES"
 # Copy executable
 cp "$EXECUTABLE" "$MACOS/$APP_NAME"
 
-# Stamp version into Info.plist
-sed -e "s/__VERSION__/$VERSION/g" "$SCRIPT_DIR/Info.plist" > "$CONTENTS/Info.plist"
+# Stamp version, build number, and Sparkle config into Info.plist
+sed -e "s/__VERSION__/$VERSION/g" \
+    -e "s/__BUILD_NUMBER__/$BUILD_NUMBER/g" \
+    -e "s|__SPARKLE_FEED_URL__|$SPARKLE_FEED_URL|g" \
+    -e "s|__SPARKLE_PUBLIC_KEY__|$SPARKLE_PUBLIC_KEY|g" \
+    "$SCRIPT_DIR/Info.plist" > "$CONTENTS/Info.plist"
 
 # Copy icon and app image resources
 cp "$PROJECT_DIR/images/Runway.icns" "$RESOURCES/Runway.icns"

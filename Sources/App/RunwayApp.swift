@@ -1,6 +1,7 @@
 import GitHubOperations
 import Models
 import Persistence
+import Sparkle
 import StatusDetection
 import SwiftUI
 import Terminal
@@ -10,6 +11,7 @@ import Views
 @main
 struct RunwayApp: App {
     @State private var store: RunwayStore
+    private let updaterController: AppUpdaterController
 
     init() {
         // .app bundles from Finder/Dock inherit a minimal PATH from launchd.
@@ -19,6 +21,7 @@ struct RunwayApp: App {
         ShellRunner.enrichPath()
 
         _store = State(initialValue: RunwayStore())
+        updaterController = AppUpdaterController()
 
         // SPM executables don't get a proper .app bundle, so macOS doesn't
         // activate them as GUI apps. Force regular activation policy so
@@ -40,6 +43,9 @@ struct RunwayApp: App {
         .windowToolbarStyle(.unified)
         .defaultSize(width: 1200, height: 800)
         .commands {
+            CommandGroup(after: .appInfo) {
+                CheckForUpdatesView(updater: updaterController.updater)
+            }
             CommandGroup(after: .sidebar) {
                 Button("Sessions") { store.currentView = .sessions }
                     .keyboardShortcut("1", modifiers: .command)
@@ -71,12 +77,12 @@ struct RunwayApp: App {
         }
 
         Settings {
-            SettingsView()
+            SettingsView(updater: updaterController.updater)
                 .environment(store.themeManager)
         }
 
         MenuBarExtra {
-            MenuBarView()
+            MenuBarView(updater: updaterController.updater)
                 .environment(store)
         } label: {
             menuBarLabel
