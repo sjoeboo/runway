@@ -86,11 +86,30 @@ jobs:
           # Verify archive exists
           ls -la "$ARCHIVE"
 
-          # Write key to temp file and pass via -f (env var detection unreliable in CI)
+          # Debug key (length only, not content)
+          echo "Key length: ${#SPARKLE_PRIVATE_KEY}"
+          echo "Key first 4 chars: ${SPARKLE_PRIVATE_KEY:0:4}"
+
+          # Write key to temp file and pass via -f
           KEY_FILE=$(mktemp)
           printenv SPARKLE_PRIVATE_KEY > "$KEY_FILE"
-          SIGN_OUTPUT=$("${{ steps.sparkle.outputs.bin }}/sign_update" "$ARCHIVE" -f "$KEY_FILE")
+          echo "Key file size: $(wc -c < "$KEY_FILE")"
+          echo "Key file lines: $(wc -l < "$KEY_FILE")"
+
+          # Run sign_update with visible stderr
+          set +e
+          SIGN_OUTPUT=$("${{ steps.sparkle.outputs.bin }}/sign_update" "$ARCHIVE" -f "$KEY_FILE" 2>&1)
+          EXIT_CODE=$?
+          set -e
           rm -f "$KEY_FILE"
+
+          echo "sign_update exit code: $EXIT_CODE"
+          echo "sign_update output: $SIGN_OUTPUT"
+
+          if [ $EXIT_CODE -ne 0 ]; then
+            echo "::error::sign_update failed with exit code $EXIT_CODE"
+            exit 1
+          fi
           echo "signature=$SIGN_OUTPUT" >> "$GITHUB_OUTPUT"
           echo "Signed: $SIGN_OUTPUT"
 
