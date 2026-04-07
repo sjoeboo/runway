@@ -54,6 +54,7 @@ public struct SessionHeaderView: View {
                             }
                             .buttonStyle(.plain)
                             .help("Toggle changes sidebar (⌘3)")
+                            .accessibilityLabel("Toggle changes sidebar")
                         }
 
                         // Tool + permission mode badge

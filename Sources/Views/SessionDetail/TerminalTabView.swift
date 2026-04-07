@@ -138,6 +138,7 @@ public struct TerminalTabView: View {
             }
             .buttonStyle(.plain)
             .help("New shell tab")
+            .accessibilityLabel("New shell tab")
 
             Spacer()
 
@@ -152,6 +153,7 @@ public struct TerminalTabView: View {
                     }
                     .buttonStyle(.plain)
                     .help("Split pane down (top/bottom)")
+                    .accessibilityLabel("Split pane down")
 
                     Button(action: splitRight) {
                         Image(systemName: "rectangle.split.2x1")
@@ -161,6 +163,7 @@ public struct TerminalTabView: View {
                     }
                     .buttonStyle(.plain)
                     .help("Split pane right (left/right)")
+                    .accessibilityLabel("Split pane right")
                 }
                 .padding(.trailing, 4)
             }

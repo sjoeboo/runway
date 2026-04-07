@@ -51,6 +51,11 @@ public struct StatusDetector: Sendable {
             return .idle
         }
 
+        // Line-start idle patterns (anchored to prevent false positives)
+        if containsLineStartPattern(content, patterns: lineStartIdlePatterns) {
+            return .idle
+        }
+
         return nil
     }
 
@@ -98,11 +103,15 @@ public struct StatusDetector: Sendable {
 
     private let idlePatterns = [
         "❯ ",
-        "> ",
-        "$ ",
         "How can I help",
         "What would you like to do",
         "Enter your prompt",
+    ]
+
+    /// Patterns that only match at line start (avoids false positives from "> " or "$ " in output).
+    private let lineStartIdlePatterns = [
+        "> ",
+        "$ ",
     ]
 
     /// Braille spinner characters used by Claude Code.
@@ -117,6 +126,13 @@ public struct StatusDetector: Sendable {
 
     private func containsAny(_ content: String, patterns: [String]) -> Bool {
         patterns.contains(where: { content.contains($0) })
+    }
+
+    private func containsLineStartPattern(_ content: String, patterns: [String]) -> Bool {
+        let lines = content.components(separatedBy: "\n")
+        return lines.contains { line in
+            patterns.contains { line.hasPrefix($0) }
+        }
     }
 
     // MARK: - ANSI Stripping

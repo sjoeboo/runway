@@ -408,31 +408,33 @@ struct SessionRowView: View {
             }
             Spacer()
 
-            if isHovered {
-                HStack(spacing: 4) {
-                    Button {
-                        Task { await actions.restartSession(id: session.id) }
-                    } label: {
-                        Image(systemName: "arrow.counterclockwise")
-                            .font(.callout)
-                            .foregroundStyle(.secondary)
-                            .frame(width: 26, height: 26)
-                    }
-                    .buttonStyle(.plain)
-                    .help("Restart session")
-
-                    Button {
-                        showDeleteConfirmation = true
-                    } label: {
-                        Image(systemName: "trash")
-                            .font(.callout)
-                            .foregroundStyle(.secondary)
-                            .frame(width: 26, height: 26)
-                    }
-                    .buttonStyle(.plain)
-                    .help("Delete session")
+            HStack(spacing: 4) {
+                Button {
+                    Task { await actions.restartSession(id: session.id) }
+                } label: {
+                    Image(systemName: "arrow.counterclockwise")
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                        .frame(width: 26, height: 26)
                 }
-            } else if session.tool != .claude {
+                .buttonStyle(.plain)
+                .help("Restart session")
+
+                Button {
+                    showDeleteConfirmation = true
+                } label: {
+                    Image(systemName: "trash")
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                        .frame(width: 26, height: 26)
+                }
+                .buttonStyle(.plain)
+                .help("Delete session")
+            }
+            .opacity(isHovered ? 1 : 0)
+            .allowsHitTesting(isHovered)
+
+            if !isHovered && session.tool != .claude {
                 Text(session.tool.displayName)
                     .font(.caption2)
                     .padding(.horizontal, 4)

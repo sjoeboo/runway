@@ -37,7 +37,6 @@ public struct DiffView: View {
                 }
             }
         }
-        .font(.custom(fontFamily, size: fontSize))
     }
 
     private var diffSummary: some View {
@@ -49,7 +48,7 @@ public struct DiffView: View {
             Text("-\(totalDeletions)")
                 .foregroundColor(theme.chrome.red)
         }
-        .font(.custom(fontFamily, size: fontSize - 1))
+        .font(.callout)
         .padding(8)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(theme.chrome.surface)
@@ -117,6 +116,7 @@ public struct DiffView: View {
             Text(line.content)
                 .font(.custom(fontFamily, size: fontSize))
                 .foregroundColor(lineColor(line.type))
+                .textSelection(.enabled)
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
         .padding(.horizontal, 4)
@@ -157,7 +157,7 @@ public struct DiffView: View {
 // MARK: - Diff Data Models
 
 public struct DiffFile: Identifiable, Sendable {
-    public var id: String { path }
+    public let id: String
     public let path: String
     public let additions: Int
     public let deletions: Int
@@ -178,7 +178,8 @@ public struct DiffFile: Identifiable, Sendable {
             if rawLine.hasPrefix("diff --git") {
                 // Save previous file
                 if let path = currentPath {
-                    files.append(DiffFile(path: path, additions: additions, deletions: deletions, lines: currentLines))
+                    files.append(
+                        DiffFile(id: "file-\(files.count)", path: path, additions: additions, deletions: deletions, lines: currentLines))
                 }
                 currentLines = []
                 additions = 0
@@ -225,7 +226,7 @@ public struct DiffFile: Identifiable, Sendable {
 
         // Save last file
         if let path = currentPath {
-            files.append(DiffFile(path: path, additions: additions, deletions: deletions, lines: currentLines))
+            files.append(DiffFile(id: "file-\(files.count)", path: path, additions: additions, deletions: deletions, lines: currentLines))
         }
 
         return files

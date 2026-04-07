@@ -121,6 +121,7 @@ public struct NewSessionDialog: View {
         }
         .padding(24)
         .frame(width: 420)
+        .fixedSize(horizontal: false, vertical: true)
         .onAppear {
             permissionMode = defaultPermissionMode
         }

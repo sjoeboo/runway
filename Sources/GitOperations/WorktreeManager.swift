@@ -118,9 +118,14 @@ public actor WorktreeManager {
     }
 
     /// Get the current branch name for a directory.
+    /// Returns nil for detached HEAD (git returns literal "HEAD").
     public func currentBranch(path: String) async -> String? {
-        try? await runGit(in: path, args: ["rev-parse", "--abbrev-ref", "HEAD"])
-            .trimmingCharacters(in: .whitespacesAndNewlines)
+        guard
+            let result = try? await runGit(in: path, args: ["rev-parse", "--abbrev-ref", "HEAD"])
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+        else { return nil }
+        // Detached HEAD returns the literal string "HEAD"
+        return result == "HEAD" ? nil : result
     }
 
     /// Get a summary of changes in the working directory.

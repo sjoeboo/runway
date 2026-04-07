@@ -131,7 +131,7 @@ struct ContentView: View {
             } detail: {
                 detail
             }
-            .navigationSplitViewStyle(.balanced)
+            .navigationSplitViewStyle(.prominentDetail)
             .toolbar {
                 toolbarContent
             }
@@ -260,14 +260,21 @@ struct ContentView: View {
                 .buttonStyle(.plain)
             }
         }
-        .foregroundColor(.white)
         .padding(.horizontal, 12)
         .padding(.vertical, 6)
-        .background(toastColor(for: msg.kind).opacity(0.9))
+        .background(toastColor(for: msg.kind))
+        .foregroundStyle(.white)
         .cornerRadius(6)
         .padding(.bottom, 8)
         .transition(reduceMotion ? .opacity : .move(edge: .bottom).combined(with: .opacity))
         .animation(reduceMotion ? .none : .easeInOut(duration: 0.3), value: msg)
+        .onAppear {
+            NSAccessibility.post(
+                element: NSApp as Any,
+                notification: .announcementRequested,
+                userInfo: [.announcement: msg.text, .priority: NSAccessibilityPriorityLevel.high.rawValue]
+            )
+        }
     }
 
     private func toastColor(for kind: StatusMessage.Kind) -> Color {

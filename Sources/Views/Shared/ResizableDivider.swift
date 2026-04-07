@@ -40,5 +40,14 @@ struct ResizableDivider: View {
                     }
             )
             .animation(.easeOut(duration: 0.15), value: isDragging)
+            .accessibilityLabel("Resize panel")
+            .accessibilityValue("\(Int(width))pt")
+            .accessibilityAdjustableAction { direction in
+                switch direction {
+                case .increment: width = min(width + 20, maxWidth)
+                case .decrement: width = max(width - 20, minWidth)
+                @unknown default: break
+                }
+            }
     }
 }

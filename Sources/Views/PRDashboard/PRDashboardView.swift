@@ -320,6 +320,7 @@ public struct PRDashboardView: View {
                 .padding(.vertical, 6)
         }
         .buttonStyle(.plain)
+        .accessibilityAddTraits(selectedTab == tab ? .isSelected : [])
     }
 
     // MARK: - Group Header

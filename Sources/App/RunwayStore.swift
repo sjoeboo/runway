@@ -353,16 +353,16 @@ public final class RunwayStore {
                 provisioningWorktreeIDs.remove(session.id)
 
                 // Now start the tmux session with the resolved path
-                await startTmuxSession(for: &session, path: sessionPath, initialPrompt: request.initialPrompt)
+                await startTmuxSession(for: session, path: sessionPath, initialPrompt: request.initialPrompt)
             }
         } else {
             // No worktree needed — start tmux immediately
-            await startTmuxSession(for: &session, path: request.path, initialPrompt: request.initialPrompt)
+            await startTmuxSession(for: session, path: request.path, initialPrompt: request.initialPrompt)
         }
     }
 
     /// Creates the tmux session and updates the session status to .running.
-    private func startTmuxSession(for session: inout Session, path: String, initialPrompt: String? = nil) async {
+    private func startTmuxSession(for session: Session, path: String, initialPrompt: String? = nil) async {
         guard tmuxAvailable else {
             updateSessionStatus(id: session.id, status: .error)
             statusMessage = .error("tmux not found — install it with: brew install tmux")
@@ -461,9 +461,6 @@ public final class RunwayStore {
         }
 
         try? database?.updateSessionStatus(id: id, status: sessions[idx].status)
-        // Re-select to trigger view refresh
-        selectedSessionID = nil
-        selectedSessionID = id
     }
 
     public func deleteSession(id: String, deleteWorktree: Bool = false) {
@@ -774,6 +771,7 @@ public final class RunwayStore {
     }
 
     func fetchPRs() async {
+        guard !isLoadingPRs else { return }
         isLoadingPRs = true
         defer { isLoadingPRs = false }
 
@@ -852,6 +850,7 @@ public final class RunwayStore {
 
         try? database?.cachePRs(pullRequests)
         try? database?.cleanPRCache()
+        try? database?.cleanIssueCache()
 
         await linkSessionPRs()
     }
@@ -930,9 +929,12 @@ public final class RunwayStore {
                 guard !Task.isCancelled, let self else { return }
                 guard !self.isLoadingPRs else { continue }
                 let fingerprint = await self.prManager.prFingerprint(filter: .mine)
-                guard let fingerprint else { continue }
-                if fingerprint != self.lastPRFingerprint {
+                // Fetch if fingerprint changed OR if stale (>5 min) to catch reviewRequested changes
+                let isStale = self.prLastFetched.map { Date().timeIntervalSince($0) > 300 } ?? true
+                if let fingerprint, fingerprint != self.lastPRFingerprint {
                     self.lastPRFingerprint = fingerprint
+                    await self.fetchPRs()
+                } else if isStale {
                     await self.fetchPRs()
                 }
             }
@@ -1330,7 +1332,7 @@ public final class RunwayStore {
 
             provisioningWorktreeIDs.remove(session.id)
 
-            await startTmuxSession(for: &session, path: sessionPath, initialPrompt: initialPrompt.isEmpty ? nil : initialPrompt)
+            await startTmuxSession(for: session, path: sessionPath, initialPrompt: initialPrompt.isEmpty ? nil : initialPrompt)
         }
     }
 

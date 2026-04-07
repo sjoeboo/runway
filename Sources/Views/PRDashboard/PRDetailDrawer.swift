@@ -389,7 +389,6 @@ public struct PRDetailDrawer: View {
                     .padding(.top, 8)
                 }
                 .buttonStyle(.plain)
-                .keyboardShortcut(KeyEquivalent(Character("\(index + 1)")), modifiers: .control)
             }
             Spacer()
         }
@@ -545,8 +544,9 @@ public struct PRDetailDrawer: View {
     @ViewBuilder
     private var diffTab: some View {
         if let files = detail?.files, !files.isEmpty {
-            let diffFiles = files.map { file in
+            let diffFiles = files.enumerated().map { index, file in
                 DiffFile(
+                    id: "prfile-\(index)",
                     path: file.path,
                     additions: file.additions,
                     deletions: file.deletions,
