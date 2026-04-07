@@ -138,6 +138,25 @@ public final class RunwayStore {
                 }
             }
 
+            // Auto-detect GitHub repo for projects that don't have one yet
+            for i in projects.indices where projects[i].ghRepo == nil {
+                if let detected = await issueManager.detectRepo(path: projects[i].path) {
+                    projects[i].ghRepo = detected.repo
+                    projects[i].ghHost = detected.host
+                    projects[i].issuesEnabled = true
+                    try? db.saveProject(projects[i])
+                }
+            }
+
+            // Load cached issues for instant display on startup
+            for project in projects {
+                if let repo = project.ghRepo,
+                    let cached = try? db.cachedIssues(repo: repo, maxAge: 86400), !cached.isEmpty
+                {
+                    projectIssues[project.id] = cached
+                }
+            }
+
             // Reconcile DB sessions with live tmux sessions
             if tmuxAvailable {
                 let liveTmux = await tmuxManager.listSessions()
@@ -403,12 +422,21 @@ public final class RunwayStore {
         projects.append(project)
         try? database?.saveProject(project)
 
-        // Auto-detect default branch in background
+        // Auto-detect default branch and GitHub repo in background
         let projectID = project.id
         Task {
             let detected = await worktreeManager.detectDefaultBranch(repoPath: path)
             if detected != defaultBranch, let idx = projects.firstIndex(where: { $0.id == projectID }) {
                 projects[idx].defaultBranch = detected
+                try? database?.saveProject(projects[idx])
+            }
+
+            if let repo = await issueManager.detectRepo(path: path),
+                let idx = projects.firstIndex(where: { $0.id == projectID })
+            {
+                projects[idx].ghRepo = repo.repo
+                projects[idx].ghHost = repo.host
+                projects[idx].issuesEnabled = true
                 try? database?.saveProject(projects[idx])
             }
         }
@@ -425,6 +453,9 @@ public final class RunwayStore {
         selectedProjectID = projectID
         selectedSessionID = nil
         selectionVersion += 1
+        if currentView == .prs {
+            currentView = .sessions
+        }
     }
 
     public func selectSession(_ sessionID: String?) {
@@ -629,7 +660,7 @@ public final class RunwayStore {
 
     /// Load cached PRs from database for instant display on startup.
     func loadCachedPRs() {
-        if let cached = try? database?.cachedPRs(maxAge: 3600), !cached.isEmpty {
+        if let cached = try? database?.cachedPRs(maxAge: 86400), !cached.isEmpty {
             pullRequests = cached
         }
     }
