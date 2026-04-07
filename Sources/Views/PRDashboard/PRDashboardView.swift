@@ -103,7 +103,9 @@ public struct PRDashboardView: View {
     }
 
     private func tabCount(_ tab: PRTab) -> Int {
-        applyFilters(to: pullRequests, tab: tab).count
+        var prs = applyFilters(to: pullRequests, tab: tab)
+        if hideDrafts { prs = prs.filter { !$0.isDraft } }
+        return prs.count
     }
 
     // MARK: - Grouping
@@ -227,29 +229,43 @@ public struct PRDashboardView: View {
                     }
                     Spacer()
                 } else {
-                    let groups = groupedPRs()
-                    List(
-                        selection: Binding(
-                            get: { selectedPRID },
-                            set: { id in
-                                let pr = pullRequests.first(where: { $0.id == id })
-                                onSelectPR(pr)
-                            }
-                        )
-                    ) {
-                        ForEach(groups.filter { !($0.group == .drafts && hideDrafts) }, id: \.group) { entry in
-                            Section {
-                                if isGroupExpanded(entry.group) {
-                                    ForEach(entry.prs) { pr in
-                                        PRRowView(
-                                            pr: pr,
-                                            onReview: onReviewPR.map { callback in { callback(pr) } }
-                                        )
-                                        .tag(pr.id)
-                                    }
+                    let visibleGroups = groupedPRs().filter { !($0.group == .drafts && hideDrafts) }
+                    if visibleGroups.isEmpty {
+                        Spacer()
+                        VStack(spacing: 8) {
+                            Image(systemName: "pull.request")
+                                .font(.largeTitle)
+                                .foregroundStyle(.secondary)
+                            Text("No pull requests")
+                                .foregroundStyle(.secondary)
+                            Button("Refresh") { onRefresh() }
+                                .controlSize(.small)
+                        }
+                        Spacer()
+                    } else {
+                        List(
+                            selection: Binding(
+                                get: { selectedPRID },
+                                set: { id in
+                                    let pr = pullRequests.first(where: { $0.id == id })
+                                    onSelectPR(pr)
                                 }
-                            } header: {
-                                groupHeader(entry.group, count: entry.prs.count)
+                            )
+                        ) {
+                            ForEach(visibleGroups, id: \.group) { entry in
+                                Section {
+                                    if isGroupExpanded(entry.group) {
+                                        ForEach(entry.prs) { pr in
+                                            PRRowView(
+                                                pr: pr,
+                                                onReview: onReviewPR.map { callback in { callback(pr) } }
+                                            )
+                                            .tag(pr.id)
+                                        }
+                                    }
+                                } header: {
+                                    groupHeader(entry.group, count: entry.prs.count)
+                                }
                             }
                         }
                     }
