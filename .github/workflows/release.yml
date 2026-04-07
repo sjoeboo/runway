@@ -86,8 +86,15 @@ jobs:
           # Verify archive exists
           ls -la "$ARCHIVE"
 
-          # sign_update reads SPARKLE_PRIVATE_KEY from the environment
-          SIGN_OUTPUT=$("${{ steps.sparkle.outputs.bin }}/sign_update" "$ARCHIVE")
+          # Capture stderr to see actual error
+          set +e
+          SIGN_OUTPUT=$("${{ steps.sparkle.outputs.bin }}/sign_update" "$ARCHIVE" 2>&1)
+          EXIT_CODE=$?
+          set -e
+          echo "Exit: $EXIT_CODE"
+          echo "Output: $SIGN_OUTPUT"
+          echo "Key length: ${#SPARKLE_PRIVATE_KEY}"
+          if [ $EXIT_CODE -ne 0 ]; then exit 1; fi
           echo "signature=$SIGN_OUTPUT" >> "$GITHUB_OUTPUT"
           echo "Signed: $SIGN_OUTPUT"
 
