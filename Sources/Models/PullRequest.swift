@@ -136,6 +136,36 @@ public struct CheckSummary: Codable, Sendable {
     public var hasFailed: Bool { failed > 0 }
 }
 
+// MARK: - Check Run (individual check detail)
+
+public struct CheckRun: Identifiable, Codable, Sendable {
+    public let id: String
+    public var name: String
+    public var status: CheckStatus
+    public var detailsURL: String?
+
+    public init(name: String, status: CheckStatus, detailsURL: String? = nil) {
+        self.id = name
+        self.name = name
+        self.status = status
+        self.detailsURL = detailsURL
+    }
+}
+
+public enum CheckStatus: String, Codable, Sendable {
+    case passed
+    case failed
+    case pending
+
+    public var label: String {
+        switch self {
+        case .passed: "Passed"
+        case .failed: "Failed"
+        case .pending: "Pending"
+        }
+    }
+}
+
 // MARK: - PR Detail (lazy-loaded)
 
 public struct PRDetail: Codable, Sendable {
@@ -144,6 +174,7 @@ public struct PRDetail: Codable, Sendable {
     public var comments: [PRComment]
     public var files: [PRFileChange]
     public var checks: CheckSummary
+    public var checkRuns: [CheckRun]
     public var reviewDecision: ReviewDecision
     public var headBranch: String
     public var baseBranch: String
@@ -157,6 +188,7 @@ public struct PRDetail: Codable, Sendable {
         comments: [PRComment] = [],
         files: [PRFileChange] = [],
         checks: CheckSummary = CheckSummary(),
+        checkRuns: [CheckRun] = [],
         reviewDecision: ReviewDecision = .none,
         headBranch: String = "",
         baseBranch: String = "",
@@ -169,6 +201,7 @@ public struct PRDetail: Codable, Sendable {
         self.comments = comments
         self.files = files
         self.checks = checks
+        self.checkRuns = checkRuns
         self.reviewDecision = reviewDecision
         self.headBranch = headBranch
         self.baseBranch = baseBranch
