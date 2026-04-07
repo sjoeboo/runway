@@ -11,31 +11,32 @@
 
 ---
 
-## What is Runway?
+**Runway** is a native macOS command center for AI coding agents. One window replaces the terminal tabs, browser windows, and git commands you juggle when working with [Claude Code](https://docs.anthropic.com/en/docs/claude-code) and similar tools.
 
-Runway is a single-window command center for developers who work with AI coding agents like Claude Code. Instead of juggling terminal tabs, browser windows, and git commands, Runway gives you:
+## Highlights
 
-- **Embedded terminals** with real-time status detection (running, waiting, idle, error)
-- **Git worktree isolation** — every session gets its own branch and working copy
-- **GitHub PR dashboard** — review, approve, merge, request changes, and comment without leaving the app
-- **Project organization** — group sessions by project, configure per-project settings
-- **GitHub Issues** — view, create, and manage issues per project
-- **Theme system** — 6 built-in themes (Tokyo Night, Ayu Mirage, Everforest, Oasis Lagoon) applied to both UI and terminal
-- **Terminal search** — `Cmd+F` find-in-terminal powered by SwiftTerm
-- **Session search** — `Cmd+K` to filter sessions and projects by name or branch
-- **Send text bar** — `Cmd+Shift+X` to send prompts to a session without switching focus
+| | Feature | What you get |
+|---|---------|-------------|
+| **🖥** | **Embedded terminals** | Full terminal emulator with ANSI truecolor, search (`Cmd+F`), drag-and-drop, and font customization |
+| **🌿** | **Git worktree isolation** | Every session gets its own branch and working copy — `main` stays clean |
+| **🔍** | **Live status detection** | See at a glance whether each agent is running, waiting, idle, or errored |
+| **📋** | **GitHub PR dashboard** | Review, approve, merge, request changes, toggle automerge, and view CI checks — all without leaving the app |
+| **📌** | **GitHub Issues** | View, create, and manage issues per project |
+| **🎨** | **Theme system** | 6 built-in themes (Tokyo Night, Ayu Mirage, Everforest, Oasis Lagoon) applied to both UI chrome and terminal |
+| **📂** | **Project organization** | Group sessions by project with per-project settings for theme, permissions, and branch prefix |
+| **⌨️** | **Keyboard-driven** | 11 shortcuts — `Cmd+K` search, `Cmd+N` new session, `Cmd+Shift+X` send bar, and more |
 
-## Quick Start
+## Install
 
-### Prerequisites
+### Download (recommended)
 
-- macOS 14 (Sonoma) or later
-- [Swift 6.0+](https://www.swift.org/install/) (bundled with Xcode 16+)
-- [GitHub CLI](https://cli.github.com/) (`gh`) for PR and issue features
-- Git (bundled with Xcode Command Line Tools)
-- tmux (recommended — enables session persistence across app restarts)
+Grab the latest **Runway.dmg** from the [Releases](https://github.com/sjoeboo/runway/releases) page, open the DMG, and drag Runway to Applications.
 
-### Build & Run
+> Runway includes Sparkle for automatic updates — you'll be notified when new versions are available.
+
+### Build from source
+
+**Prerequisites:** macOS 14+, Swift 6.0+ (Xcode 16+), Git, [GitHub CLI](https://cli.github.com/) (`gh`)
 
 ```bash
 git clone https://github.com/sjoeboo/runway.git
@@ -44,26 +45,22 @@ swift build
 swift run Runway
 ```
 
-### Development Setup
-
-Install the linting and formatting tools:
+To build a proper `.app` bundle:
 
 ```bash
-make setup   # installs swiftlint and swift-format via Homebrew
+make package        # → build/Runway.app (release universal binary)
+make dmg            # → build/Runway.dmg (requires package first)
+make dist           # → package + DMG in one step
 ```
 
-### Common Commands
+### Development setup
 
 ```bash
-make check      # build + test + lint + format-check (mirrors CI)
-make test       # run all tests
-make fix        # auto-fix lint and format issues
-make precommit  # fix, then verify everything passes
-make lint       # SwiftLint only
-make help       # show all available targets
+make setup          # installs swiftlint, swift-format, and git pre-commit hook
+make check          # build + test + lint + format-check (mirrors CI)
+make fix            # auto-fix lint and format issues
+make precommit      # fix, then verify everything passes
 ```
-
-All PRs must pass the CI pipeline (build, test, SwiftLint, swift-format) before merging.
 
 ## Features
 
@@ -71,7 +68,7 @@ All PRs must pass the CI pipeline (build, test, SwiftLint, swift-format) before 
 
 Create named sessions tied to projects. Each session launches a terminal running your chosen tool (Claude Code, shell, or custom command) in an isolated git worktree.
 
-- **Auto-branch naming** — session name automatically suggests a branch using the project's configured prefix (default: `feature/`)
+- **Auto-branch naming** — session name suggests a branch using the project's configured prefix (default: `feature/`)
 - **Per-project branch prefixes** — configure `feature/`, `fix/`, `yourname/`, or any prefix in Project Settings
 - **Worktree isolation** — each session works in `.worktrees/{branch}`, keeping `main` clean
 - **Worktree cleanup** — delete confirmation offers "Delete Session Only" or "Delete Session & Worktree" (removes branch too)
@@ -90,24 +87,17 @@ Runway knows what your agent is doing. Two detection paths work together:
 | **HTTP Hooks** | Claude Code sends lifecycle events (session start, permission request, stop) to Runway's hook server |
 | **Buffer Polling** | Every 3 seconds, terminal buffer content is scanned for 90+ patterns — spinners, prompts, permission dialogs, idle indicators |
 
-Hook injection is automatic — Runway writes to `~/.claude/settings.json` on every launch with the current port (force-updated to handle ephemeral ports).
+Hook injection is automatic — Runway writes to `~/.claude/settings.json` on every launch with the current ephemeral port.
 
-Status shows in the sidebar as colored indicators:
-- Green circle = running
-- Yellow half-circle = waiting for permission
-- Hollow circle = idle
-- Spinner = starting
-- Red X = error
-- Dim dot = stopped
+Status shows in the sidebar as colored indicators: green (running), yellow (waiting for permission), hollow (idle), spinner (starting), red (error), dim (stopped).
 
-### Terminal Features
+### Terminal
 
-- **Embedded SwiftTerm** terminal with full ANSI 256-color and truecolor support
+- **Embedded SwiftTerm** with full ANSI 256-color and truecolor support
 - **Cmd+F search** — find text in terminal history with next/previous navigation
-- **Cmd+Shift+X send bar** — type and send prompts to the terminal without switching focus (useful while viewing diffs or PRs)
-- **Shift+Enter** — sends CSI u escape sequence recognized by Claude Code as "insert newline"
-- **Native text selection** — mouse events are intercepted to ensure copy/paste always works
-- **Drag and drop** — drop files into the terminal to insert their paths
+- **Cmd+Shift+X send bar** — type and send prompts without switching focus
+- **Shift+Enter** — insert newline (recognized by Claude Code)
+- **Drag and drop** — drop files and images into the terminal to insert their paths
 - **Font customization** — choose font family (grouped: Nerd Fonts, Monospaced, All) and size with live preview
 
 ### GitHub PR Dashboard
@@ -115,13 +105,14 @@ Status shows in the sidebar as colored indicators:
 Built-in PR management powered by `gh` CLI:
 
 - **Three views**: All PRs, Mine, Review Requested
-- **Detail drawer** with Overview, Diff, and Conversation tabs (`Ctrl+1/2/3` to switch)
-- **Actions**: approve, request changes, comment, merge (squash/merge/rebase), toggle draft
+- **PR grouping** by status with merge-state badges
+- **Detail drawer** with Overview, Diff, and Conversation tabs (`Ctrl+1/2/3`)
+- **Actions**: approve, request changes, comment, merge (squash/merge/rebase), toggle draft, toggle automerge
+- **CI checks tab** — view GitHub Actions / CI check results per PR
 - **Visual status**: check results (passed/failed/pending), review decision badges, diff stats (+/-)
-- **PR enrichment**: background-fetches detail data with bounded concurrency; unenriched PRs show loading spinners
 - **Session linking**: PRs are matched to sessions by worktree branch
-- **Send to Session**: button in PR detail navigates to the linked session with the send bar open
-- **Conversation timeline**: reviews and comments interleaved by date with colored left-border accents indicating review decisions
+- **Send to Session**: navigate to the linked session with the send bar open
+- **Conversation timeline**: reviews and comments interleaved chronologically with colored accents for review decisions
 
 ### GitHub Issues
 
@@ -129,16 +120,17 @@ Per-project issue management:
 
 - **Enable per project** in Project Settings (auto-detects repo via git remote)
 - **Issue list** with labels and status
+- **Issue detail view** — full-parity detail drawer matching the PR experience
 - **Create issues** with title, body, and label selection
 - **Open in browser** for full GitHub UI when needed
 
 ### Project Settings
 
-Per-project configuration accessible from the sidebar context menu:
+Per-project configuration from the sidebar context menu:
 
 - **Theme override** — use a different theme for specific projects
-- **Permission mode default** — set the default permission mode for new sessions
-- **Branch prefix** — customize auto-generated branch names (e.g., `fix/`, `release/`, `yourname/`)
+- **Permission mode default** — set the default for new sessions
+- **Branch prefix** — customize auto-generated branch names
 - **GitHub integration** — enable issues, auto-detect repository
 
 ### Theme System
@@ -167,34 +159,35 @@ Themes apply to both the app chrome (sidebar, toolbar, status bar) and the termi
 | `Cmd+K` | Focus sidebar search |
 | `Cmd+F` | Find in terminal |
 | `Cmd+Shift+X` | Toggle send-to-session bar |
-| `Shift+Enter` | Newline in terminal (instead of submit) |
-| `Ctrl+1` | PR detail: Overview tab |
-| `Ctrl+2` | PR detail: Diff tab |
-| `Ctrl+3` | PR detail: Conversation tab |
-
-### Toast Notifications
-
-- **Success/info** toasts auto-dismiss after 3 seconds
-- **Error** toasts persist until dismissed (click X) — text is selectable for copying
+| `Shift+Enter` | Newline in terminal |
+| `Ctrl+1/2/3` | PR detail: Overview / Diff / Conversation |
 
 ## Architecture
 
-Runway is a pure SwiftUI app built with Swift Package Manager. The codebase is split into 11 focused targets:
+Pure SwiftUI app built with Swift Package Manager. 11 focused targets:
 
 ```
 Sources/
 ├── App/                # @main entry, RunwayStore, window setup
-├── Models/             # Session, Project, PullRequest, HookEvent
-├── Persistence/        # GRDB/SQLite database (WAL mode, ~/.runway/state.db)
-├── Terminal/           # TerminalProvider protocol, PTY process management
+├── Models/             # Session, Project, PullRequest, HookEvent, GitHubIssue
+├── Persistence/        # GRDB/SQLite (WAL mode, ~/.runway/state.db)
+├── Terminal/           # TerminalProvider protocol, PTY + tmux management
 ├── TerminalView/       # NSViewRepresentable wrapping SwiftTerm, search bar, event monitors
 ├── GitOperations/      # Actor-based git worktree CLI wrapper
-├── GitHubOperations/   # Actor-based gh CLI wrapper for PR and issue management
-├── StatusDetection/    # Hook server + terminal buffer scanner + hook injector
+├── GitHubOperations/   # Actor-based gh CLI wrapper (PRs + issues)
+├── StatusDetection/    # Hook server + buffer scanner + hook injector
 ├── Theme/              # AppTheme, ChromePalette, TerminalPalette
-├── Views/              # All SwiftUI views (sidebar, session detail, PRs, settings)
+├── Views/              # All SwiftUI views
 └── CGhosttyVT/         # libghostty wrapper (standby — awaiting SIMD support)
 ```
+
+### Dependencies
+
+| Package | Purpose |
+|---------|---------|
+| [GRDB.swift](https://github.com/groue/GRDB.swift) | SQLite ORM with typed records and migrations |
+| [SwiftTerm](https://github.com/migueldeicaza/SwiftTerm) | Terminal emulator (AppKit NSView) with search API |
+| [Sparkle](https://github.com/sparkle-project/Sparkle) | Auto-update framework for macOS |
 
 ### Key Patterns
 
@@ -206,14 +199,6 @@ Sources/
 | TerminalProvider protocol | Terminal target | Abstracts backend (SwiftTerm now, libghostty later) |
 | GRDB typed records | Persistence | Type-safe SQLite with migrations (currently v8) |
 | Environment injection | Theme | `@Environment(\.theme)` for consistent theming |
-
-### Dependencies
-
-| Package | Version | Purpose |
-|---------|---------|---------|
-| [GRDB.swift](https://github.com/groue/GRDB.swift) | 7.4.0+ | SQLite ORM with typed records and migrations |
-| [SwiftTerm](https://github.com/migueldeicaza/SwiftTerm) | 1.2.0+ | Terminal emulator (AppKit NSView) with search API |
-| [libghostty-spm](https://github.com/nicholsonm/libghostty-spm) | 1.0.0+ | GPU-accelerated terminal (on standby) |
 
 ## Configuration
 
@@ -228,57 +213,22 @@ Runway stores its state in `~/.runway/`:
 
 ### Claude Code Integration
 
-Runway auto-injects hooks into `~/.claude/settings.json` on every launch (force-updated to handle ephemeral ports), subscribing to:
+Runway auto-injects hooks into `~/.claude/settings.json` on every launch, subscribing to lifecycle events: `SessionStart`, `UserPromptSubmit`, `PermissionRequest`, `Notification`, `Stop`, `SessionEnd`. Hook injection uses atomic writes (temp file + rename) and skips re-injection when hooks already point to the correct port.
 
-- `SessionStart` — marks session as running
-- `UserPromptSubmit` — marks session as running
-- `PermissionRequest` — marks session as waiting
-- `Notification` — permission prompts and elicitation dialogs
-- `Stop` — marks session as idle
-- `SessionEnd` — marks session as stopped
+## CI & Testing
 
-Hook injection uses atomic writes (temp file + rename) and skips re-injection only when the existing hooks already point to the correct port.
-
-## Development Status
-
-Runway is in **active development**. Core features are complete and stable.
-
-### CI & Testing
-
-- **118 tests** across 7 test targets (Models, Persistence, StatusDetection, Theme, Terminal, GitOperations, GitHubOperations)
-- **GitHub Actions CI** runs on every PR: build, test, SwiftLint, swift-format
+- **118 tests** across 8 test targets
+- **GitHub Actions CI** on every PR: build, test, SwiftLint, swift-format
 - **Branch protection** on `master` — CI must pass before merging
-- **SwiftLint** enforces safety (no force casts/unwraps/try) and style
-- **swift-format** enforces consistent formatting
 - **Pre-commit hooks** run lint + format checks locally
 
-### What Works
-
-- Session creation with git worktree isolation and cleanup
-- Embedded terminal with SwiftTerm (multi-tab, search, send bar)
-- Session persistence across app restarts via tmux + SQLite
-- Live status detection (hook server + buffer polling)
-- GitHub PR dashboard (fetch, filter, detail view, approve, comment, merge, request changes, toggle draft)
-- PR-to-session linking with "Send to Session" workflow
-- GitHub Issues per project (list, create, labels)
-- Permission mode picker with color-coded security badges
-- Default branch auto-detection (`main` vs `master`)
-- Theme system with 6 built-in themes + system appearance auto-switching
-- Font customization (family + size, grouped picker, Nerd Font default)
-- Claude Code hook injection (auto-updated on every launch)
-- Project organization with per-project settings (theme, permissions, branch prefix)
-- Sidebar search/filter (`Cmd+K`)
-- Comprehensive keyboard shortcuts (11 shortcuts across all workflows)
-- Persistent error toasts with dismiss control
-
-### Planned
+## Planned
 
 - Multi-session split view / open session in new window
 - Menu bar extra for monitoring agent status
 - Session templates (save common configurations)
 - Global activity feed / cross-session dashboard
 - Session-to-session tree (parent/child agent visualization)
-- Proper `.app` bundle with icon and entitlements
 
 ## License
 
