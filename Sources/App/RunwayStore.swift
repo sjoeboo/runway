@@ -43,6 +43,10 @@ public final class RunwayStore {
     var tmuxAvailable: Bool = false
     var showSendBar: Bool = false
     var showTerminalSearch: Bool = false
+    /// Incremented to trigger a horizontal split in the active terminal tab.
+    var splitHorizontalTrigger: Int = 0
+    /// Incremented to trigger a vertical split in the active terminal tab.
+    var splitVerticalTrigger: Int = 0
     var sidebarSearchQuery: String = ""
     var focusSidebarSearch: Bool = false
     var showReviewPRDialog: Bool = false

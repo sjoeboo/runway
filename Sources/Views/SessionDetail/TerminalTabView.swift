@@ -24,6 +24,8 @@ public struct TerminalTabView: View {
     let session: Session
     let tmuxManager: TmuxSessionManager
     @Binding var showSearch: Bool
+    @Binding var splitHorizontalTrigger: Int
+    @Binding var splitVerticalTrigger: Int
     @State private var tabs: [TerminalTab] = []
     @State private var selectedTabID: String?
     @State private var shellCounter: Int = 0
@@ -31,10 +33,18 @@ public struct TerminalTabView: View {
     @AppStorage("terminalFontFamily") private var fontFamily: String = "MesloLGS Nerd Font"
     @AppStorage("terminalFontSize") private var fontSize: Double = 13
 
-    public init(session: Session, tmuxManager: TmuxSessionManager = TmuxSessionManager(), showSearch: Binding<Bool>) {
+    public init(
+        session: Session,
+        tmuxManager: TmuxSessionManager = TmuxSessionManager(),
+        showSearch: Binding<Bool>,
+        splitHorizontalTrigger: Binding<Int> = .constant(0),
+        splitVerticalTrigger: Binding<Int> = .constant(0)
+    ) {
         self.session = session
         self.tmuxManager = tmuxManager
         self._showSearch = showSearch
+        self._splitHorizontalTrigger = splitHorizontalTrigger
+        self._splitVerticalTrigger = splitVerticalTrigger
     }
 
     public var body: some View {
@@ -97,6 +107,8 @@ public struct TerminalTabView: View {
             selectedTabID = nil
             initializeTabsIfReady()
         }
+        .onChange(of: splitHorizontalTrigger) { _, _ in splitVertical() }
+        .onChange(of: splitVerticalTrigger) { _, _ in splitHorizontal() }
         .onChange(of: session.status) { _, newStatus in
             // Wait for the tmux session to be created before attaching.
             // TerminalPane calls `tmux attach-session` immediately, so we
@@ -128,6 +140,30 @@ public struct TerminalTabView: View {
             .help("New shell tab")
 
             Spacer()
+
+            // Split pane buttons
+            if selectedTab != nil {
+                HStack(spacing: 2) {
+                    Button(action: splitVertical) {
+                        Image(systemName: "rectangle.split.1x2")
+                            .font(.caption)
+                            .foregroundColor(theme.chrome.textDim)
+                            .frame(width: 28, height: 28)
+                    }
+                    .buttonStyle(.plain)
+                    .help("Split pane horizontally (top/bottom)")
+
+                    Button(action: splitHorizontal) {
+                        Image(systemName: "rectangle.split.2x1")
+                            .font(.caption)
+                            .foregroundColor(theme.chrome.textDim)
+                            .frame(width: 28, height: 28)
+                    }
+                    .buttonStyle(.plain)
+                    .help("Split pane vertically (left/right)")
+                }
+                .padding(.trailing, 4)
+            }
         }
         .padding(.horizontal, 4)
         .padding(.vertical, 2)
@@ -299,6 +335,20 @@ public struct TerminalTabView: View {
 
             tabs.append(tab)
             selectedTabID = tab.id
+        }
+    }
+
+    private func splitVertical() {
+        guard let tab = selectedTab, let tmuxName = tab.config.tmuxSessionName else { return }
+        Task {
+            try? await tmuxManager.splitWindow(sessionName: tmuxName, direction: .horizontal)
+        }
+    }
+
+    private func splitHorizontal() {
+        guard let tab = selectedTab, let tmuxName = tab.config.tmuxSessionName else { return }
+        Task {
+            try? await tmuxManager.splitWindow(sessionName: tmuxName, direction: .vertical)
         }
     }
 
