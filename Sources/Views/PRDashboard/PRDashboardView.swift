@@ -29,6 +29,8 @@ public struct PRDashboardView: View {
     @AppStorage("prGroupNeedsAttentionExpanded") private var needsAttentionExpanded: Bool = true
     @AppStorage("prGroupInProgressExpanded") private var inProgressExpanded: Bool = true
     @AppStorage("prGroupReadyExpanded") private var readyExpanded: Bool = true
+    @AppStorage("prGroupWaitingForReviewExpanded") private var waitingForReviewExpanded: Bool = true
+    @AppStorage("prGroupDraftsExpanded") private var draftsExpanded: Bool = false
     @Environment(\.theme) private var theme
 
     public init(
@@ -93,10 +95,6 @@ public struct PRDashboardView: View {
             result = result.filter { sessionPRIDs.contains($0.id) }
         }
 
-        if hideDrafts {
-            result = result.filter { !$0.isDraft }
-        }
-
         return result
     }
 
@@ -105,31 +103,17 @@ public struct PRDashboardView: View {
     }
 
     private func tabCount(_ tab: PRTab) -> Int {
-        applyFilters(to: pullRequests, tab: tab).count
+        var prs = applyFilters(to: pullRequests, tab: tab)
+        if hideDrafts { prs = prs.filter { !$0.isDraft } }
+        return prs.count
     }
 
     // MARK: - Grouping
 
-    enum PRGroup: String, CaseIterable {
-        case needsAttention = "Needs Attention"
-        case inProgress = "In Progress"
-        case ready = "Ready"
-    }
-
-    private func group(for pr: PullRequest) -> PRGroup {
-        if pr.checks.hasFailed || pr.reviewDecision == .changesRequested {
-            return .needsAttention
-        }
-        if pr.checks.allPassed && pr.reviewDecision == .approved {
-            return .ready
-        }
-        return .inProgress
-    }
-
     private func groupedPRs() -> [(group: PRGroup, prs: [PullRequest])] {
         var byGroup: [PRGroup: [PullRequest]] = [:]
         for pr in filteredPRs {
-            let g = group(for: pr)
+            let g = prGroup(for: pr)
             byGroup[g, default: []].append(pr)
         }
         return PRGroup.allCases.compactMap { g in
@@ -143,6 +127,8 @@ public struct PRDashboardView: View {
         case .needsAttention: return needsAttentionExpanded
         case .inProgress: return inProgressExpanded
         case .ready: return readyExpanded
+        case .waitingForReview: return waitingForReviewExpanded
+        case .drafts: return draftsExpanded
         }
     }
 
@@ -151,6 +137,8 @@ public struct PRDashboardView: View {
         case .needsAttention: needsAttentionExpanded.toggle()
         case .inProgress: inProgressExpanded.toggle()
         case .ready: readyExpanded.toggle()
+        case .waitingForReview: waitingForReviewExpanded.toggle()
+        case .drafts: draftsExpanded.toggle()
         }
     }
 
@@ -159,6 +147,8 @@ public struct PRDashboardView: View {
         case .needsAttention: return theme.chrome.red
         case .inProgress: return theme.chrome.yellow
         case .ready: return theme.chrome.green
+        case .waitingForReview: return theme.chrome.accent
+        case .drafts: return theme.chrome.textDim
         }
     }
 
@@ -167,6 +157,8 @@ public struct PRDashboardView: View {
         case .needsAttention: return "exclamationmark.circle"
         case .inProgress: return "clock"
         case .ready: return "checkmark.circle"
+        case .waitingForReview: return "eye"
+        case .drafts: return "circle.dashed"
         }
     }
 
@@ -237,29 +229,43 @@ public struct PRDashboardView: View {
                     }
                     Spacer()
                 } else {
-                    let groups = groupedPRs()
-                    List(
-                        selection: Binding(
-                            get: { selectedPRID },
-                            set: { id in
-                                let pr = pullRequests.first(where: { $0.id == id })
-                                onSelectPR(pr)
-                            }
-                        )
-                    ) {
-                        ForEach(groups, id: \.group) { entry in
-                            Section {
-                                if isGroupExpanded(entry.group) {
-                                    ForEach(entry.prs) { pr in
-                                        PRRowView(
-                                            pr: pr,
-                                            onReview: onReviewPR.map { callback in { callback(pr) } }
-                                        )
-                                        .tag(pr.id)
-                                    }
+                    let visibleGroups = groupedPRs().filter { !($0.group == .drafts && hideDrafts) }
+                    if visibleGroups.isEmpty {
+                        Spacer()
+                        VStack(spacing: 8) {
+                            Image(systemName: "pull.request")
+                                .font(.largeTitle)
+                                .foregroundStyle(.secondary)
+                            Text("No pull requests")
+                                .foregroundStyle(.secondary)
+                            Button("Refresh") { onRefresh() }
+                                .controlSize(.small)
+                        }
+                        Spacer()
+                    } else {
+                        List(
+                            selection: Binding(
+                                get: { selectedPRID },
+                                set: { id in
+                                    let pr = pullRequests.first(where: { $0.id == id })
+                                    onSelectPR(pr)
                                 }
-                            } header: {
-                                groupHeader(entry.group, count: entry.prs.count)
+                            )
+                        ) {
+                            ForEach(visibleGroups, id: \.group) { entry in
+                                Section {
+                                    if isGroupExpanded(entry.group) {
+                                        ForEach(entry.prs) { pr in
+                                            PRRowView(
+                                                pr: pr,
+                                                onReview: onReviewPR.map { callback in { callback(pr) } }
+                                            )
+                                            .tag(pr.id)
+                                        }
+                                    }
+                                } header: {
+                                    groupHeader(entry.group, count: entry.prs.count)
+                                }
                             }
                         }
                     }
@@ -342,6 +348,49 @@ public struct PRDashboardView: View {
     }
 }
 
+// MARK: - Grouping
+
+enum PRGroup: String, CaseIterable {
+    case needsAttention = "Needs Attention"
+    case inProgress = "In Progress"
+    case waitingForReview = "Waiting for Review"
+    case ready = "Ready"
+    case drafts = "Drafts"
+}
+
+/// Determine which group a PR belongs to.
+///
+/// Evaluation order: drafts first, then needsAttention → inProgress → waitingForReview → ready.
+/// Package-internal for testability.
+func prGroup(for pr: PullRequest) -> PRGroup {
+    // Drafts always go to their own section
+    if pr.isDraft { return .drafts }
+
+    // Needs Attention: failed checks, changes requested, conflicts, or blocked
+    if pr.checks.hasFailed
+        || pr.reviewDecision == .changesRequested
+        || pr.mergeable == .conflicting
+        || pr.mergeStateStatus == .blocked
+    {
+        return .needsAttention
+    }
+
+    // In Progress: checks not yet all passed
+    // Treat unenriched PRs (enrichedAt == nil, total == 0) as in-progress
+    let checksEffectivelyPassed = pr.checks.allPassed || (pr.checks.total == 0 && pr.enrichedAt != nil)
+    if !checksEffectivelyPassed {
+        return .inProgress
+    }
+
+    // Waiting for Review: checks passed, but no approval yet
+    if pr.reviewDecision == .pending || pr.reviewDecision == .none {
+        return .waitingForReview
+    }
+
+    // Ready: checks passed + approved
+    return .ready
+}
+
 // MARK: - PR Tab
 
 public enum PRTab: String, CaseIterable, Sendable {
@@ -389,6 +438,7 @@ struct PRRowView: View {
                         .foregroundStyle(.secondary)
                     CheckSummaryBadge(checks: pr.checks)
                     ReviewDecisionBadge(decision: pr.reviewDecision)
+                    MergeStatusBadge(mergeable: pr.mergeable, mergeStateStatus: pr.mergeStateStatus)
                 }
             }
 

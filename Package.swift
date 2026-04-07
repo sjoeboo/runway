@@ -150,5 +150,10 @@ let package = Package(
             dependencies: ["Terminal"],
             path: "Tests/TerminalTests"
         ),
+        .testTarget(
+            name: "ViewsTests",
+            dependencies: ["Views", "Models"],
+            path: "Tests/ViewsTests"
+        ),
     ]
 )

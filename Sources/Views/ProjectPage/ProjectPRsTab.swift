@@ -196,6 +196,7 @@ private struct ProjectPRRowView: View {
                         .foregroundStyle(.secondary)
                     CheckSummaryBadge(checks: pr.checks)
                     ReviewDecisionBadge(decision: pr.reviewDecision)
+                    MergeStatusBadge(mergeable: pr.mergeable, mergeStateStatus: pr.mergeStateStatus)
                 }
             }
 
