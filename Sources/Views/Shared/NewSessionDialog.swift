@@ -15,6 +15,7 @@ public struct NewSessionDialog: View {
     @State private var branchManuallyEdited: Bool = false
     @AppStorage("defaultPermissionMode") private var defaultPermissionMode: PermissionMode = .default
     @State private var permissionMode: PermissionMode = .default
+    @State private var initialPrompt: String = ""
     @State private var validationError: String?
 
     let projects: [Project]
@@ -115,6 +116,25 @@ public struct NewSessionDialog: View {
                             }
                         ), placeholder: "feature/my-feature")
                 }
+
+                // Initial prompt (only for Claude sessions)
+                if tool == .claude {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Initial Prompt")
+                            .font(.caption)
+                            .foregroundColor(theme.chrome.textDim)
+                        TextEditor(text: $initialPrompt)
+                            .font(.body)
+                            .frame(minHeight: 60, maxHeight: 120)
+                            .scrollContentBackground(.hidden)
+                            .background(Color(nsColor: .textBackgroundColor))
+                            .cornerRadius(6)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 6)
+                                    .stroke(Color(nsColor: .separatorColor), lineWidth: 1)
+                            )
+                    }
+                }
             }
 
             if let error = validationError {
@@ -177,7 +197,8 @@ public struct NewSessionDialog: View {
             tool: tool,
             useWorktree: useWorktree,
             branchName: useWorktree ? branchName : nil,
-            permissionMode: tool == .claude ? permissionMode : .default
+            permissionMode: tool == .claude ? permissionMode : .default,
+            initialPrompt: (tool == .claude && !initialPrompt.isEmpty) ? initialPrompt : nil
         )
 
         onCreate(request)
