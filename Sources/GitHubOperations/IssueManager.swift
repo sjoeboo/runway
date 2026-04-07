@@ -5,6 +5,108 @@ import Models
 public actor IssueManager {
     public init() {}
 
+    // MARK: - Detail Cache
+
+    private var detailCache: [String: (detail: IssueDetail, fetchedAt: Date)] = [:]
+    private let detailTTL: TimeInterval = 300
+
+    public func evictDetail(repo: String, number: Int) {
+        detailCache.removeValue(forKey: "\(repo)#\(number)")
+    }
+
+    // MARK: - fetchDetail
+
+    /// Fetch detailed issue information including body, comments, timeline events, labels, and assignees.
+    /// Results are cached for 5 minutes.
+    public func fetchDetail(repo: String, number: Int, host: String? = nil) async throws -> IssueDetail {
+        let cacheKey = "\(repo)#\(number)"
+        if let cached = detailCache[cacheKey],
+            Date().timeIntervalSince(cached.fetchedAt) < detailTTL
+        {
+            return cached.detail
+        }
+
+        // Call 1: gh issue view (rich metadata + comments)
+        let viewOutput = try await runGH(
+            args: [
+                "issue", "view", "\(number)",
+                "--repo", repo,
+                "--json", "body,comments,labels,assignees,milestone,stateReason",
+            ], host: host)
+
+        // Call 2: timeline events via REST API
+        // --slurp wraps paginated results into [[...]] so multi-page responses decode correctly
+        let timelineOutput = try await runGH(
+            args: ["api", "repos/\(repo)/issues/\(number)/timeline", "--paginate", "--slurp"],
+            host: host)
+
+        let detail = try parseIssueDetail(viewOutput: viewOutput, timelineOutput: timelineOutput)
+        detailCache[cacheKey] = (detail: detail, fetchedAt: Date())
+        return detail
+    }
+
+    // MARK: - Mutations
+
+    /// Edit an issue's title and/or body.
+    public func editIssue(
+        repo: String, number: Int, host: String? = nil,
+        title: String? = nil, body: String? = nil
+    ) async throws {
+        var args = ["issue", "edit", "\(number)", "--repo", repo]
+        if let title { args += ["--title", title] }
+        if let body { args += ["--body", body] }
+        try await runGH(args: args, host: host)
+        evictDetail(repo: repo, number: number)
+    }
+
+    /// Add a comment to an issue.
+    public func addComment(repo: String, number: Int, host: String? = nil, body: String) async throws {
+        try await runGH(
+            args: ["issue", "comment", "\(number)", "--repo", repo, "--body", body],
+            host: host)
+        evictDetail(repo: repo, number: number)
+    }
+
+    /// Close an issue with an optional reason.
+    public func closeIssue(
+        repo: String, number: Int, host: String? = nil, reason: CloseReason = .completed
+    ) async throws {
+        try await runGH(
+            args: ["issue", "close", "\(number)", "--repo", repo, "--reason", reason.cliValue],
+            host: host)
+        evictDetail(repo: repo, number: number)
+    }
+
+    /// Reopen a closed issue.
+    public func reopenIssue(repo: String, number: Int, host: String? = nil) async throws {
+        try await runGH(args: ["issue", "reopen", "\(number)", "--repo", repo], host: host)
+        evictDetail(repo: repo, number: number)
+    }
+
+    /// Add and/or remove labels on an issue.
+    public func updateLabels(
+        repo: String, number: Int, host: String? = nil,
+        add: [String] = [], remove: [String] = []
+    ) async throws {
+        var args = ["issue", "edit", "\(number)", "--repo", repo]
+        for label in add { args += ["--add-label", label] }
+        for label in remove { args += ["--remove-label", label] }
+        try await runGH(args: args, host: host)
+        evictDetail(repo: repo, number: number)
+    }
+
+    /// Add and/or remove assignees on an issue.
+    public func updateAssignees(
+        repo: String, number: Int, host: String? = nil,
+        add: [String] = [], remove: [String] = []
+    ) async throws {
+        var args = ["issue", "edit", "\(number)", "--repo", repo]
+        for user in add { args += ["--add-assignee", user] }
+        for user in remove { args += ["--remove-assignee", user] }
+        try await runGH(args: args, host: host)
+        evictDetail(repo: repo, number: number)
+    }
+
     /// Fetch issues for a given repo.
     public func fetchIssues(repo: String, host: String? = nil) async throws -> [GitHubIssue] {
         let args = [
@@ -70,6 +172,107 @@ public actor IssueManager {
     private func parseLabels(_ json: String) throws -> [IssueLabel] {
         guard let data = json.data(using: .utf8) else { return [] }
         return try JSONDecoder.issueGH.decode([IssueLabel].self, from: data)
+    }
+
+    private func parseIssueDetail(viewOutput: String, timelineOutput: String) throws -> IssueDetail {
+        // Decode gh issue view response
+        guard let viewData = viewOutput.data(using: .utf8) else {
+            return IssueDetail()
+        }
+        let viewItem = try JSONDecoder.issueGH.decode(GHIssueViewItem.self, from: viewData)
+
+        // Map comments
+        let comments: [IssueComment] = viewItem.comments.map { comment in
+            IssueComment(
+                id: comment.id,
+                author: comment.author?.login ?? "",
+                body: comment.body ?? "",
+                createdAt: comment.createdAt ?? Date(),
+                updatedAt: comment.updatedAt ?? Date()
+            )
+        }
+
+        // Map labels
+        let labels: [IssueDetailLabel] = viewItem.labels.map { label in
+            IssueDetailLabel(name: label.name, color: label.color ?? "")
+        }
+
+        // Map assignees
+        let assignees: [String] = viewItem.assignees.map { $0.login }
+
+        // Decode timeline events (filter out "commented" — use comments from view instead)
+        // --slurp wraps paginated pages into [[...]], so decode as nested array and flatMap
+        var timelineEvents: [IssueTimelineEvent] = []
+        if let timelineData = timelineOutput.data(using: .utf8) {
+            let rawEvents: [GHTimelineEvent]
+            if let nested = try? JSONDecoder.issueGH.decode(
+                [[GHTimelineEvent]].self, from: timelineData
+            ) {
+                rawEvents = nested.flatMap { $0 }
+            } else if let flat = try? JSONDecoder.issueGH.decode(
+                [GHTimelineEvent].self, from: timelineData
+            ) {
+                rawEvents = flat
+            } else {
+                rawEvents = []
+            }
+
+            timelineEvents =
+                rawEvents
+                .enumerated()
+                .compactMap { (index, ev) in
+                    guard let event = ev.event, event != "commented" else { return nil }
+                    let actor = ev.actor?.login ?? ""
+                    let id = "\(event)-\(actor)-\(index)"
+                    let eventDate = ev.createdAt ?? Date()
+
+                    // Map label
+                    let label: IssueDetailLabel? = ev.label.map {
+                        IssueDetailLabel(name: $0.name, color: $0.color ?? "")
+                    }
+
+                    // Map assignee
+                    let assignee: String? = ev.assignee?.login
+
+                    // Map cross-reference source
+                    var source: IssueReference?
+                    if event == "cross-referenced", let src = ev.source?.issue {
+                        let refType = src.pullRequest != nil ? "pullRequest" : "issue"
+                        source = IssueReference(
+                            type: refType,
+                            number: src.number ?? 0,
+                            title: src.title ?? "",
+                            url: src.htmlURL ?? ""
+                        )
+                    }
+
+                    // Map rename
+                    let rename: IssueRename? = ev.rename.map {
+                        IssueRename(from: $0.from, to: $0.to)
+                    }
+
+                    return IssueTimelineEvent(
+                        id: id,
+                        event: event,
+                        actor: actor,
+                        createdAt: eventDate,
+                        label: label,
+                        assignee: assignee,
+                        source: source,
+                        rename: rename
+                    )
+                }
+        }
+
+        return IssueDetail(
+            body: viewItem.body ?? "",
+            comments: comments,
+            timelineEvents: timelineEvents,
+            labels: labels,
+            assignees: assignees,
+            milestone: viewItem.milestone?.title,
+            stateReason: viewItem.stateReason
+        )
     }
 
     private func parseRemoteURL(_ url: String) -> (repo: String, host: String?)? {
@@ -180,4 +383,76 @@ private struct GHIssueLabelItem: Decodable {
 
 private struct GHIssueAssignee: Decodable {
     let login: String
+}
+
+// MARK: - GH Detail JSON Models
+
+private struct GHIssueViewItem: Decodable {
+    let body: String?
+    let comments: [GHIssueCommentItem]
+    let labels: [GHIssueViewLabel]
+    let assignees: [GHIssueAssignee]
+    let milestone: GHMilestone?
+    let stateReason: String?
+}
+
+private struct GHIssueCommentItem: Decodable {
+    let id: String
+    let author: GHIssueAuthor?
+    let body: String?
+    let createdAt: Date?
+    let updatedAt: Date?
+}
+
+private struct GHIssueViewLabel: Decodable {
+    let name: String
+    let color: String?
+}
+
+private struct GHMilestone: Decodable {
+    let title: String?
+}
+
+private struct GHTimelineEvent: Decodable {
+    let event: String?
+    let actor: GHIssueAuthor?
+    let createdAt: Date?
+    let label: GHTimelineLabel?
+    let assignee: GHIssueAuthor?
+    let source: GHTimelineSource?
+    let rename: GHTimelineRename?
+
+    enum CodingKeys: String, CodingKey {
+        case event, actor, label, assignee, source, rename
+        case createdAt = "created_at"
+    }
+}
+
+private struct GHTimelineLabel: Decodable {
+    let name: String
+    let color: String?
+}
+
+private struct GHTimelineSource: Decodable {
+    let issue: GHTimelineSourceIssue?
+}
+
+private struct GHTimelineSourceIssue: Decodable {
+    let number: Int?
+    let title: String?
+    let htmlURL: String?
+    let pullRequest: GHTimelinePullRequestMarker?
+
+    enum CodingKeys: String, CodingKey {
+        case number, title
+        case htmlURL = "html_url"
+        case pullRequest = "pull_request"
+    }
+}
+
+private struct GHTimelinePullRequestMarker: Decodable {}
+
+private struct GHTimelineRename: Decodable {
+    let from: String
+    let to: String
 }

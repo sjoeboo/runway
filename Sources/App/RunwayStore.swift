@@ -66,6 +66,9 @@ public final class RunwayStore {
     var isLoadingIssues: Bool = false
     var projectLabels: [String: [IssueLabel]] = [:]
     var issueLastFetched: [String: Date] = [:]  // keyed by project ID
+    var selectedIssueID: String?
+    var issueDetail: IssueDetail?
+    var isLoadingIssueDetail: Bool = false
 
     // MARK: - Managers
     let themeManager: ThemeManager
@@ -1079,10 +1082,100 @@ public final class RunwayStore {
         }
     }
 
-    func openIssueInBrowser(_ issue: GitHubIssue) {
-        if let url = URL(string: issue.url) {
-            NSWorkspace.shared.open(url)
+    func selectIssue(_ issue: GitHubIssue?) async {
+        selectedIssueID = issue?.id
+        issueDetail = nil
+        guard let issue else { return }
+
+        isLoadingIssueDetail = true
+        defer { isLoadingIssueDetail = false }
+
+        do {
+            let host = issue.url.contains("github.com") ? nil : extractHost(from: issue.url)
+            let detail = try await issueManager.fetchDetail(repo: issue.repo, number: issue.number, host: host)
+            issueDetail = detail
+        } catch {
+            print("[Runway] Failed to fetch issue detail: \(error)")
         }
+    }
+
+    private func extractHost(from urlString: String) -> String? {
+        guard let url = URL(string: urlString), let host = url.host, host != "github.com" else { return nil }
+        return host
+    }
+
+    func editIssue(_ issue: GitHubIssue, title: String?, body: String?) async {
+        guard let project = projectForIssue(issue) else { return }
+        do {
+            try await issueManager.editIssue(repo: issue.repo, number: issue.number, host: project.ghHost, title: title, body: body)
+            statusMessage = .success("Issue #\(issue.number) updated")
+            issueDetail = try? await issueManager.fetchDetail(repo: issue.repo, number: issue.number, host: project.ghHost)
+            await fetchIssues(forProject: project.id)
+        } catch {
+            statusMessage = .error("Edit failed: \(error.localizedDescription)")
+        }
+    }
+
+    func commentOnIssue(_ issue: GitHubIssue, body: String) async {
+        guard let project = projectForIssue(issue) else { return }
+        do {
+            try await issueManager.addComment(repo: issue.repo, number: issue.number, host: project.ghHost, body: body)
+            issueDetail = try? await issueManager.fetchDetail(repo: issue.repo, number: issue.number, host: project.ghHost)
+        } catch {
+            statusMessage = .error("Comment failed: \(error.localizedDescription)")
+        }
+    }
+
+    func closeIssue(_ issue: GitHubIssue, reason: CloseReason) async {
+        guard let project = projectForIssue(issue) else { return }
+        do {
+            try await issueManager.closeIssue(repo: issue.repo, number: issue.number, host: project.ghHost, reason: reason)
+            statusMessage = .success("Closed #\(issue.number)")
+            issueDetail = try? await issueManager.fetchDetail(repo: issue.repo, number: issue.number, host: project.ghHost)
+            await fetchIssues(forProject: project.id)
+        } catch {
+            statusMessage = .error("Close failed: \(error.localizedDescription)")
+        }
+    }
+
+    func reopenIssue(_ issue: GitHubIssue) async {
+        guard let project = projectForIssue(issue) else { return }
+        do {
+            try await issueManager.reopenIssue(repo: issue.repo, number: issue.number, host: project.ghHost)
+            statusMessage = .success("Reopened #\(issue.number)")
+            issueDetail = try? await issueManager.fetchDetail(repo: issue.repo, number: issue.number, host: project.ghHost)
+            await fetchIssues(forProject: project.id)
+        } catch {
+            statusMessage = .error("Reopen failed: \(error.localizedDescription)")
+        }
+    }
+
+    func updateIssueLabels(_ issue: GitHubIssue, add: [String], remove: [String]) async {
+        guard let project = projectForIssue(issue) else { return }
+        do {
+            try await issueManager.updateLabels(repo: issue.repo, number: issue.number, host: project.ghHost, add: add, remove: remove)
+            statusMessage = .success("Labels updated")
+            issueDetail = try? await issueManager.fetchDetail(repo: issue.repo, number: issue.number, host: project.ghHost)
+            await fetchIssues(forProject: project.id)
+        } catch {
+            statusMessage = .error("Label update failed: \(error.localizedDescription)")
+        }
+    }
+
+    func updateIssueAssignees(_ issue: GitHubIssue, add: [String], remove: [String]) async {
+        guard let project = projectForIssue(issue) else { return }
+        do {
+            try await issueManager.updateAssignees(repo: issue.repo, number: issue.number, host: project.ghHost, add: add, remove: remove)
+            statusMessage = .success("Assignees updated")
+            issueDetail = try? await issueManager.fetchDetail(repo: issue.repo, number: issue.number, host: project.ghHost)
+            await fetchIssues(forProject: project.id)
+        } catch {
+            statusMessage = .error("Assignee update failed: \(error.localizedDescription)")
+        }
+    }
+
+    private func projectForIssue(_ issue: GitHubIssue) -> Project? {
+        projects.first(where: { $0.ghRepo == issue.repo })
     }
 
     // MARK: - PR Review Session
