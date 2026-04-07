@@ -39,6 +39,12 @@ jobs:
           echo "build_number=$BUILD_NUMBER" >> "$GITHUB_OUTPUT"
           echo "Building version: $VERSION (build $BUILD_NUMBER)"
 
+      - name: Check Sparkle signing key
+        id: sparkle_key
+        env:
+          HAS_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY != '' }}
+        run: echo "available=$HAS_KEY" >> "$GITHUB_OUTPUT"
+
       - name: Download Sparkle
         id: sparkle
         run: |
@@ -69,7 +75,7 @@ jobs:
           echo "Created $ZIP_NAME"
 
       - name: Sign update with Sparkle EdDSA
-        if: ${{ secrets.SPARKLE_PRIVATE_KEY != '' }}
+        if: steps.sparkle_key.outputs.available == 'true'
         id: sparkle_sign
         env:
           SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
@@ -83,7 +89,7 @@ jobs:
           echo "Signed: $SIGN_OUTPUT"
 
       - name: Generate appcast
-        if: ${{ secrets.SPARKLE_PRIVATE_KEY != '' }}
+        if: steps.sparkle_key.outputs.available == 'true'
         env:
           SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
         run: |
@@ -132,7 +138,7 @@ jobs:
             "${ASSETS[@]}"
 
       - name: Publish appcast to GitHub Pages
-        if: ${{ secrets.SPARKLE_PRIVATE_KEY != '' && hashFiles('build/appcast.xml') != '' }}
+        if: steps.sparkle_key.outputs.available == 'true' && hashFiles('build/appcast.xml') != ''
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
