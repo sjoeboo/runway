@@ -1,0 +1,20 @@
+pull_request_rules:
+  - name: Automerge Renovate PRs when CI passes
+    conditions:
+      - author=renovate[bot]
+      - check-success=Build, Test & Lint
+      - -draft
+    actions:
+      merge:
+        method: squash
+
+  - name: Automerge minor/patch dependency PRs from humans
+    conditions:
+      - label=dependencies
+      - label=automerge
+      - check-success=Build, Test & Lint
+      - -draft
+      - "#approved-reviews-by>=1"
+    actions:
+      merge:
+        method: squash
