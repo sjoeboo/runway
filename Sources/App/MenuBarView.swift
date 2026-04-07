@@ -1,9 +1,11 @@
 import Models
+import Sparkle
 import SwiftUI
 
 /// Mini status view shown in the macOS menu bar extra.
 struct MenuBarView: View {
     @Environment(RunwayStore.self) private var store
+    var updater: SPUUpdater?
 
     private var activeSessions: [Session] {
         store.sessions.filter { $0.status == .running || $0.status == .waiting }
@@ -58,6 +60,12 @@ struct MenuBarView: View {
             }
             .padding(.horizontal, 12)
             .padding(.bottom, 4)
+
+            if let updater {
+                CheckForUpdatesView(updater: updater)
+                    .padding(.horizontal, 12)
+                    .padding(.bottom, 4)
+            }
 
             Button("Open Runway") {
                 NSApplication.shared.activate(ignoringOtherApps: true)

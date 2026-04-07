@@ -1,4 +1,5 @@
 import Models
+import Sparkle
 import SwiftUI
 import Theme
 
@@ -9,7 +10,11 @@ public struct SettingsView: View {
     @AppStorage("terminalFontSize") private var fontSize: Double = 13
     @AppStorage("defaultPermissionMode") private var defaultPermissionMode: PermissionMode = .default
 
-    public init() {}
+    private let updater: SPUUpdater?
+
+    public init(updater: SPUUpdater? = nil) {
+        self.updater = updater
+    }
 
     public var body: some View {
         TabView {
@@ -210,9 +215,29 @@ public struct SettingsView: View {
                 }
             }
 
+            if let updater {
+                Section("Updates") {
+                    Toggle(
+                        "Automatically check for updates",
+                        isOn: Binding(
+                            get: { updater.automaticallyChecksForUpdates },
+                            set: { updater.automaticallyChecksForUpdates = $0 }
+                        )
+                    )
+
+                    LabeledContent("Check Now") {
+                        UpdateCheckButton(updater: updater)
+                    }
+                }
+            }
+
             Section("About") {
                 LabeledContent("Version") {
-                    Text("0.1.0")
+                    Text(Self.appVersion)
+                        .foregroundColor(.secondary)
+                }
+                LabeledContent("Build") {
+                    Text(Self.buildNumber)
                         .foregroundColor(.secondary)
                 }
                 LabeledContent("Config Directory") {
@@ -223,5 +248,33 @@ public struct SettingsView: View {
         }
         .formStyle(.grouped)
         .padding()
+    }
+
+    // MARK: - Version Helpers
+
+    private static var appVersion: String {
+        Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "dev"
+    }
+
+    private static var buildNumber: String {
+        Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "—"
+    }
+}
+
+// MARK: - UpdateCheckButton
+
+/// A settings-appropriate "Check for Updates" button that respects Sparkle's ready state.
+private struct UpdateCheckButton: View {
+    let updater: SPUUpdater
+    @State private var canCheck = false
+
+    var body: some View {
+        Button("Check for Updates\u{2026}") {
+            updater.checkForUpdates()
+        }
+        .disabled(!canCheck)
+        .onReceive(updater.publisher(for: \.canCheckForUpdates)) { value in
+            canCheck = value
+        }
     }
 }
