@@ -195,27 +195,60 @@ private func shellEscape(_ path: String) -> String {
 
 /// Intercepts mouse events via a local event monitor and temporarily disables
 /// SwiftTerm's mouse reporting so native text selection always works.
-/// Scroll wheel events are unaffected so tmux scrollback still functions.
+///
+/// Scroll wheel events are also monitored to ensure `allowMouseReporting` is
+/// restored before any scroll — this prevents a timing race where an async
+/// restore hasn't fired yet and the scroll falls to the wrong code path,
+/// knocking tmux out of copy-mode.
 @MainActor
 class MouseSelectionMonitor {
     static let shared = MouseSelectionMonitor()
     private var monitor: Any?
+    private var savedReporting = true
+    private var suppressed = false
 
     func start() {
         guard monitor == nil else { return }
         monitor = NSEvent.addLocalMonitorForEvents(
-            matching: [.leftMouseDown, .leftMouseDragged, .leftMouseUp]
-        ) { event in
-            if let terminal = NSApplication.shared.keyWindow?.firstResponder
-                as? LocalProcessTerminalView
-            {
-                let saved = terminal.allowMouseReporting
-                terminal.allowMouseReporting = false
-                // Restore after the event is dispatched (next run loop iteration)
-                DispatchQueue.main.async {
-                    terminal.allowMouseReporting = saved
+            matching: [.leftMouseDown, .leftMouseDragged, .leftMouseUp, .scrollWheel]
+        ) { [self] event in
+            guard
+                let terminal = NSApplication.shared.keyWindow?.firstResponder
+                    as? LocalProcessTerminalView
+            else { return event }
+
+            // Scroll events: if we're mid-selection with reporting suppressed,
+            // restore it immediately so SwiftTerm forwards the scroll to tmux.
+            if event.type == .scrollWheel {
+                if suppressed {
+                    terminal.allowMouseReporting = savedReporting
+                    suppressed = false
                 }
+                return event
             }
+
+            // Mouse-up: end the suppression window.
+            if event.type == .leftMouseUp {
+                if suppressed {
+                    // Restore after the event is dispatched so SwiftTerm's
+                    // mouseUp handler still sees reporting disabled (avoids
+                    // sending a spurious click to tmux).
+                    DispatchQueue.main.async { [self] in
+                        if suppressed {
+                            terminal.allowMouseReporting = savedReporting
+                            suppressed = false
+                        }
+                    }
+                }
+                return event
+            }
+
+            // Mouse-down / drag: suppress reporting for native text selection.
+            if !suppressed {
+                savedReporting = terminal.allowMouseReporting
+                suppressed = true
+            }
+            terminal.allowMouseReporting = false
             return event
         }
     }
@@ -223,6 +256,7 @@ class MouseSelectionMonitor {
     func stop() {
         if let m = monitor { NSEvent.removeMonitor(m) }
         monitor = nil
+        suppressed = false
     }
 }
 
@@ -284,6 +318,19 @@ class TerminalContainerView: NSView {
             terminal.leadingAnchor.constraint(equalTo: leadingAnchor),
             terminal.trailingAnchor.constraint(equalTo: trailingAnchor),
         ])
+        // Hide SwiftTerm's built-in NSScroller — tmux owns scrollback,
+        // so the scroller is misleading and causes users to get stuck
+        // in SwiftTerm's (empty) alternate-screen buffer scroll.
+        hideSwiftTermScroller(in: terminal)
+    }
+
+    private func hideSwiftTermScroller(in view: NSView) {
+        for subview in view.subviews {
+            if let scroller = subview as? NSScroller {
+                scroller.isHidden = true
+                return
+            }
+        }
     }
 }
 
