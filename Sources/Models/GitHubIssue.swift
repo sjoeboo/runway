@@ -125,7 +125,7 @@ public struct IssueTimelineEvent: Identifiable, Codable, Sendable {
     public var event: String
     public var actor: String
     public var createdAt: Date
-    public var label: String?
+    public var label: IssueDetailLabel?
     public var assignee: String?
     public var source: IssueReference?
     public var rename: IssueRename?
@@ -135,7 +135,7 @@ public struct IssueTimelineEvent: Identifiable, Codable, Sendable {
         event: String,
         actor: String,
         createdAt: Date = Date(),
-        label: String? = nil,
+        label: IssueDetailLabel? = nil,
         assignee: String? = nil,
         source: IssueReference? = nil,
         rename: IssueRename? = nil
@@ -194,8 +194,8 @@ public struct IssueRename: Codable, Sendable {
 // MARK: - CloseReason
 
 public enum CloseReason: String, Codable, Sendable, CaseIterable {
-    case completed = "COMPLETED"
-    case notPlanned = "NOT_PLANNED"
+    case completed
+    case notPlanned = "not planned"
 
     public var displayName: String {
         switch self {

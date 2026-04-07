@@ -89,15 +89,17 @@ import Testing
 }
 
 @Test func issueTimelineEventLabelVariant() {
+    let label = IssueDetailLabel(name: "bug", color: "d73a4a")
     let event = IssueTimelineEvent(
         id: "evt-3",
         event: "labeled",
         actor: "github-bot",
-        label: "bug"
+        label: label
     )
 
     #expect(event.event == "labeled")
-    #expect(event.label == "bug")
+    #expect(event.label?.name == "bug")
+    #expect(event.label?.color == "d73a4a")
     #expect(event.assignee == nil)
 }
 
@@ -129,8 +131,8 @@ import Testing
 }
 
 @Test func closeReasonRawValues() {
-    #expect(CloseReason.completed.rawValue == "COMPLETED")
-    #expect(CloseReason.notPlanned.rawValue == "NOT_PLANNED")
+    #expect(CloseReason.completed.rawValue == "completed")
+    #expect(CloseReason.notPlanned.rawValue == "not planned")
 }
 
 // MARK: - GitHubIssue repo field
