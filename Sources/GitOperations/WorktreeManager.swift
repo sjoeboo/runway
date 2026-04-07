@@ -81,6 +81,11 @@ public actor WorktreeManager {
         return parseWorktreeList(output)
     }
 
+    /// Prune stale worktree references (e.g., directories that were manually deleted).
+    public func pruneWorktrees(repoPath: String) async throws {
+        try await runGit(in: repoPath, args: ["worktree", "prune"])
+    }
+
     /// Remove a worktree and optionally delete its branch.
     public func removeWorktree(
         repoPath: String,

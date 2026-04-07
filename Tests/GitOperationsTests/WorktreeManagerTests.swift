@@ -201,3 +201,44 @@ private func withTempGitRepo(_ body: (String) async throws -> Void) async throws
         }
     }
 }
+
+@Test func pruneWorktreesOnCleanRepo() async throws {
+    try await withTempGitRepo { repoPath in
+        let manager = WorktreeManager()
+        // Should not throw on a clean repo with nothing to prune
+        try await manager.pruneWorktrees(repoPath: repoPath)
+        let worktrees = try await manager.listWorktrees(repoPath: repoPath)
+        #expect(worktrees.count == 1)
+    }
+}
+
+@Test func pruneWorktreesRemovesStaleLockfile() async throws {
+    try await withTempGitRepo { repoPath in
+        let manager = WorktreeManager()
+        let currentBranch = await manager.currentBranch(path: repoPath) ?? "main"
+
+        try FileManager.default.createDirectory(
+            atPath: "\(repoPath)/.worktrees",
+            withIntermediateDirectories: true
+        )
+
+        let worktreePath = try await manager.createWorktree(
+            repoPath: repoPath,
+            branchName: "stale-wt",
+            baseBranch: currentBranch
+        )
+
+        // Simulate a manually-deleted worktree (directory gone, git ref remains)
+        try FileManager.default.removeItem(atPath: worktreePath)
+
+        // Before prune: git still knows about the worktree
+        let before = try await manager.listWorktrees(repoPath: repoPath)
+        #expect(before.count == 2)
+
+        // Prune cleans up the stale reference
+        try await manager.pruneWorktrees(repoPath: repoPath)
+
+        let after = try await manager.listWorktrees(repoPath: repoPath)
+        #expect(after.count == 1)
+    }
+}
