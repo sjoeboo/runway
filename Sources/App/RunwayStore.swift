@@ -915,12 +915,28 @@ public final class RunwayStore {
         }
     }
 
+    /// Unified post-action refresh: wait 1s for GitHub to propagate, then re-enrich
+    /// the PR list entry and refresh the detail view if this PR is currently selected.
+    private func refreshPRAfterAction(_ pr: PullRequest) async {
+        try? await Task.sleep(for: .seconds(1))
+        await reEnrichPR(pr)
+        if selectedPRID == pr.id {
+            let host = prManager.hostFromURL(pr.url)
+            if let detail = try? await prManager.fetchDetail(
+                repo: pr.repo, number: pr.number, host: host
+            ) {
+                detailCache[pr.id] = (detail, Date())
+                prDetail = detail
+            }
+        }
+    }
+
     func approvePR(_ pr: PullRequest) async {
         let host = prManager.hostFromURL(pr.url)
         do {
             try await prManager.approve(repo: pr.repo, number: pr.number, host: host)
             statusMessage = .success("Approved #\(pr.number)")
-            await reEnrichPR(pr)
+            await refreshPRAfterAction(pr)
         } catch {
             statusMessage = .error("Approve failed: \(error.localizedDescription)")
         }
@@ -930,8 +946,8 @@ public final class RunwayStore {
         let host = prManager.hostFromURL(pr.url)
         do {
             try await prManager.comment(repo: pr.repo, number: pr.number, body: body, host: host)
-            // Refresh detail to show new comment
-            prDetail = try await prManager.fetchDetail(repo: pr.repo, number: pr.number, host: host)
+            statusMessage = .success("Commented on #\(pr.number)")
+            await refreshPRAfterAction(pr)
         } catch {
             statusMessage = .error("Comment failed: \(error.localizedDescription)")
         }
@@ -942,8 +958,7 @@ public final class RunwayStore {
         do {
             try await prManager.requestChanges(repo: pr.repo, number: pr.number, body: body, host: host)
             statusMessage = .success("Requested changes on #\(pr.number)")
-            prDetail = try await prManager.fetchDetail(repo: pr.repo, number: pr.number, host: host)
-            await reEnrichPR(pr)
+            await refreshPRAfterAction(pr)
         } catch {
             statusMessage = .error("Request changes failed: \(error.localizedDescription)")
         }
@@ -954,7 +969,7 @@ public final class RunwayStore {
         do {
             try await prManager.merge(repo: pr.repo, number: pr.number, strategy: strategy, host: host)
             statusMessage = .success("Merged #\(pr.number)")
-            await fetchPRs()
+            await refreshPRAfterAction(pr)
         } catch {
             statusMessage = .error("Merge failed: \(error.localizedDescription)")
         }
@@ -965,7 +980,7 @@ public final class RunwayStore {
         do {
             try await prManager.updateBranch(repo: pr.repo, number: pr.number, rebase: rebase, host: host)
             statusMessage = .success("Updated #\(pr.number) with latest \(pr.baseBranch)")
-            await reEnrichPR(pr)
+            await refreshPRAfterAction(pr)
         } catch {
             statusMessage = .error("Branch update failed: \(error.localizedDescription)")
         }
@@ -976,7 +991,7 @@ public final class RunwayStore {
         do {
             try await prManager.toggleDraft(repo: pr.repo, number: pr.number, makeDraft: !pr.isDraft, host: host)
             statusMessage = .success(pr.isDraft ? "Marked #\(pr.number) as ready" : "Converted #\(pr.number) to draft")
-            await fetchPRs()
+            await refreshPRAfterAction(pr)
         } catch {
             statusMessage = .error("Draft toggle failed: \(error.localizedDescription)")
         }
