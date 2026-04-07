@@ -5,6 +5,32 @@ All notable changes to Runway are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.2.0] — 2026-04-07
+
+### Added
+
+- **Tmux pane splitting** — Split terminal panes via toolbar buttons or `Cmd+D` (right) / `Cmd+Shift+D` (down) ([#141](https://github.com/sjoeboo/runway/pull/141))
+- **PR Review mode** — Dedicated "PR Review" tab in the new session dialog (`Cmd+Shift+R`) creates review sessions for any PR number ([#142](https://github.com/sjoeboo/runway/pull/142))
+- **Changes sidebar** — Toggle with `Cmd+3` to see all changed files in a session's worktree, with diff viewer, line stats, and "vs Main" / "Uncommitted" modes ([#143](https://github.com/sjoeboo/runway/pull/143))
+- **Orphaned worktree cleanup** — On startup, automatically prunes worktrees that have no matching session; merged branches are deleted, unmerged branches are preserved ([#144](https://github.com/sjoeboo/runway/pull/144))
+
+### Fixed
+
+- **Terminal search feedback** — Shows match count ("N matches") and disables navigation with red tint when no results found ([#219](https://github.com/sjoeboo/runway/pull/219))
+- **PTY thread starvation** — Replaced blocking `waitpid()` with event-driven `DispatchSourceProcess`, fixing thread exhaustion with 10+ open sessions ([#219](https://github.com/sjoeboo/runway/pull/219))
+- **Worktree failure safety** — Sessions now transition to error state if worktree creation fails, instead of silently falling back to the project root ([#219](https://github.com/sjoeboo/runway/pull/219))
+- **Keyboard navigation** — Replaced `DisclosureGroup` with `Section(isExpanded:)` for proper arrow-key and VoiceOver navigation in the project list ([#219](https://github.com/sjoeboo/runway/pull/219))
+- **Pipe deadlock in shell runner** — Increased buffer to 64 KB to prevent concurrent read/write hangs ([#218](https://github.com/sjoeboo/runway/pull/218))
+- **PR diff pagination** — Large PRs with 31+ files now load correctly ([#218](https://github.com/sjoeboo/runway/pull/218))
+- **Branch name sanitization** — Disallows invalid git characters (`~^:?*[]\@{}`, `.lock` suffix, leading/consecutive dots) ([#218](https://github.com/sjoeboo/runway/pull/218))
+
+### Maintenance
+
+- Deep codebase audit addressing 69 issues across security, correctness, accessibility, and UX ([#218](https://github.com/sjoeboo/runway/pull/218))
+- Test suite expanded from 118 to 180 tests
+
+[0.2.0]: https://github.com/sjoeboo/runway/compare/v0.1.1...v0.2.0
+
 ## [0.1.1] — 2026-04-07
 
 ### Added

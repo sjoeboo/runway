@@ -24,7 +24,7 @@
 | **📌** | **GitHub Issues** | View, create, and manage issues per project |
 | **🎨** | **Theme system** | 6 built-in themes (Tokyo Night, Ayu Mirage, Everforest, Oasis Lagoon) applied to both UI chrome and terminal |
 | **📂** | **Project organization** | Group sessions by project with per-project settings for theme, permissions, and branch prefix |
-| **⌨️** | **Keyboard-driven** | 11 shortcuts — `Cmd+K` search, `Cmd+N` new session, `Cmd+Shift+X` send bar, and more |
+| **⌨️** | **Keyboard-driven** | 15 shortcuts — `Cmd+K` search, `Cmd+N` new session, `Cmd+D` split pane, `Cmd+3` changes, and more |
 
 ## Install
 
@@ -72,6 +72,9 @@ Create named sessions tied to projects. Each session launches a terminal running
 - **Per-project branch prefixes** — configure `feature/`, `fix/`, `yourname/`, or any prefix in Project Settings
 - **Worktree isolation** — each session works in `.worktrees/{branch}`, keeping `main` clean
 - **Worktree cleanup** — delete confirmation offers "Delete Session Only" or "Delete Session & Worktree" (removes branch too)
+- **Orphan worktree cleanup** — on startup, worktrees with no matching session are automatically pruned; merged branches are deleted, unmerged branches preserved
+- **PR Review mode** — dedicated "PR Review" tab in the new session dialog (`Cmd+Shift+R`) creates a review session for any PR number
+- **Changes sidebar** — toggle with `Cmd+3` to see all changed files in the session worktree, with inline diff viewer and "vs Main" / "Uncommitted" modes
 - **Default branch detection** — auto-detects `main` vs `master` via `git symbolic-ref`
 - **Permission modes** — choose Default, Accept Edits, or Bypass All per session (with color-coded badges)
 - **Multiple terminal tabs** — add shell tabs alongside your main agent session
@@ -97,6 +100,7 @@ Status shows in the sidebar as colored indicators: green (running), yellow (wait
 - **Cmd+F search** — find text in terminal history with next/previous navigation
 - **Cmd+Shift+X send bar** — type and send prompts without switching focus
 - **Shift+Enter** — insert newline (recognized by Claude Code)
+- **Tmux pane splitting** — split panes via toolbar buttons or `Cmd+D` (right) / `Cmd+Shift+D` (down)
 - **Drag and drop** — drop files and images into the terminal to insert their paths
 - **Font customization** — choose font family (grouped: Nerd Fonts, Monospaced, All) and size with live preview
 
@@ -159,6 +163,10 @@ Themes apply to both the app chrome (sidebar, toolbar, status bar) and the termi
 | `Cmd+K` | Focus sidebar search |
 | `Cmd+F` | Find in terminal |
 | `Cmd+Shift+X` | Toggle send-to-session bar |
+| `Cmd+Shift+R` | New PR Review session |
+| `Cmd+D` | Split terminal pane right |
+| `Cmd+Shift+D` | Split terminal pane down |
+| `Cmd+3` | Toggle changes sidebar |
 | `Shift+Enter` | Newline in terminal |
 | `Ctrl+1/2/3` | PR detail: Overview / Diff / Conversation |
 
@@ -217,7 +225,7 @@ Runway auto-injects hooks into `~/.claude/settings.json` on every launch, subscr
 
 ## CI & Testing
 
-- **118 tests** across 8 test targets
+- **180 tests** across 8 test targets
 - **GitHub Actions CI** on every PR: build, test, SwiftLint, swift-format
 - **Branch protection** on `master` — CI must pass before merging
 - **Pre-commit hooks** run lint + format checks locally
