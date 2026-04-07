@@ -203,4 +203,12 @@ public enum CloseReason: String, Codable, Sendable, CaseIterable {
         case .notPlanned: return "Not planned"
         }
     }
+
+    /// Value accepted by `gh issue close --reason`.
+    public var cliValue: String {
+        switch self {
+        case .completed: return "completed"
+        case .notPlanned: return "not_planned"
+        }
+    }
 }

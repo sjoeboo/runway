@@ -35,8 +35,9 @@ public actor IssueManager {
             ], host: host)
 
         // Call 2: timeline events via REST API
+        // --slurp wraps paginated results into [[...]] so multi-page responses decode correctly
         let timelineOutput = try await runGH(
-            args: ["api", "repos/\(repo)/issues/\(number)/timeline", "--paginate"],
+            args: ["api", "repos/\(repo)/issues/\(number)/timeline", "--paginate", "--slurp"],
             host: host)
 
         let detail = try parseIssueDetail(viewOutput: viewOutput, timelineOutput: timelineOutput)
@@ -71,7 +72,7 @@ public actor IssueManager {
         repo: String, number: Int, host: String? = nil, reason: CloseReason = .completed
     ) async throws {
         try await runGH(
-            args: ["issue", "close", "\(number)", "--repo", repo, "--reason", reason.rawValue],
+            args: ["issue", "close", "\(number)", "--repo", repo, "--reason", reason.cliValue],
             host: host)
         evictDetail(repo: repo, number: number)
     }
@@ -200,17 +201,29 @@ public actor IssueManager {
         let assignees: [String] = viewItem.assignees.map { $0.login }
 
         // Decode timeline events (filter out "commented" — use comments from view instead)
+        // --slurp wraps paginated pages into [[...]], so decode as nested array and flatMap
         var timelineEvents: [IssueTimelineEvent] = []
-        if let timelineData = timelineOutput.data(using: .utf8),
-            let rawEvents = try? JSONDecoder.issueGH.decode([GHTimelineEvent].self, from: timelineData)
-        {
+        if let timelineData = timelineOutput.data(using: .utf8) {
+            let rawEvents: [GHTimelineEvent]
+            if let nested = try? JSONDecoder.issueGH.decode(
+                [[GHTimelineEvent]].self, from: timelineData
+            ) {
+                rawEvents = nested.flatMap { $0 }
+            } else if let flat = try? JSONDecoder.issueGH.decode(
+                [GHTimelineEvent].self, from: timelineData
+            ) {
+                rawEvents = flat
+            } else {
+                rawEvents = []
+            }
+
             timelineEvents =
                 rawEvents
-                .filter { $0.event != "commented" }
                 .enumerated()
-                .map { (index, ev) in
+                .compactMap { (index, ev) in
+                    guard let event = ev.event, event != "commented" else { return nil }
                     let actor = ev.actor?.login ?? ""
-                    let id = "\(ev.event)-\(actor)-\(index)"
+                    let id = "\(event)-\(actor)-\(index)"
                     let eventDate = ev.createdAt ?? Date()
 
                     // Map label
@@ -223,8 +236,8 @@ public actor IssueManager {
 
                     // Map cross-reference source
                     var source: IssueReference?
-                    if ev.event == "cross-referenced", let src = ev.source?.issue {
-                        let refType = src.pullRequest != nil ? "PullRequest" : "Issue"
+                    if event == "cross-referenced", let src = ev.source?.issue {
+                        let refType = src.pullRequest != nil ? "pullRequest" : "issue"
                         source = IssueReference(
                             type: refType,
                             number: src.number ?? 0,
@@ -240,7 +253,7 @@ public actor IssueManager {
 
                     return IssueTimelineEvent(
                         id: id,
-                        event: ev.event,
+                        event: event,
                         actor: actor,
                         createdAt: eventDate,
                         label: label,
@@ -401,7 +414,7 @@ private struct GHMilestone: Decodable {
 }
 
 private struct GHTimelineEvent: Decodable {
-    let event: String
+    let event: String?
     let actor: GHIssueAuthor?
     let createdAt: Date?
     let label: GHTimelineLabel?
