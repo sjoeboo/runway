@@ -797,7 +797,9 @@ public final class RunwayStore {
     /// Link PRs to sessions — concurrent, like Hangar.
     /// Sets TTL timestamps so the independent freshen loop doesn't immediately re-fetch.
     private func linkSessionPRs() async {
-        let worktreeSessions = sessions.filter { $0.worktreeBranch != nil }
+        let worktreeSessions = sessions.filter {
+            $0.worktreeBranch != nil && !provisioningWorktreeIDs.contains($0.id)
+        }
         guard !worktreeSessions.isEmpty else { return }
         let now = Date()
 
@@ -862,7 +864,9 @@ public final class RunwayStore {
     /// Only fetches for sessions whose cache has expired — lightweight when nothing is stale.
     private func freshenSessionPRs() async {
         let now = Date()
-        let worktreeSessions = sessions.filter { $0.worktreeBranch != nil }
+        let worktreeSessions = sessions.filter {
+            $0.worktreeBranch != nil && !provisioningWorktreeIDs.contains($0.id)
+        }
         guard !worktreeSessions.isEmpty else { return }
 
         // Find sessions that need refreshing (stale or never fetched)
