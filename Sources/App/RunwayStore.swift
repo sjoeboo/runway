@@ -43,6 +43,10 @@ public final class RunwayStore {
     var tmuxAvailable: Bool = false
     var showSendBar: Bool = false
     var showTerminalSearch: Bool = false
+    /// Incremented to trigger a horizontal split in the active terminal tab.
+    var splitHorizontalTrigger: Int = 0
+    /// Incremented to trigger a vertical split in the active terminal tab.
+    var splitVerticalTrigger: Int = 0
     var sidebarSearchQuery: String = ""
     var focusSidebarSearch: Bool = false
     var showReviewPRDialog: Bool = false
@@ -1198,23 +1202,12 @@ public final class RunwayStore {
             return
         }
 
-        let worktreePath: String
-        do {
-            worktreePath = try await worktreeManager.checkoutWorktree(
-                repoPath: project.path,
-                branch: pr.headBranch
-            )
-        } catch {
-            statusMessage = .error("Worktree failed: \(error.localizedDescription)")
-            return
-        }
-
         let resolvedMode = project.permissionMode ?? .default
 
         var session = Session(
             title: sessionName,
             projectID: projectID,
-            path: worktreePath,
+            path: project.path,
             tool: .claude,
             status: .starting,
             worktreeBranch: pr.headBranch,
@@ -1222,26 +1215,7 @@ public final class RunwayStore {
             permissionMode: resolvedMode
         )
 
-        if tmuxAvailable {
-            let tmuxName = "runway-\(session.id)"
-            let command = ([session.tool.command] + session.permissionMode.cliFlags).joined(separator: " ")
-
-            do {
-                try await tmuxManager.createSession(
-                    name: tmuxName,
-                    workDir: worktreePath,
-                    command: command,
-                    env: [
-                        "RUNWAY_SESSION_ID": session.id,
-                        "RUNWAY_TITLE": session.title,
-                    ]
-                )
-                session.status = .running
-            } catch {
-                statusMessage = .error("tmux session failed: \(error.localizedDescription)")
-            }
-        }
-
+        // Add session to UI immediately so the user sees it right away
         sessions.append(session)
         do {
             try database?.saveSession(session)
@@ -1250,14 +1224,44 @@ public final class RunwayStore {
         }
         selectedSessionID = session.id
         currentView = .sessions
-
         sessionPRs[session.id] = pr
 
-        if !initialPrompt.isEmpty, tmuxAvailable {
-            let tmuxName = "runway-\(session.id)"
-            try? await Task.sleep(for: .milliseconds(500))
-            try? await tmuxManager.sendText(sessionName: tmuxName, text: initialPrompt)
+        // Provision worktree in background, then start tmux
+        provisioningWorktreeIDs.insert(session.id)
+
+        Task {
+            var sessionPath = project.path
+            do {
+                sessionPath = try await worktreeManager.checkoutWorktree(
+                    repoPath: project.path,
+                    branch: pr.headBranch
+                )
+            } catch {
+                print("[Runway] Worktree checkout failed, using project path: \(error)")
+                statusMessage = .error("Worktree failed: \(error.localizedDescription)")
+            }
+
+            // Update session path
+            if let idx = sessions.firstIndex(where: { $0.id == session.id }) {
+                sessions[idx].path = sessionPath
+            }
+            try? database?.updateSessionPath(id: session.id, path: sessionPath)
+
+            provisioningWorktreeIDs.remove(session.id)
+
+            await startTmuxSession(for: &session, path: sessionPath, initialPrompt: initialPrompt.isEmpty ? nil : initialPrompt)
         }
+    }
+
+    /// Creates a PR review session from the new session dialog — resolves the PR then creates the session.
+    func handleReviewSessionRequest(_ request: ReviewSessionRequest) async throws {
+        let pr = try await prManager.resolvePR(repo: request.repo, number: request.prNumber, host: request.host)
+        await handleReviewPR(
+            pr: pr,
+            sessionName: request.sessionName,
+            projectID: request.projectID,
+            initialPrompt: request.initialPrompt
+        )
     }
 
     func resolvePRForReview(number: Int, repo: String, host: String?) async {

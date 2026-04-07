@@ -2,138 +2,90 @@ import Models
 import SwiftUI
 import Theme
 
+/// The kind of session being created.
+private enum SessionKind: String, CaseIterable {
+    case normal = "New Session"
+    case prReview = "PR Review"
+}
+
 /// Modal dialog for creating a new AI coding session.
 public struct NewSessionDialog: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.theme) private var theme
 
-    @State private var title: String = ""
+    // Shared state
+    @State private var sessionKind: SessionKind = .normal
     @State private var selectedProjectID: String?
-    @State private var tool: Tool = .claude
-    @State private var useWorktree: Bool = true
-    @State private var branchName: String = ""
-    @State private var branchManuallyEdited: Bool = false
     @AppStorage("defaultPermissionMode") private var defaultPermissionMode: PermissionMode = .default
     @State private var permissionMode: PermissionMode = .default
     @State private var initialPrompt: String = ""
     @State private var validationError: String?
 
+    // Normal session state
+    @State private var title: String = ""
+    @State private var tool: Tool = .claude
+    @State private var useWorktree: Bool = true
+    @State private var branchName: String = ""
+    @State private var branchManuallyEdited: Bool = false
+
+    // PR Review state
+    @State private var prNumberText: String = ""
+    @State private var reviewSessionName: String = ""
+    @State private var isCreatingReview: Bool = false
+
     let projects: [Project]
     let initialProjectID: String?
     let parentID: String?
     let onCreate: (NewSessionRequest) -> Void
+    let onCreateReview: ((ReviewSessionRequest) async throws -> Void)?
 
     public init(
         projects: [Project],
         initialProjectID: String? = nil,
         parentID: String? = nil,
-        onCreate: @escaping (NewSessionRequest) -> Void
+        onCreate: @escaping (NewSessionRequest) -> Void,
+        onCreateReview: ((ReviewSessionRequest) async throws -> Void)? = nil
     ) {
         self.projects = projects
         self.initialProjectID = initialProjectID
         self.parentID = parentID
         self.onCreate = onCreate
+        self.onCreateReview = onCreateReview
         self._selectedProjectID = State(initialValue: initialProjectID)
+    }
+
+    private var projectsWithRepo: [Project] {
+        projects.filter { $0.ghRepo != nil }
+    }
+
+    private var selectedProject: Project? {
+        projects.first(where: { $0.id == selectedProjectID })
     }
 
     public var body: some View {
         VStack(spacing: 16) {
-            Text("New Session")
-                .font(.title2)
-                .fontWeight(.semibold)
+            // Session type picker
+            Picker("Type", selection: $sessionKind) {
+                ForEach(SessionKind.allCases, id: \.self) { kind in
+                    Text(kind.rawValue).tag(kind)
+                }
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+            .onChange(of: sessionKind) {
+                validationError = nil
+                // Default to first project with repo when switching to PR review
+                if sessionKind == .prReview && selectedProjectID == nil {
+                    selectedProjectID = projectsWithRepo.first?.id
+                }
+            }
 
             VStack(alignment: .leading, spacing: 12) {
-                // Title
-                field("Session Name", text: $title, placeholder: "feature-name")
-                    .onChange(of: title) {
-                        if useWorktree && !branchManuallyEdited {
-                            branchName = autobranchName(from: title)
-                        }
-                    }
-
-                // Project picker
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Project")
-                        .font(.caption)
-                        .foregroundColor(theme.chrome.textDim)
-                    Picker("Project", selection: $selectedProjectID) {
-                        Text("None").tag(nil as String?)
-                        ForEach(projects) { project in
-                            Text(project.name).tag(project.id as String?)
-                        }
-                    }
-                    .labelsHidden()
-                }
-
-                // Tool picker
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Tool")
-                        .font(.caption)
-                        .foregroundColor(theme.chrome.textDim)
-                    Picker("Tool", selection: $tool) {
-                        Text("Claude").tag(Tool.claude)
-                        Text("Shell").tag(Tool.shell)
-                    }
-                    .pickerStyle(.segmented)
-                    .labelsHidden()
-                }
-
-                // Permission mode (only for Claude sessions)
-                if tool == .claude {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("Permissions")
-                            .font(.caption)
-                            .foregroundColor(theme.chrome.textDim)
-                        Picker("Permissions", selection: $permissionMode) {
-                            ForEach(PermissionMode.allCases, id: \.self) { mode in
-                                Text(mode.displayName).tag(mode)
-                            }
-                        }
-                        .pickerStyle(.segmented)
-                        .labelsHidden()
-
-                        if permissionMode == .bypassAll {
-                            Text("Skips all permission prompts — use with caution")
-                                .font(.caption2)
-                                .foregroundColor(theme.chrome.orange)
-                        }
-                    }
-                }
-
-                // Worktree toggle
-                Toggle("Create worktree", isOn: $useWorktree)
-
-                // Branch name (visible when worktree enabled)
-                if useWorktree {
-                    field(
-                        "Branch Name",
-                        text: Binding(
-                            get: { branchName },
-                            set: { newValue in
-                                branchName = newValue
-                                // If user edits branch to differ from auto, mark as manually edited
-                                branchManuallyEdited = (newValue != autobranchName(from: title))
-                            }
-                        ), placeholder: "feature/my-feature")
-                }
-
-                // Initial prompt (only for Claude sessions)
-                if tool == .claude {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("Initial Prompt")
-                            .font(.caption)
-                            .foregroundColor(theme.chrome.textDim)
-                        TextEditor(text: $initialPrompt)
-                            .font(.body)
-                            .frame(minHeight: 60, maxHeight: 120)
-                            .scrollContentBackground(.hidden)
-                            .background(Color(nsColor: .textBackgroundColor))
-                            .cornerRadius(6)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 6)
-                                    .stroke(Color(nsColor: .separatorColor), lineWidth: 1)
-                            )
-                    }
+                switch sessionKind {
+                case .normal:
+                    normalSessionFields
+                case .prReview:
+                    prReviewFields
                 }
             }
 
@@ -147,15 +99,178 @@ public struct NewSessionDialog: View {
                 Button("Cancel") { dismiss() }
                     .keyboardShortcut(.cancelAction)
                 Spacer()
-                Button("Create") { create() }
-                    .keyboardShortcut(.defaultAction)
-                    .disabled(title.isEmpty)
+
+                if sessionKind == .prReview && isCreatingReview {
+                    ProgressView()
+                        .controlSize(.small)
+                    Text("Creating review session…")
+                        .font(.caption)
+                        .foregroundColor(theme.chrome.textDim)
+                }
+
+                Button(sessionKind == .normal ? "Create" : "Create Review") {
+                    if sessionKind == .normal {
+                        createNormalSession()
+                    } else {
+                        createReviewSession()
+                    }
+                }
+                .keyboardShortcut(.defaultAction)
+                .disabled(sessionKind == .normal ? title.isEmpty : !canCreateReview)
             }
         }
         .padding(24)
         .frame(width: 420)
         .onAppear {
             permissionMode = defaultPermissionMode
+        }
+    }
+
+    // MARK: - Normal Session Fields
+
+    @ViewBuilder
+    private var normalSessionFields: some View {
+        // Title
+        field("Session Name", text: $title, placeholder: "feature-name")
+            .onChange(of: title) {
+                if useWorktree && !branchManuallyEdited {
+                    branchName = autobranchName(from: title)
+                }
+            }
+
+        // Project picker
+        VStack(alignment: .leading, spacing: 4) {
+            Text("Project")
+                .font(.caption)
+                .foregroundColor(theme.chrome.textDim)
+            Picker("Project", selection: $selectedProjectID) {
+                Text("None").tag(nil as String?)
+                ForEach(projects) { project in
+                    Text(project.name).tag(project.id as String?)
+                }
+            }
+            .labelsHidden()
+        }
+
+        // Tool picker
+        VStack(alignment: .leading, spacing: 4) {
+            Text("Tool")
+                .font(.caption)
+                .foregroundColor(theme.chrome.textDim)
+            Picker("Tool", selection: $tool) {
+                Text("Claude").tag(Tool.claude)
+                Text("Shell").tag(Tool.shell)
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+        }
+
+        // Permission mode (only for Claude sessions)
+        if tool == .claude {
+            permissionPicker
+        }
+
+        // Worktree toggle
+        Toggle("Create worktree", isOn: $useWorktree)
+
+        // Branch name (visible when worktree enabled)
+        if useWorktree {
+            field(
+                "Branch Name",
+                text: Binding(
+                    get: { branchName },
+                    set: { newValue in
+                        branchName = newValue
+                        branchManuallyEdited = (newValue != autobranchName(from: title))
+                    }
+                ), placeholder: "feature/my-feature")
+        }
+
+        // Initial prompt (only for Claude sessions)
+        if tool == .claude {
+            promptEditor
+        }
+    }
+
+    // MARK: - PR Review Fields
+
+    @ViewBuilder
+    private var prReviewFields: some View {
+        // PR Number
+        field("PR Number", text: $prNumberText, placeholder: "1234")
+
+        // Project picker (only projects with a configured repo)
+        VStack(alignment: .leading, spacing: 4) {
+            Text("Project")
+                .font(.caption)
+                .foregroundColor(theme.chrome.textDim)
+            if projectsWithRepo.isEmpty {
+                Text("No projects with a GitHub repo configured")
+                    .font(.caption)
+                    .foregroundColor(theme.chrome.orange)
+            } else {
+                Picker("Project", selection: $selectedProjectID) {
+                    ForEach(projectsWithRepo) { project in
+                        Text(project.name).tag(project.id as String?)
+                    }
+                }
+                .labelsHidden()
+            }
+        }
+
+        // Session name (optional override)
+        field("Session Name", text: $reviewSessionName, placeholder: "Auto-generated from PR title")
+
+        // Permission mode
+        permissionPicker
+
+        // Initial prompt
+        field("Initial Prompt", text: $initialPrompt, placeholder: "Review this PR")
+            .onAppear {
+                if initialPrompt.isEmpty {
+                    initialPrompt = "Review this PR"
+                }
+            }
+    }
+
+    // MARK: - Shared Components
+
+    private var permissionPicker: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text("Permissions")
+                .font(.caption)
+                .foregroundColor(theme.chrome.textDim)
+            Picker("Permissions", selection: $permissionMode) {
+                ForEach(PermissionMode.allCases, id: \.self) { mode in
+                    Text(mode.displayName).tag(mode)
+                }
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+
+            if permissionMode == .bypassAll {
+                Text("Skips all permission prompts — use with caution")
+                    .font(.caption2)
+                    .foregroundColor(theme.chrome.orange)
+            }
+        }
+    }
+
+    private var promptEditor: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text("Initial Prompt")
+                .font(.caption)
+                .foregroundColor(theme.chrome.textDim)
+            TextEditor(text: $initialPrompt)
+                .font(.body)
+                .frame(minHeight: 60, maxHeight: 120)
+                .scrollContentBackground(.hidden)
+                .background(Color(nsColor: .textBackgroundColor))
+                .cornerRadius(6)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 6)
+                        .stroke(Color(nsColor: .separatorColor), lineWidth: 1)
+                )
         }
     }
 
@@ -169,8 +284,14 @@ public struct NewSessionDialog: View {
         }
     }
 
+    // MARK: - Actions
+
+    private var canCreateReview: Bool {
+        guard let number = Int(prNumberText), number > 0 else { return false }
+        return selectedProject?.ghRepo != nil && !isCreatingReview
+    }
+
     private func autobranchName(from title: String) -> String {
-        // Strip all git-illegal characters: ~, ^, :, ?, *, [, \, control chars, spaces, ..
         let sanitized = title.lowercased()
             .replacing(/[^a-z0-9\-]/, with: "-")
             .replacing(/--+/, with: "-")
@@ -180,7 +301,7 @@ public struct NewSessionDialog: View {
         return "\(prefix)\(sanitized)"
     }
 
-    private func create() {
+    private func createNormalSession() {
         guard !title.isEmpty else {
             validationError = "Session name is required"
             return
@@ -203,5 +324,42 @@ public struct NewSessionDialog: View {
 
         onCreate(request)
         dismiss()
+    }
+
+    private func createReviewSession() {
+        guard let number = Int(prNumberText), number > 0 else {
+            validationError = "Enter a valid PR number"
+            return
+        }
+        guard let project = selectedProject, let repo = project.ghRepo else {
+            validationError = "Select a project with a GitHub repo"
+            return
+        }
+
+        let sessionName = reviewSessionName.isEmpty ? "Review: PR #\(number)" : reviewSessionName
+        let prompt = initialPrompt.isEmpty ? "Review this PR" : initialPrompt
+
+        let request = ReviewSessionRequest(
+            prNumber: number,
+            repo: repo,
+            host: project.ghHost,
+            sessionName: sessionName,
+            projectID: project.id,
+            permissionMode: permissionMode,
+            initialPrompt: prompt
+        )
+
+        isCreatingReview = true
+        validationError = nil
+
+        Task {
+            do {
+                try await onCreateReview?(request)
+                dismiss()
+            } catch {
+                isCreatingReview = false
+                validationError = "Failed to resolve PR #\(number): \(error.localizedDescription)"
+            }
+        }
     }
 }

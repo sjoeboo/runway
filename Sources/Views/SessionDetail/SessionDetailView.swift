@@ -9,6 +9,8 @@ public struct SessionDetailView: View {
     var onSelectPR: ((PullRequest) -> Void)?
     @Binding var showSendBar: Bool
     @Binding var showTerminalSearch: Bool
+    @Binding var splitHorizontalTrigger: Int
+    @Binding var splitVerticalTrigger: Int
     @Binding var changesVisible: Bool
     @Binding var changesMode: ChangesMode
     let changes: [FileChange]
@@ -26,6 +28,8 @@ public struct SessionDetailView: View {
         onSelectPR: ((PullRequest) -> Void)? = nil,
         showSendBar: Binding<Bool>,
         showTerminalSearch: Binding<Bool>,
+        splitHorizontalTrigger: Binding<Int> = .constant(0),
+        splitVerticalTrigger: Binding<Int> = .constant(0),
         changesVisible: Binding<Bool>,
         changesMode: Binding<ChangesMode>,
         changes: [FileChange] = [],
@@ -40,6 +44,8 @@ public struct SessionDetailView: View {
         self.onSelectPR = onSelectPR
         self._showSendBar = showSendBar
         self._showTerminalSearch = showTerminalSearch
+        self._splitHorizontalTrigger = splitHorizontalTrigger
+        self._splitVerticalTrigger = splitVerticalTrigger
         self._changesVisible = changesVisible
         self._changesMode = changesMode
         self.changes = changes
@@ -109,7 +115,12 @@ public struct SessionDetailView: View {
                 DiffView(patch: diffPatch)
             }
         } else {
-            TerminalTabView(session: session, showSearch: $showTerminalSearch)
+            TerminalTabView(
+                session: session,
+                showSearch: $showTerminalSearch,
+                splitHorizontalTrigger: $splitHorizontalTrigger,
+                splitVerticalTrigger: $splitVerticalTrigger
+            )
         }
     }
 }

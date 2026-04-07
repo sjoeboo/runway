@@ -70,6 +70,14 @@ struct RunwayApp: App {
                 Button("Find in Terminal") { store.showTerminalSearch.toggle() }
                     .keyboardShortcut("f", modifiers: .command)
 
+                Divider()
+
+                Button("Split Pane Down") { store.splitHorizontalTrigger += 1 }
+                    .keyboardShortcut("d", modifiers: [.command, .shift])
+
+                Button("Split Pane Right") { store.splitVerticalTrigger += 1 }
+                    .keyboardShortcut("d", modifiers: .command)
+
                 Button("Search Sessions") { store.focusSidebarSearch = true }
                     .keyboardShortcut("k", modifiers: .command)
 
@@ -136,12 +144,16 @@ struct ContentView: View {
                 NewSessionDialog(
                     projects: store.projects,
                     initialProjectID: store.newSessionProjectID,
-                    parentID: store.newSessionParentID
-                ) { request in
-                    Task { await store.handleNewSessionRequest(request) }
-                    store.newSessionProjectID = nil
-                    store.newSessionParentID = nil
-                }
+                    parentID: store.newSessionParentID,
+                    onCreate: { request in
+                        Task { await store.handleNewSessionRequest(request) }
+                        store.newSessionProjectID = nil
+                        store.newSessionParentID = nil
+                    },
+                    onCreateReview: { request in
+                        try await store.handleReviewSessionRequest(request)
+                    }
+                )
                 .theme(theme)
             }
             .sheet(
@@ -386,6 +398,14 @@ struct ContentView: View {
                     showTerminalSearch: Binding(
                         get: { store.showTerminalSearch },
                         set: { store.showTerminalSearch = $0 }
+                    ),
+                    splitHorizontalTrigger: Binding(
+                        get: { store.splitHorizontalTrigger },
+                        set: { store.splitHorizontalTrigger = $0 }
+                    ),
+                    splitVerticalTrigger: Binding(
+                        get: { store.splitVerticalTrigger },
+                        set: { store.splitVerticalTrigger = $0 }
                     ),
                     changesVisible: Binding(
                         get: { store.changesVisible },
