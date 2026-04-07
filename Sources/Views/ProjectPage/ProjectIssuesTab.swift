@@ -31,6 +31,7 @@ public struct ProjectIssuesTab: View {
     var onUpdateLabels: ((GitHubIssue, [String], [String]) -> Void)?
     var onUpdateAssignees: ((GitHubIssue, [String], [String]) -> Void)?
 
+    @AppStorage("issueListWidth") private var issueListWidth: Double = 320
     @Environment(\.theme) private var theme
     @State private var filter: IssueFilter = .open
     @State private var showNewIssue: Bool = false
@@ -132,8 +133,8 @@ public struct ProjectIssuesTab: View {
             } else if let issue = selectedIssue {
                 HStack(spacing: 0) {
                     issuesList
-                        .frame(maxWidth: 320)
-                    Divider()
+                        .frame(maxWidth: CGFloat(issueListWidth))
+                    ResizableDivider(width: $issueListWidth)
                     IssueDetailDrawer(
                         issue: issue,
                         detail: issueDetail,
