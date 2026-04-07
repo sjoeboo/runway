@@ -83,8 +83,11 @@ jobs:
           VERSION="${{ steps.version.outputs.version }}"
           ARCHIVE="build/Runway-${VERSION}-universal.app.zip"
 
-          # sign_update reads SPARKLE_PRIVATE_KEY from the environment
-          SIGN_OUTPUT=$("${{ steps.sparkle.outputs.bin }}/sign_update" "$ARCHIVE")
+          # Verify archive exists
+          ls -la "$ARCHIVE"
+
+          # sign_update -s passes the EdDSA key directly
+          SIGN_OUTPUT=$("${{ steps.sparkle.outputs.bin }}/sign_update" "$ARCHIVE" -s "$SPARKLE_PRIVATE_KEY")
           echo "signature=$SIGN_OUTPUT" >> "$GITHUB_OUTPUT"
           echo "Signed: $SIGN_OUTPUT"
 
