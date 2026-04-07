@@ -5,6 +5,23 @@ All notable changes to Runway are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.1.1] — 2026-04-07
+
+### Added
+
+- **Resizable divider** — Drag to resize the list and detail panels in the main window ([#139](https://github.com/sjoeboo/runway/pull/139))
+
+### Fixed
+
+- **Sidebar project navigation** — Reliably opens the project page when clicking a project in the sidebar ([#138](https://github.com/sjoeboo/runway/pull/138))
+- **Monorepo PR cross-contamination** — Provisioning sessions are now skipped during PR linking, preventing incorrect PR associations in monorepo setups ([#140](https://github.com/sjoeboo/runway/pull/140))
+
+### Maintenance
+
+- Refreshed README and CLAUDE.md for v0.1.0 ([#137](https://github.com/sjoeboo/runway/pull/137))
+
+[0.1.1]: https://github.com/sjoeboo/runway/compare/v0.1.0...v0.1.1
+
 ## [0.1.0] — 2026-04-07
 
 ### Added
