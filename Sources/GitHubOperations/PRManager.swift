@@ -154,14 +154,16 @@ public actor PRManager {
 
     /// Fetch per-file patch content via the REST API.
     private func fetchFileDiffs(repo: String, number: Int, host: String? = nil) async throws -> [String: String] {
+        // --slurp wraps each page in an outer array so --paginate output is valid JSON
         let output = try await runGH(
-            args: ["api", "repos/\(repo)/pulls/\(number)/files", "--paginate"],
+            args: ["api", "repos/\(repo)/pulls/\(number)/files", "--paginate", "--slurp"],
             host: host
         )
         guard let data = output.data(using: .utf8) else { return [:] }
-        let files = try JSONDecoder().decode([GHRESTFile].self, from: data)
+        // --slurp produces [[...], [...]] — one inner array per page
+        let pages = try JSONDecoder().decode([[GHRESTFile]].self, from: data)
         var patches: [String: String] = [:]
-        for file in files {
+        for file in pages.flatMap({ $0 }) {
             if let patch = file.patch {
                 patches[file.filename] = patch
             }

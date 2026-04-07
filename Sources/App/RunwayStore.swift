@@ -22,7 +22,6 @@ public final class RunwayStore {
     var selectedSessionID: String?
     /// Incremented on every selection change to force SwiftUI re-render
     /// when selectedSessionID goes nil→nil (no-op for @Observable).
-    var selectionVersion: Int = 0
     var selectedPRID: String?
     var prDetail: PRDetail?
     var prTab: PRTab = .mine
@@ -213,9 +212,8 @@ public final class RunwayStore {
             print("[Runway] Failed to load state: \(error)")
         }
 
-        // Background prefetch PRs so data is ready when user opens PR dashboard
+        // Reload cached PRs after reconciliation (init already schedules fetchPRs)
         loadCachedPRs()
-        Task { await fetchPRs() }
     }
 
     /// Remove worktrees that exist on disk but have no matching session in the database.
@@ -355,16 +353,16 @@ public final class RunwayStore {
                 provisioningWorktreeIDs.remove(session.id)
 
                 // Now start the tmux session with the resolved path
-                await startTmuxSession(for: &session, path: sessionPath, initialPrompt: request.initialPrompt)
+                await startTmuxSession(for: session, path: sessionPath, initialPrompt: request.initialPrompt)
             }
         } else {
             // No worktree needed — start tmux immediately
-            await startTmuxSession(for: &session, path: request.path, initialPrompt: request.initialPrompt)
+            await startTmuxSession(for: session, path: request.path, initialPrompt: request.initialPrompt)
         }
     }
 
     /// Creates the tmux session and updates the session status to .running.
-    private func startTmuxSession(for session: inout Session, path: String, initialPrompt: String? = nil) async {
+    private func startTmuxSession(for session: Session, path: String, initialPrompt: String? = nil) async {
         guard tmuxAvailable else {
             updateSessionStatus(id: session.id, status: .error)
             statusMessage = .error("tmux not found — install it with: brew install tmux")
@@ -421,9 +419,13 @@ public final class RunwayStore {
         guard let idx = sessions.firstIndex(where: { $0.id == id }) else { return }
         let session = sessions[idx]
 
-        // Kill existing tmux session
+        // Kill existing tmux sessions (main + shell tabs)
         let tmuxName = "runway-\(id)"
         if tmuxAvailable {
+            let shellSessions = await tmuxManager.listSessions(prefix: "runway-\(id)-shell")
+            for shell in shellSessions {
+                try? await tmuxManager.killSession(name: shell.name)
+            }
             try? await tmuxManager.killSession(name: tmuxName)
         }
 
@@ -459,9 +461,6 @@ public final class RunwayStore {
         }
 
         try? database?.updateSessionStatus(id: id, status: sessions[idx].status)
-        // Re-select to trigger view refresh
-        selectedSessionID = nil
-        selectedSessionID = id
     }
 
     public func deleteSession(id: String, deleteWorktree: Bool = false) {
@@ -496,9 +495,14 @@ public final class RunwayStore {
             selectedSessionID = nextSelection
         }
 
-        // Clean up tmux session and optionally worktree
+        // Clean up tmux session (main + shell tabs) and optionally worktree
         Task {
             if tmuxAvailable {
+                // Kill shell tab sessions first (runway-{id}-shell1, etc.)
+                let shellSessions = await tmuxManager.listSessions(prefix: "runway-\(id)-shell")
+                for shell in shellSessions {
+                    try? await tmuxManager.killSession(name: shell.name)
+                }
                 try? await tmuxManager.killSession(name: "runway-\(id)")
             }
 
@@ -510,9 +514,7 @@ public final class RunwayStore {
                         repoPath: repoPath, worktreePath: wtPath, deleteBranch: true
                     )
                 } catch {
-                    await MainActor.run {
-                        statusMessage = .error("Worktree cleanup failed: \(error.localizedDescription)")
-                    }
+                    statusMessage = .error("Worktree cleanup failed: \(error.localizedDescription)")
                 }
             }
         }
@@ -546,6 +548,12 @@ public final class RunwayStore {
     }
 
     public func deleteProject(id: String) {
+        // Delete all sessions belonging to this project first
+        let childSessions = sessions.filter { $0.projectID == id }
+        for session in childSessions {
+            deleteSession(id: session.id)
+        }
+
         projects.removeAll { $0.id == id }
         try? database?.deleteProject(id: id)
     }
@@ -555,7 +563,6 @@ public final class RunwayStore {
     public func selectProject(_ projectID: String?) {
         selectedProjectID = projectID
         selectedSessionID = nil
-        selectionVersion += 1
         if currentView == .prs {
             currentView = .sessions
         }
@@ -564,7 +571,6 @@ public final class RunwayStore {
     public func selectSession(_ sessionID: String?) {
         selectedSessionID = sessionID
         selectedProjectID = nil
-        selectionVersion += 1
         if currentView == .prs {
             currentView = .sessions
         }
@@ -626,39 +632,30 @@ public final class RunwayStore {
     private static let portFilePath = "\(FileManager.default.homeDirectoryForCurrentUser.path)/.runway/hook_port"
 
     private func startHookServer() async {
-        await hookServer.onEvent { [weak self] event in
-            Task { @MainActor in
-                self?.handleHookEvent(event)
-            }
-        }
-
         do {
-            // Try to reuse the previous port so existing Claude sessions keep working
+            // Determine which port to try first, then create the definitive server.
             let previousPort = Self.loadPersistedPort()
+
             if let previousPort {
                 hookServer = HookServer(port: previousPort)
-                await hookServer.onEvent { [weak self] event in
-                    Task { @MainActor in
-                        self?.handleHookEvent(event)
-                    }
+                do {
+                    try await hookServer.start()
+                } catch {
+                    // Previous port unavailable — stop old listener and fall back to ephemeral
+                    print("[Runway] Previous port \(previousPort) unavailable, using ephemeral")
+                    await hookServer.stop()
+                    hookServer = HookServer()
+                    try await hookServer.start()
                 }
+            } else {
+                // No saved port — use ephemeral
+                try await hookServer.start()
             }
 
-            do {
-                try await hookServer.start()
-            } catch {
-                // Previous port unavailable — fall back to ephemeral
-                if let previousPort {
-                    print("[Runway] Previous port \(previousPort) unavailable, using ephemeral")
-                    hookServer = HookServer()
-                    await hookServer.onEvent { [weak self] event in
-                        Task { @MainActor in
-                            self?.handleHookEvent(event)
-                        }
-                    }
-                    try await hookServer.start()
-                } else {
-                    throw error
+            // Register the event handler exactly once on the final, started server.
+            await hookServer.onEvent { [weak self] event in
+                Task { @MainActor in
+                    self?.handleHookEvent(event)
                 }
             }
 
@@ -710,12 +707,16 @@ public final class RunwayStore {
 
     // MARK: - Buffer-based Status Detection
 
+    private var bufferDetectionTask: Task<Void, Never>?
+
     /// Polls terminal buffers to detect session status for sessions without hook events.
     /// Runs every 3 seconds and updates status based on terminal content analysis.
     func startBufferDetection() {
-        Task { @MainActor in
+        bufferDetectionTask?.cancel()
+        bufferDetectionTask = Task { @MainActor in
             while !Task.isCancelled {
                 try? await Task.sleep(for: .seconds(3))
+                guard !sessions.isEmpty else { continue }
                 pollTerminalBuffers()
             }
         }
@@ -733,14 +734,14 @@ public final class RunwayStore {
                 continue
             }
 
-            // Read last 15 lines from the cached terminal view
+            // Read last 10 lines from the cached terminal view (matches StatusDetector.detect)
             guard let terminal = TerminalSessionCache.shared.mainTerminal(forSessionID: session.id) else {
                 continue
             }
 
             let terminalAccess = terminal.getTerminal()
             let rows = terminalAccess.rows
-            let startRow = max(0, rows - 15)
+            let startRow = max(0, rows - 10)
             var lines: [String] = []
             for row in startRow..<rows {
                 if let line = terminalAccess.getLine(row: row) {
@@ -769,6 +770,7 @@ public final class RunwayStore {
     }
 
     func fetchPRs() async {
+        guard !isLoadingPRs else { return }
         isLoadingPRs = true
         defer { isLoadingPRs = false }
 
@@ -847,6 +849,7 @@ public final class RunwayStore {
 
         try? database?.cachePRs(pullRequests)
         try? database?.cleanPRCache()
+        try? database?.cleanIssueCache()
 
         await linkSessionPRs()
     }
@@ -925,9 +928,12 @@ public final class RunwayStore {
                 guard !Task.isCancelled, let self else { return }
                 guard !self.isLoadingPRs else { continue }
                 let fingerprint = await self.prManager.prFingerprint(filter: .mine)
-                guard let fingerprint else { continue }
-                if fingerprint != self.lastPRFingerprint {
+                // Fetch if fingerprint changed OR if stale (>5 min) to catch reviewRequested changes
+                let isStale = self.prLastFetched.map { Date().timeIntervalSince($0) > 300 } ?? true
+                if let fingerprint, fingerprint != self.lastPRFingerprint {
                     self.lastPRFingerprint = fingerprint
+                    await self.fetchPRs()
+                } else if isStale {
                     await self.fetchPRs()
                 }
             }
@@ -1325,7 +1331,7 @@ public final class RunwayStore {
 
             provisioningWorktreeIDs.remove(session.id)
 
-            await startTmuxSession(for: &session, path: sessionPath, initialPrompt: initialPrompt.isEmpty ? nil : initialPrompt)
+            await startTmuxSession(for: session, path: sessionPath, initialPrompt: initialPrompt.isEmpty ? nil : initialPrompt)
         }
     }
 
@@ -1447,7 +1453,7 @@ extension RunwayStore: SidebarActions {
 // MARK: - Status Message
 
 struct StatusMessage: Equatable {
-    enum Kind { case success, info, error }
+    enum Kind: Equatable { case success, info, error }
     let text: String
     let kind: Kind
 

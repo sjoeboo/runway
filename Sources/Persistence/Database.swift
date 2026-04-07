@@ -32,7 +32,11 @@ public final class Database: Sendable {
     /// In-memory database for testing.
     public init(inMemory: Bool) throws {
         precondition(inMemory)
-        dbQueue = try DatabaseQueue()
+        var config = Configuration()
+        config.prepareDatabase { db in
+            try db.execute(sql: "PRAGMA busy_timeout = 5000")
+        }
+        dbQueue = try DatabaseQueue(configuration: config)
         try migrate()
     }
 
@@ -187,6 +191,13 @@ public final class Database: Sendable {
             }
         }
 
+        migrator.registerMigration("v10_indexes") { db in
+            try db.execute(sql: "CREATE INDEX IF NOT EXISTS idx_sessions_projectid ON sessions(projectID)")
+            try db.execute(sql: "CREATE INDEX IF NOT EXISTS idx_sessions_status ON sessions(status)")
+            try db.execute(sql: "CREATE INDEX IF NOT EXISTS idx_pr_cache_fetchedat ON pr_cache(fetchedAt)")
+            try db.execute(sql: "CREATE INDEX IF NOT EXISTS idx_issue_cache_fetchedat ON issue_cache(fetchedAt)")
+        }
+
         try migrator.migrate(dbQueue)
     }
 
@@ -322,13 +333,15 @@ public final class Database: Sendable {
 
     /// Save multiple PRs to the cache.
     public func cachePRs(_ prs: [PullRequest]) throws {
+        let encoder = JSONEncoder()
+        let now = Date()
         try dbQueue.write { db in
             for pr in prs {
-                let data = try JSONEncoder().encode(pr)
+                let data = try encoder.encode(pr)
                 let json = String(data: data, encoding: .utf8) ?? ""
                 try db.execute(
                     sql: "INSERT OR REPLACE INTO pr_cache (id, json, fetchedAt) VALUES (?, ?, ?)",
-                    arguments: [pr.id, json, Date()]
+                    arguments: [pr.id, json, now]
                 )
             }
         }
@@ -365,13 +378,15 @@ public final class Database: Sendable {
 
     /// Save multiple issues to the cache.
     public func cacheIssues(_ issues: [GitHubIssue]) throws {
+        let encoder = JSONEncoder()
+        let now = Date()
         try dbQueue.write { db in
             for issue in issues {
-                let data = try JSONEncoder().encode(issue)
+                let data = try encoder.encode(issue)
                 let json = String(data: data, encoding: .utf8) ?? ""
                 try db.execute(
                     sql: "INSERT OR REPLACE INTO issue_cache (id, json, fetchedAt) VALUES (?, ?, ?)",
-                    arguments: [issue.id, json, Date()]
+                    arguments: [issue.id, json, now]
                 )
             }
         }

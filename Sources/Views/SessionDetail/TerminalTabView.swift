@@ -35,7 +35,7 @@ public struct TerminalTabView: View {
 
     public init(
         session: Session,
-        tmuxManager: TmuxSessionManager = TmuxSessionManager(),
+        tmuxManager: TmuxSessionManager,
         showSearch: Binding<Bool>,
         splitHorizontalTrigger: Binding<Int> = .constant(0),
         splitVerticalTrigger: Binding<Int> = .constant(0)
@@ -107,8 +107,8 @@ public struct TerminalTabView: View {
             selectedTabID = nil
             initializeTabsIfReady()
         }
-        .onChange(of: splitHorizontalTrigger) { _, _ in splitVertical() }
-        .onChange(of: splitVerticalTrigger) { _, _ in splitHorizontal() }
+        .onChange(of: splitHorizontalTrigger) { _, _ in splitDown() }
+        .onChange(of: splitVerticalTrigger) { _, _ in splitRight() }
         .onChange(of: session.status) { _, newStatus in
             // Wait for the tmux session to be created before attaching.
             // TerminalPane calls `tmux attach-session` immediately, so we
@@ -138,29 +138,32 @@ public struct TerminalTabView: View {
             }
             .buttonStyle(.plain)
             .help("New shell tab")
+            .accessibilityLabel("New shell tab")
 
             Spacer()
 
             // Split pane buttons
             if selectedTab != nil {
                 HStack(spacing: 2) {
-                    Button(action: splitVertical) {
+                    Button(action: splitDown) {
                         Image(systemName: "rectangle.split.1x2")
                             .font(.caption)
                             .foregroundColor(theme.chrome.textDim)
                             .frame(width: 28, height: 28)
                     }
                     .buttonStyle(.plain)
-                    .help("Split pane horizontally (top/bottom)")
+                    .help("Split pane down (top/bottom)")
+                    .accessibilityLabel("Split pane down")
 
-                    Button(action: splitHorizontal) {
+                    Button(action: splitRight) {
                         Image(systemName: "rectangle.split.2x1")
                             .font(.caption)
                             .foregroundColor(theme.chrome.textDim)
                             .frame(width: 28, height: 28)
                     }
                     .buttonStyle(.plain)
-                    .help("Split pane vertically (left/right)")
+                    .help("Split pane right (left/right)")
+                    .accessibilityLabel("Split pane right")
                 }
                 .padding(.trailing, 4)
             }
@@ -173,34 +176,31 @@ public struct TerminalTabView: View {
     private func tabButton(_ tab: TerminalTab) -> some View {
         let isSelected = tab.id == selectedTabID
 
-        return Button {
-            selectedTabID = tab.id
-        } label: {
-            HStack(spacing: 4) {
-                if tab.isMain {
-                    Image(systemName: "terminal")
-                        .font(.caption2)
-                }
-                Text(tab.title)
-                    .font(.caption)
-                    .lineLimit(1)
-
-                if !tab.isMain && tabs.count > 1 {
-                    Button(action: { closeTab(tab.id) }) {
-                        Image(systemName: "xmark")
-                            .font(.caption2.weight(.bold))
-                            .foregroundColor(theme.chrome.textDim)
-                    }
-                    .buttonStyle(.plain)
-                }
+        return HStack(spacing: 4) {
+            if tab.isMain {
+                Image(systemName: "terminal")
+                    .font(.caption2)
             }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 5)
-            .background(isSelected ? theme.chrome.background : theme.chrome.surface)
-            .foregroundColor(isSelected ? theme.chrome.text : theme.chrome.textDim)
-            .cornerRadius(4)
+            Text(tab.title)
+                .font(.caption)
+                .lineLimit(1)
+
+            if !tab.isMain && tabs.count > 1 {
+                Button(action: { closeTab(tab.id) }) {
+                    Image(systemName: "xmark")
+                        .font(.caption2.weight(.bold))
+                        .foregroundColor(theme.chrome.textDim)
+                }
+                .buttonStyle(.plain)
+            }
         }
-        .buttonStyle(.plain)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 5)
+        .background(isSelected ? theme.chrome.background : theme.chrome.surface)
+        .foregroundColor(isSelected ? theme.chrome.text : theme.chrome.textDim)
+        .clipShape(RoundedRectangle(cornerRadius: 4))
+        .contentShape(Rectangle())
+        .onTapGesture { selectedTabID = tab.id }
     }
 
     // MARK: - Tab Management
@@ -338,14 +338,16 @@ public struct TerminalTabView: View {
         }
     }
 
-    private func splitVertical() {
+    /// Split the current pane top/bottom (creates a horizontal divider).
+    private func splitDown() {
         guard let tab = selectedTab, let tmuxName = tab.config.tmuxSessionName else { return }
         Task {
             try? await tmuxManager.splitWindow(sessionName: tmuxName, direction: .horizontal)
         }
     }
 
-    private func splitHorizontal() {
+    /// Split the current pane left/right (creates a vertical divider).
+    private func splitRight() {
         guard let tab = selectedTab, let tmuxName = tab.config.tmuxSessionName else { return }
         Task {
             try? await tmuxManager.splitWindow(sessionName: tmuxName, direction: .vertical)

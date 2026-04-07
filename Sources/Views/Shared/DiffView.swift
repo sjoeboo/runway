@@ -37,7 +37,6 @@ public struct DiffView: View {
                 }
             }
         }
-        .font(.custom(fontFamily, size: fontSize))
     }
 
     private var diffSummary: some View {
@@ -49,7 +48,7 @@ public struct DiffView: View {
             Text("-\(totalDeletions)")
                 .foregroundColor(theme.chrome.red)
         }
-        .font(.custom(fontFamily, size: fontSize - 1))
+        .font(.callout)
         .padding(8)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(theme.chrome.surface)
@@ -117,6 +116,7 @@ public struct DiffView: View {
             Text(line.content)
                 .font(.custom(fontFamily, size: fontSize))
                 .foregroundColor(lineColor(line.type))
+                .textSelection(.enabled)
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
         .padding(.horizontal, 4)
@@ -157,7 +157,7 @@ public struct DiffView: View {
 // MARK: - Diff Data Models
 
 public struct DiffFile: Identifiable, Sendable {
-    public var id: String { path }
+    public let id: String
     public let path: String
     public let additions: Int
     public let deletions: Int
@@ -172,12 +172,14 @@ public struct DiffFile: Identifiable, Sendable {
         var deletions = 0
         var oldLine = 0
         var newLine = 0
+        var lineIndex = 0
 
         for rawLine in patch.components(separatedBy: "\n") {
             if rawLine.hasPrefix("diff --git") {
                 // Save previous file
                 if let path = currentPath {
-                    files.append(DiffFile(path: path, additions: additions, deletions: deletions, lines: currentLines))
+                    files.append(
+                        DiffFile(id: "file-\(files.count)", path: path, additions: additions, deletions: deletions, lines: currentLines))
                 }
                 currentLines = []
                 additions = 0
@@ -198,17 +200,25 @@ public struct DiffFile: Identifiable, Sendable {
                     let oldNums = oldPart.dropFirst().components(separatedBy: ",")
                     oldLine = Int(oldNums[0]) ?? 0
                 }
-                currentLines.append(DiffLine(type: .hunk, content: rawLine, oldLineNo: nil, newLineNo: nil))
+                currentLines.append(DiffLine(index: lineIndex, type: .hunk, content: rawLine, oldLineNo: nil, newLineNo: nil))
+                lineIndex += 1
             } else if rawLine.hasPrefix("+") {
                 additions += 1
-                currentLines.append(DiffLine(type: .addition, content: String(rawLine.dropFirst()), oldLineNo: nil, newLineNo: newLine))
+                currentLines.append(
+                    DiffLine(index: lineIndex, type: .addition, content: String(rawLine.dropFirst()), oldLineNo: nil, newLineNo: newLine))
+                lineIndex += 1
                 newLine += 1
             } else if rawLine.hasPrefix("-") {
                 deletions += 1
-                currentLines.append(DiffLine(type: .deletion, content: String(rawLine.dropFirst()), oldLineNo: oldLine, newLineNo: nil))
+                currentLines.append(
+                    DiffLine(index: lineIndex, type: .deletion, content: String(rawLine.dropFirst()), oldLineNo: oldLine, newLineNo: nil))
+                lineIndex += 1
                 oldLine += 1
             } else if rawLine.hasPrefix(" ") {
-                currentLines.append(DiffLine(type: .context, content: String(rawLine.dropFirst()), oldLineNo: oldLine, newLineNo: newLine))
+                currentLines.append(
+                    DiffLine(index: lineIndex, type: .context, content: String(rawLine.dropFirst()), oldLineNo: oldLine, newLineNo: newLine)
+                )
+                lineIndex += 1
                 oldLine += 1
                 newLine += 1
             }
@@ -216,7 +226,7 @@ public struct DiffFile: Identifiable, Sendable {
 
         // Save last file
         if let path = currentPath {
-            files.append(DiffFile(path: path, additions: additions, deletions: deletions, lines: currentLines))
+            files.append(DiffFile(id: "file-\(files.count)", path: path, additions: additions, deletions: deletions, lines: currentLines))
         }
 
         return files
@@ -230,8 +240,8 @@ public struct DiffLine: Identifiable, Sendable {
     public let oldLineNo: Int?
     public let newLineNo: Int?
 
-    public init(type: DiffLineType, content: String, oldLineNo: Int?, newLineNo: Int?) {
-        self.id = "\(type)-\(oldLineNo ?? -1)-\(newLineNo ?? -1)-\(content.hashValue)"
+    public init(index: Int, type: DiffLineType, content: String, oldLineNo: Int?, newLineNo: Int?) {
+        self.id = "line-\(index)"
         self.type = type
         self.content = content
         self.oldLineNo = oldLineNo

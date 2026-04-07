@@ -120,7 +120,7 @@ public struct ReviewPRSheet: View {
         .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(theme.chrome.surface)
-        .cornerRadius(8)
+        .clipShape(RoundedRectangle(cornerRadius: 8))
     }
 
     private func formField<Content: View>(_ label: String, @ViewBuilder content: () -> Content) -> some View {
@@ -145,7 +145,7 @@ private struct PRStateBadge: View {
             .padding(.vertical, 2)
             .foregroundColor(.white)
             .background(badgeColor)
-            .cornerRadius(4)
+            .clipShape(RoundedRectangle(cornerRadius: 4))
     }
 
     private var badgeColor: Color {

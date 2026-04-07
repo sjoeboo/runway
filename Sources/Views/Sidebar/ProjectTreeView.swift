@@ -186,6 +186,7 @@ struct ProjectSection: View {
     @State private var isHeaderHovered = false
     @State private var isRenaming = false
     @State private var editName: String = ""
+    @State private var showDeleteConfirmation = false
     @Environment(\.theme) private var theme
 
     init(
@@ -248,11 +249,11 @@ struct ProjectSection: View {
                             isRenaming = false
                         }
                         .textFieldStyle(.plain)
-                        .font(.system(.title3, weight: .semibold))
+                        .font(.system(.subheadline, weight: .semibold))
                         .onAppear { editName = project.name }
                 } else {
                     Text(project.name)
-                        .font(.system(.title3, weight: .semibold))
+                        .font(.system(.subheadline, weight: .semibold))
                         .foregroundColor(theme.chrome.text)
                         .onTapGesture {
                             actions.selectProject(project.id)
@@ -307,10 +308,22 @@ struct ProjectSection: View {
             Divider()
 
             Button(role: .destructive) {
-                actions.deleteProject(id: project.id)
+                showDeleteConfirmation = true
             } label: {
                 Label("Remove Project", systemImage: "folder.badge.minus")
             }
+        }
+        .confirmationDialog(
+            "Remove \"\(project.name)\"?",
+            isPresented: $showDeleteConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button("Remove Project and Sessions", role: .destructive) {
+                actions.deleteProject(id: project.id)
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This will remove the project and all its sessions from Runway. Worktrees on disk will not be deleted.")
         }
     }
 }
@@ -395,43 +408,42 @@ struct SessionRowView: View {
             }
             Spacer()
 
-            if isHovered {
-                HStack(spacing: 4) {
-                    Button {
-                        Task { await actions.restartSession(id: session.id) }
-                    } label: {
-                        Image(systemName: "arrow.counterclockwise")
-                            .font(.callout)
-                            .foregroundStyle(.secondary)
-                            .frame(width: 26, height: 26)
-                    }
-                    .buttonStyle(.plain)
-                    .help("Restart session")
-
-                    Button {
-                        showDeleteConfirmation = true
-                    } label: {
-                        Image(systemName: "trash")
-                            .font(.callout)
-                            .foregroundStyle(.secondary)
-                            .frame(width: 26, height: 26)
-                    }
-                    .buttonStyle(.plain)
-                    .help("Delete session")
+            HStack(spacing: 4) {
+                Button {
+                    Task { await actions.restartSession(id: session.id) }
+                } label: {
+                    Image(systemName: "arrow.counterclockwise")
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                        .frame(width: 26, height: 26)
                 }
-            } else if session.tool != .claude {
+                .buttonStyle(.plain)
+                .help("Restart session")
+
+                Button {
+                    showDeleteConfirmation = true
+                } label: {
+                    Image(systemName: "trash")
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                        .frame(width: 26, height: 26)
+                }
+                .buttonStyle(.plain)
+                .help("Delete session")
+            }
+            .opacity(isHovered ? 1 : 0)
+            .allowsHitTesting(isHovered)
+
+            if !isHovered && session.tool != .claude {
                 Text(session.tool.displayName)
                     .font(.caption2)
                     .padding(.horizontal, 4)
                     .padding(.vertical, 1)
                     .background(theme.chrome.surface)
-                    .cornerRadius(4)
+                    .clipShape(RoundedRectangle(cornerRadius: 4))
             }
         }
         .padding(.vertical, 4)
-        .onTapGesture {
-            actions.selectSession(session.id)
-        }
         .onHover { hovering in
             isHovered = hovering
         }

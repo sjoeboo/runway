@@ -57,6 +57,7 @@ public struct NewProjectDialog: View {
         }
         .padding(24)
         .frame(width: 420)
+        .fixedSize(horizontal: false, vertical: true)
         .onChange(of: path) { _, newPath in
             detectBranch(at: newPath)
         }
@@ -92,10 +93,12 @@ public struct NewProjectDialog: View {
         panel.allowsMultipleSelection = false
         panel.message = "Select project directory"
 
-        if panel.runModal() == .OK, let url = panel.url {
-            path = url.path
-            if name.isEmpty {
-                name = url.lastPathComponent
+        panel.begin { response in
+            if response == .OK, let url = panel.url {
+                path = url.path
+                if name.isEmpty {
+                    name = url.lastPathComponent
+                }
             }
         }
     }

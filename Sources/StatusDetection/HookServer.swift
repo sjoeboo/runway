@@ -35,6 +35,13 @@ public actor HookServer {
     /// After this method returns, `actualPort` contains the assigned port.
     public func start() async throws {
         let params = NWParameters.tcp
+        // Bind to loopback only — prevent LAN access to hook events
+        params.requiredLocalEndpoint = NWEndpoint.hostPort(
+            host: .ipv4(.loopback),
+            port: requestedPort == 0
+                ? .any
+                : NWEndpoint.Port(rawValue: requestedPort) ?? .any
+        )
         let nwPort: NWEndpoint.Port
         if requestedPort == 0 {
             nwPort = .any
@@ -86,6 +93,9 @@ public actor HookServer {
         accumulateRequest(connection: connection, buffer: Data())
     }
 
+    /// Maximum allowed request size (1 MB) to prevent unbounded memory growth.
+    private static let maxRequestSize = 1_048_576
+
     /// Accumulate HTTP request data until we have the full body (Content-Length aware).
     /// Calls processRequest once the full payload is received.
     nonisolated private func accumulateRequest(connection: NWConnection, buffer: Data) {
@@ -97,6 +107,12 @@ public actor HookServer {
 
             var accumulated = buffer
             accumulated.append(data)
+
+            // Prevent unbounded memory growth from slow/malicious clients
+            if accumulated.count > HookServer.maxRequestSize {
+                connection.cancel()
+                return
+            }
 
             // Check if we have the full HTTP request
             let separator = Data("\r\n\r\n".utf8)

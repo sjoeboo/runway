@@ -69,7 +69,10 @@ public actor TmuxSessionManager {
         // Send initial command if provided (separate call since send-keys
         // with \; can be fragile if the command itself contains semicolons)
         if let command, !command.isEmpty {
-            _ = try? await runTmux(args: ["send-keys", "-t", name, command, "Enter"])
+            // Use -l for literal text (no tmux key-name interpretation),
+            // then send Enter separately as a key name.
+            _ = try? await runTmux(args: ["send-keys", "-t", name, "-l", command])
+            _ = try? await runTmux(args: ["send-keys", "-t", name, "Enter"])
         }
     }
 

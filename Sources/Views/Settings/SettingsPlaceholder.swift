@@ -12,6 +12,11 @@ public struct SettingsView: View {
 
     private let updater: SPUUpdater?
 
+    private var hookServerPort: String {
+        let path = "\(FileManager.default.homeDirectoryForCurrentUser.path)/.runway/hook_port"
+        return (try? String(contentsOfFile: path, encoding: .utf8))?.trimmingCharacters(in: .whitespacesAndNewlines) ?? "—"
+    }
+
     public init(updater: SPUUpdater? = nil) {
         self.updater = updater
     }
@@ -27,7 +32,7 @@ public struct SettingsView: View {
             generalSettings
                 .tabItem { Label("General", systemImage: "gear") }
         }
-        .frame(width: 500, height: 400)
+        .frame(minWidth: 500, minHeight: 360)
     }
 
     // MARK: - Appearance
@@ -146,7 +151,7 @@ public struct SettingsView: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .background(themeManager.currentTheme.chrome.background)
                     .foregroundColor(themeManager.currentTheme.chrome.text)
-                    .cornerRadius(6)
+                    .clipShape(RoundedRectangle(cornerRadius: 6))
             }
         }
         .formStyle(.grouped)
@@ -206,12 +211,12 @@ public struct SettingsView: View {
 
             Section("Hooks") {
                 LabeledContent("Hook Server Port") {
-                    Text("47437")
+                    Text(hookServerPort)
                         .foregroundColor(.secondary)
                 }
                 LabeledContent("Status") {
-                    Text("Running")
-                        .foregroundColor(.green)
+                    Text(hookServerPort == "—" ? "Not running" : "Running")
+                        .foregroundColor(hookServerPort == "—" ? .secondary : .green)
                 }
             }
 

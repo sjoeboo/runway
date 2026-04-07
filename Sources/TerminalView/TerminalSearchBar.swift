@@ -64,7 +64,7 @@ public struct TerminalSearchBar: View {
             .padding(.horizontal, 10)
             .padding(.vertical, 6)
             .background(.ultraThinMaterial)
-            .cornerRadius(6)
+            .clipShape(RoundedRectangle(cornerRadius: 6))
             .shadow(radius: 2)
             .padding(.horizontal, 8)
             .padding(.top, 4)

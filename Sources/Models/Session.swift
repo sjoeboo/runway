@@ -49,13 +49,9 @@ public struct Session: Identifiable, Codable, Sendable {
         self.lastAccessedAt = lastAccessedAt
     }
 
-    /// Generate a unique session ID in the format "id-{8hex}-{timestamp}".
+    /// Generate a unique session ID using UUID for full entropy.
     public static func generateID() -> String {
-        let hex = (0..<4).map { _ in
-            String(format: "%02x", UInt8.random(in: 0...255))
-        }.joined()
-        let ts = Int(Date().timeIntervalSince1970)
-        return "id-\(hex)-\(ts)"
+        "id-\(UUID().uuidString.lowercased())"
     }
 }
 

@@ -27,7 +27,7 @@ struct RunwayApp: App {
         // activate them as GUI apps. Force regular activation policy so
         // the window, dock icon, and menu bar all appear.
         NSApplication.shared.setActivationPolicy(.regular)
-        NSApplication.shared.activate(ignoringOtherApps: true)
+        NSApplication.shared.activate()
         AppIcon.install()
     }
 
@@ -131,7 +131,7 @@ struct ContentView: View {
             } detail: {
                 detail
             }
-            .navigationSplitViewStyle(.balanced)
+            .navigationSplitViewStyle(.prominentDetail)
             .toolbar {
                 toolbarContent
             }
@@ -260,14 +260,21 @@ struct ContentView: View {
                 .buttonStyle(.plain)
             }
         }
-        .foregroundColor(.white)
         .padding(.horizontal, 12)
         .padding(.vertical, 6)
-        .background(toastColor(for: msg.kind).opacity(0.9))
-        .cornerRadius(6)
+        .background(toastColor(for: msg.kind))
+        .foregroundStyle(.white)
+        .clipShape(RoundedRectangle(cornerRadius: 6))
         .padding(.bottom, 8)
         .transition(reduceMotion ? .opacity : .move(edge: .bottom).combined(with: .opacity))
         .animation(reduceMotion ? .none : .easeInOut(duration: 0.3), value: msg)
+        .onAppear {
+            NSAccessibility.post(
+                element: NSApp as Any,
+                notification: .announcementRequested,
+                userInfo: [.announcement: msg.text, .priority: NSAccessibilityPriorityLevel.high.rawValue]
+            )
+        }
     }
 
     private func toastColor(for kind: StatusMessage.Kind) -> Color {
@@ -322,8 +329,6 @@ struct ContentView: View {
     @ViewBuilder
     private var detail: some View {
         detailContent
-            // Force re-render when selectionVersion changes (fixes nil→nil no-op on first launch)
-            .id(store.selectionVersion)
             .onChange(of: store.selectedSessionID) { _, newValue in
                 // When a session is selected (e.g. via List selection binding),
                 // clear selectedProjectID so the session detail takes priority.
@@ -389,6 +394,7 @@ struct ContentView: View {
             {
                 SessionDetailView(
                     session: session,
+                    tmuxManager: store.tmuxManager,
                     linkedPR: store.sessionPRs[sessionID],
                     onSelectPR: { pr in Task { await store.selectPR(pr) } },
                     showSendBar: Binding(
@@ -428,7 +434,9 @@ struct ContentView: View {
             } else {
                 EmptyStateView(
                     title: "No Session Selected",
-                    subtitle: "Select a session from the sidebar or press ⌘N to create one"
+                    subtitle: "Select a session from the sidebar or press ⌘N to create one",
+                    actionTitle: store.projects.isEmpty ? "Add Your First Project" : nil,
+                    onAction: store.projects.isEmpty ? { store.showNewProjectDialog = true } : nil
                 )
             }
         case .prs:

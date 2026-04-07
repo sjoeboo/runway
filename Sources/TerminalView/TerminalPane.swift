@@ -178,7 +178,7 @@ public struct TerminalPane: NSViewRepresentable {
         return env.map { "\($0.key)=\($0.value)" }
     }
 
-    public class Coordinator {
+    @MainActor public class Coordinator {
         var terminal: LocalProcessTerminalView?
         var lastThemeID: String?
         var lastFontFamily: String?

@@ -50,9 +50,6 @@ public struct Project: Identifiable, Codable, Sendable, Equatable {
     }
 
     public static func generateID() -> String {
-        let hex = (0..<4).map { _ in
-            String(format: "%02x", UInt8.random(in: 0...255))
-        }.joined()
-        return "proj-\(hex)"
+        "proj-\(UUID().uuidString.lowercased())"
     }
 }

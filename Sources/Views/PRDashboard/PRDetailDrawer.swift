@@ -389,7 +389,6 @@ public struct PRDetailDrawer: View {
                     .padding(.top, 8)
                 }
                 .buttonStyle(.plain)
-                .keyboardShortcut(KeyEquivalent(Character("\(index + 1)")), modifiers: .control)
             }
             Spacer()
         }
@@ -513,7 +512,7 @@ public struct PRDetailDrawer: View {
         .padding(.vertical, 6)
         .padding(.horizontal, 8)
         .background(checkRunBackground(run.status))
-        .cornerRadius(6)
+        .clipShape(RoundedRectangle(cornerRadius: 6))
     }
 
     @ViewBuilder
@@ -545,8 +544,9 @@ public struct PRDetailDrawer: View {
     @ViewBuilder
     private var diffTab: some View {
         if let files = detail?.files, !files.isEmpty {
-            let diffFiles = files.map { file in
+            let diffFiles = files.enumerated().map { index, file in
                 DiffFile(
+                    id: "prfile-\(index)",
                     path: file.path,
                     additions: file.additions,
                     deletions: file.deletions,
@@ -570,6 +570,7 @@ public struct PRDetailDrawer: View {
         var oldLine = 0
         var newLine = 0
 
+        var lineIndex = 0
         for rawLine in patch.components(separatedBy: "\n") {
             if rawLine.hasPrefix("@@") {
                 let parts = rawLine.components(separatedBy: " ")
@@ -581,15 +582,23 @@ public struct PRDetailDrawer: View {
                     let oldNums = oldPart.dropFirst().components(separatedBy: ",")
                     oldLine = Int(oldNums[0]) ?? 0
                 }
-                lines.append(DiffLine(type: .hunk, content: rawLine, oldLineNo: nil, newLineNo: nil))
+                lines.append(DiffLine(index: lineIndex, type: .hunk, content: rawLine, oldLineNo: nil, newLineNo: nil))
+                lineIndex += 1
             } else if rawLine.hasPrefix("+") {
-                lines.append(DiffLine(type: .addition, content: String(rawLine.dropFirst()), oldLineNo: nil, newLineNo: newLine))
+                lines.append(
+                    DiffLine(index: lineIndex, type: .addition, content: String(rawLine.dropFirst()), oldLineNo: nil, newLineNo: newLine))
+                lineIndex += 1
                 newLine += 1
             } else if rawLine.hasPrefix("-") {
-                lines.append(DiffLine(type: .deletion, content: String(rawLine.dropFirst()), oldLineNo: oldLine, newLineNo: nil))
+                lines.append(
+                    DiffLine(index: lineIndex, type: .deletion, content: String(rawLine.dropFirst()), oldLineNo: oldLine, newLineNo: nil))
+                lineIndex += 1
                 oldLine += 1
             } else if rawLine.hasPrefix(" ") {
-                lines.append(DiffLine(type: .context, content: String(rawLine.dropFirst()), oldLineNo: oldLine, newLineNo: newLine))
+                lines.append(
+                    DiffLine(index: lineIndex, type: .context, content: String(rawLine.dropFirst()), oldLineNo: oldLine, newLineNo: newLine)
+                )
+                lineIndex += 1
                 oldLine += 1
                 newLine += 1
             }
@@ -689,7 +698,7 @@ public struct PRDetailDrawer: View {
                         .padding(.horizontal, 6)
                         .padding(.vertical, 2)
                         .background(reviewColor(review.state).opacity(0.1))
-                        .cornerRadius(4)
+                        .clipShape(RoundedRectangle(cornerRadius: 4))
                 }
                 if !review.body.isEmpty {
                     renderMarkdown(review.body, inlineOnly: true)
@@ -701,7 +710,7 @@ public struct PRDetailDrawer: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(theme.chrome.surface)
-        .cornerRadius(6)
+        .clipShape(RoundedRectangle(cornerRadius: 6))
     }
 
     private func reviewIcon(_ state: String) -> String {
@@ -732,7 +741,7 @@ public struct PRDetailDrawer: View {
         .padding(8)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(theme.chrome.surface)
-        .cornerRadius(6)
+        .clipShape(RoundedRectangle(cornerRadius: 6))
     }
 
     private func reviewColor(_ state: String) -> SwiftUI.Color {
