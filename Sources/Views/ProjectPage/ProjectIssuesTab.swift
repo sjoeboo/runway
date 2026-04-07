@@ -71,7 +71,7 @@ public struct ProjectIssuesTab: View {
 
                 Button(action: onRefresh) {
                     Image(systemName: "arrow.clockwise")
-                        .font(.caption)
+                        .font(.callout)
                 }
                 .buttonStyle(.plain)
                 .help("Refresh issues")
@@ -81,7 +81,7 @@ public struct ProjectIssuesTab: View {
                     showNewIssue = true
                 } label: {
                     Image(systemName: "plus")
-                        .font(.caption)
+                        .font(.callout)
                 }
                 .buttonStyle(.plain)
                 .help("New issue")
@@ -113,13 +113,13 @@ public struct ProjectIssuesTab: View {
         VStack(spacing: 8) {
             Image(systemName: "exclamationmark.circle")
                 .font(.largeTitle)
-                .foregroundColor(theme.chrome.textDim)
+                .foregroundStyle(.secondary)
             Text("Issues not enabled")
                 .font(.headline)
-                .foregroundColor(theme.chrome.textDim)
+                .foregroundStyle(.secondary)
             Text("Enable issues in Project Settings to use this feature.")
-                .font(.caption)
-                .foregroundColor(theme.chrome.textDim)
+                .font(.callout)
+                .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -130,8 +130,8 @@ public struct ProjectIssuesTab: View {
         VStack(spacing: 8) {
             ProgressView()
             Text("Loading issues…")
-                .font(.caption)
-                .foregroundColor(theme.chrome.textDim)
+                .font(.callout)
+                .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
@@ -140,10 +140,10 @@ public struct ProjectIssuesTab: View {
         VStack(spacing: 8) {
             Image(systemName: "tray")
                 .font(.largeTitle)
-                .foregroundColor(theme.chrome.textDim)
+                .foregroundStyle(.secondary)
             Text("No \(filter.rawValue.lowercased()) issues")
                 .font(.headline)
-                .foregroundColor(theme.chrome.textDim)
+                .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
@@ -184,9 +184,10 @@ private struct IssueRowView: View {
                 HStack(spacing: 4) {
                     Text("#\(issue.number)")
                         .font(.caption)
-                        .foregroundColor(theme.chrome.textDim)
+                        .foregroundStyle(.secondary)
                     Text(issue.title)
                         .font(.body)
+                        .foregroundStyle(.primary)
                         .lineLimit(2)
                 }
 
@@ -199,13 +200,13 @@ private struct IssueRowView: View {
                 }
 
                 Text(issue.updatedAt, style: .relative)
-                    .font(.caption2)
-                    .foregroundColor(theme.chrome.textDim)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
 
             Spacer()
         }
-        .padding(.vertical, 2)
+        .padding(.vertical, 4)
     }
 }
 
