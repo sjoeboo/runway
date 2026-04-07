@@ -19,8 +19,17 @@ public struct ProjectIssuesTab: View {
     let issuesEnabled: Bool
     let onRefresh: () -> Void
     let onCreate: (String, String, [String]) -> Void
-    let onOpenIssue: (GitHubIssue) -> Void
+    let onSelectIssue: (GitHubIssue?) -> Void
     let onFetchLabels: () -> Void
+    var selectedIssueID: String?
+    var issueDetail: IssueDetail?
+    var isLoadingDetail: Bool = false
+    var onComment: ((GitHubIssue, String) -> Void)?
+    var onCloseIssue: ((GitHubIssue, CloseReason) -> Void)?
+    var onReopen: ((GitHubIssue) -> Void)?
+    var onEdit: ((GitHubIssue, String?, String?) -> Void)?
+    var onUpdateLabels: ((GitHubIssue, [String], [String]) -> Void)?
+    var onUpdateAssignees: ((GitHubIssue, [String], [String]) -> Void)?
 
     @Environment(\.theme) private var theme
     @State private var filter: IssueFilter = .open
@@ -33,8 +42,17 @@ public struct ProjectIssuesTab: View {
         issuesEnabled: Bool,
         onRefresh: @escaping () -> Void,
         onCreate: @escaping (String, String, [String]) -> Void,
-        onOpenIssue: @escaping (GitHubIssue) -> Void,
-        onFetchLabels: @escaping () -> Void
+        onSelectIssue: @escaping (GitHubIssue?) -> Void,
+        onFetchLabels: @escaping () -> Void,
+        selectedIssueID: String? = nil,
+        issueDetail: IssueDetail? = nil,
+        isLoadingDetail: Bool = false,
+        onComment: ((GitHubIssue, String) -> Void)? = nil,
+        onCloseIssue: ((GitHubIssue, CloseReason) -> Void)? = nil,
+        onReopen: ((GitHubIssue) -> Void)? = nil,
+        onEdit: ((GitHubIssue, String?, String?) -> Void)? = nil,
+        onUpdateLabels: ((GitHubIssue, [String], [String]) -> Void)? = nil,
+        onUpdateAssignees: ((GitHubIssue, [String], [String]) -> Void)? = nil
     ) {
         self.issues = issues
         self.labels = labels
@@ -42,8 +60,21 @@ public struct ProjectIssuesTab: View {
         self.issuesEnabled = issuesEnabled
         self.onRefresh = onRefresh
         self.onCreate = onCreate
-        self.onOpenIssue = onOpenIssue
+        self.onSelectIssue = onSelectIssue
         self.onFetchLabels = onFetchLabels
+        self.selectedIssueID = selectedIssueID
+        self.issueDetail = issueDetail
+        self.isLoadingDetail = isLoadingDetail
+        self.onComment = onComment
+        self.onCloseIssue = onCloseIssue
+        self.onReopen = onReopen
+        self.onEdit = onEdit
+        self.onUpdateLabels = onUpdateLabels
+        self.onUpdateAssignees = onUpdateAssignees
+    }
+
+    private var selectedIssue: GitHubIssue? {
+        issues.first(where: { $0.id == selectedIssueID })
     }
 
     private var filteredIssues: [GitHubIssue] {
@@ -98,6 +129,25 @@ public struct ProjectIssuesTab: View {
                 loadingView
             } else if filteredIssues.isEmpty {
                 emptyStateView
+            } else if let issue = selectedIssue {
+                HStack(spacing: 0) {
+                    issuesList
+                        .frame(maxWidth: 320)
+                    Divider()
+                    IssueDetailDrawer(
+                        issue: issue,
+                        detail: issueDetail,
+                        labels: labels,
+                        isLoading: isLoadingDetail,
+                        onClose: { onSelectIssue(nil) },
+                        onComment: { body in onComment?(issue, body) },
+                        onCloseIssue: { reason in onCloseIssue?(issue, reason) },
+                        onReopen: { onReopen?(issue) },
+                        onEdit: { title, body in onEdit?(issue, title, body) },
+                        onUpdateLabels: { add, remove in onUpdateLabels?(issue, add, remove) },
+                        onUpdateAssignees: { add, remove in onUpdateAssignees?(issue, add, remove) }
+                    )
+                }
             } else {
                 issuesList
             }
@@ -151,9 +201,9 @@ public struct ProjectIssuesTab: View {
     private var issuesList: some View {
         List {
             ForEach(filteredIssues) { issue in
-                IssueRowView(issue: issue, labels: labels)
+                IssueRowView(issue: issue, labels: labels, isSelected: issue.id == selectedIssueID)
                     .contentShape(Rectangle())
-                    .onTapGesture { onOpenIssue(issue) }
+                    .onTapGesture { onSelectIssue(issue) }
                     .listRowInsets(EdgeInsets(top: 4, leading: 12, bottom: 4, trailing: 12))
             }
         }
@@ -166,6 +216,7 @@ public struct ProjectIssuesTab: View {
 private struct IssueRowView: View {
     let issue: GitHubIssue
     let labels: [IssueLabel]
+    var isSelected: Bool = false
 
     @Environment(\.theme) private var theme
 
@@ -207,6 +258,14 @@ private struct IssueRowView: View {
             Spacer()
         }
         .padding(.vertical, 4)
+        .padding(.leading, isSelected ? 0 : 3)
+        .overlay(alignment: .leading) {
+            if isSelected {
+                RoundedRectangle(cornerRadius: 1)
+                    .fill(theme.chrome.accent)
+                    .frame(width: 3)
+            }
+        }
     }
 }
 
