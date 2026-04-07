@@ -104,8 +104,8 @@ public struct ProjectPageView: View {
                         .font(.headline)
                     if !project.path.isEmpty {
                         Text(project.path)
-                            .font(.system(.caption, design: .monospaced))
-                            .foregroundColor(theme.chrome.textDim)
+                            .font(.system(.callout, design: .monospaced))
+                            .foregroundStyle(.secondary)
                             .lineLimit(1)
                     }
                 }
@@ -118,7 +118,7 @@ public struct ProjectPageView: View {
                 } label: {
                     Image(systemName: "gearshape")
                         .font(.body)
-                        .foregroundColor(theme.chrome.textDim)
+                        .foregroundStyle(.secondary)
                 }
                 .buttonStyle(IconButtonStyle())
                 .help("Project Settings")
@@ -223,7 +223,7 @@ private struct TabButton: View {
                         .foregroundColor(isActive ? theme.chrome.text : theme.chrome.textDim)
 
                     Text("\(count)")
-                        .font(.caption2)
+                        .font(.caption)
                         .foregroundColor(isActive ? theme.chrome.text : theme.chrome.textDim)
                         .padding(.horizontal, 5)
                         .padding(.vertical, 1)

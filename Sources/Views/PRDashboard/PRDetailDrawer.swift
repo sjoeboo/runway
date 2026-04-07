@@ -70,14 +70,14 @@ public struct PRDetailDrawer: View {
             HStack {
                 stateBadge
                 Text("#\(pr.number)")
-                    .font(.caption)
-                    .foregroundColor(theme.chrome.textDim)
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
                 ReviewDecisionBadge(decision: pr.reviewDecision)
                 Spacer()
                 Button(action: onClose) {
                     Image(systemName: "xmark")
-                        .font(.caption)
-                        .foregroundColor(theme.chrome.textDim)
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
                 }
                 .buttonStyle(.plain)
             }
@@ -88,7 +88,7 @@ public struct PRDetailDrawer: View {
 
             // Repo name
             Text(pr.repo)
-                .font(.caption)
+                .font(.callout)
                 .foregroundColor(theme.chrome.cyan)
 
             HStack(spacing: 12) {
@@ -104,8 +104,8 @@ public struct PRDetailDrawer: View {
                     Label("+\(adds) -\(dels)", systemImage: "doc.text")
                 }
             }
-            .font(.caption)
-            .foregroundColor(theme.chrome.textDim)
+            .font(.callout)
+            .foregroundStyle(.secondary)
 
             // Checks summary (from detail if available, otherwise from PR)
             let checks = detail?.checks ?? pr.checks
@@ -253,7 +253,7 @@ public struct PRDetailDrawer: View {
                     .foregroundColor(theme.chrome.red)
             }
         }
-        .font(.caption)
+        .font(.callout)
     }
 
     private func detailReviewBadge(_ decision: ReviewDecision) -> some View {
@@ -272,7 +272,7 @@ public struct PRDetailDrawer: View {
                 EmptyView()
             }
         }
-        .font(.caption)
+        .font(.callout)
     }
 
     // MARK: - Tabs
@@ -288,8 +288,8 @@ public struct PRDetailDrawer: View {
                                 .fontWeight(selectedTab == tab ? .semibold : .regular)
                             // Show shortcut hint for discoverability
                             Text("^\(index + 1)")
-                                .font(.caption2)
-                                .foregroundColor(theme.chrome.textDim.opacity(0.5))
+                                .font(.caption)
+                                .foregroundStyle(.tertiary)
                         }
                         .foregroundColor(selectedTab == tab ? theme.chrome.accent : theme.chrome.textDim)
 
@@ -345,7 +345,7 @@ public struct PRDetailDrawer: View {
                         .textSelection(.enabled)
                 } else {
                     Text("No description provided")
-                        .foregroundColor(theme.chrome.textDim)
+                        .foregroundStyle(.secondary)
                         .italic()
                 }
             }
@@ -455,8 +455,8 @@ public struct PRDetailDrawer: View {
                 // Comment input
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Add a comment")
-                        .font(.caption)
-                        .foregroundColor(theme.chrome.textDim)
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
                     TextEditor(text: $inlineCommentText)
                         .frame(height: 60)
                         .font(.body)
@@ -490,13 +490,13 @@ public struct PRDetailDrawer: View {
             VStack(alignment: .leading, spacing: 4) {
                 HStack {
                     Image(systemName: reviewIcon(review.state))
-                        .font(.caption2)
+                        .font(.caption)
                         .foregroundColor(reviewColor(review.state))
                     Text(review.author)
-                        .font(.caption)
+                        .font(.callout)
                         .fontWeight(.semibold)
                     Text(review.state.lowercased())
-                        .font(.caption2)
+                        .font(.caption)
                         .foregroundColor(reviewColor(review.state))
                         .padding(.horizontal, 6)
                         .padding(.vertical, 2)
@@ -528,11 +528,11 @@ public struct PRDetailDrawer: View {
         VStack(alignment: .leading, spacing: 4) {
             HStack {
                 Text(comment.author)
-                    .font(.caption)
+                    .font(.callout)
                     .fontWeight(.semibold)
                 if let path = comment.path {
                     Text(path)
-                        .font(.caption2)
+                        .font(.caption)
                         .foregroundColor(theme.chrome.accent)
                 }
             }
@@ -562,19 +562,19 @@ public struct PRDetailDrawer: View {
         switch pr.state {
         case .open:
             Label("Open", systemImage: "circle.fill")
-                .font(.caption)
+                .font(.callout)
                 .foregroundColor(theme.chrome.green)
         case .draft:
             Label("Draft", systemImage: "circle.dashed")
-                .font(.caption)
-                .foregroundColor(theme.chrome.textDim)
+                .font(.callout)
+                .foregroundStyle(.secondary)
         case .merged:
             Label("Merged", systemImage: "arrow.triangle.merge")
-                .font(.caption)
+                .font(.callout)
                 .foregroundColor(theme.chrome.purple)
         case .closed:
             Label("Closed", systemImage: "xmark.circle.fill")
-                .font(.caption)
+                .font(.callout)
                 .foregroundColor(theme.chrome.red)
         }
     }

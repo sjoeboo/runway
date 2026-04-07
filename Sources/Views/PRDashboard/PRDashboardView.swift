@@ -185,7 +185,7 @@ public struct PRDashboardView: View {
                         showSessionPRsOnly.toggle()
                     } label: {
                         Image(systemName: showSessionPRsOnly ? "terminal.fill" : "terminal")
-                            .font(.caption)
+                            .font(.callout)
                     }
                     .buttonStyle(IconButtonStyle())
                     .help(showSessionPRsOnly ? "Showing session PRs only" : "Show only session PRs")
@@ -195,7 +195,7 @@ public struct PRDashboardView: View {
                         hideDrafts.toggle()
                     } label: {
                         Image(systemName: hideDrafts ? "eye.slash" : "eye")
-                            .font(.caption)
+                            .font(.callout)
                     }
                     .buttonStyle(IconButtonStyle())
                     .help(hideDrafts ? "Show drafts" : "Hide drafts")
@@ -203,7 +203,7 @@ public struct PRDashboardView: View {
 
                     Button(action: onRefresh) {
                         Image(systemName: "arrow.clockwise")
-                            .font(.caption)
+                            .font(.callout)
                     }
                     .buttonStyle(IconButtonStyle())
                     .padding(.trailing, 8)
@@ -220,9 +220,9 @@ public struct PRDashboardView: View {
                     VStack(spacing: 8) {
                         Image(systemName: "pull.request")
                             .font(.largeTitle)
-                            .foregroundColor(theme.chrome.textDim)
+                            .foregroundStyle(.secondary)
                         Text("No pull requests")
-                            .foregroundColor(theme.chrome.textDim)
+                            .foregroundStyle(.secondary)
                         Button("Refresh") { onRefresh() }
                             .controlSize(.small)
                     }
@@ -304,19 +304,19 @@ public struct PRDashboardView: View {
         Button(action: { toggleGroupExpanded(group) }) {
             HStack(spacing: 6) {
                 Image(systemName: groupIcon(group))
-                    .font(.caption)
+                    .font(.callout)
                     .foregroundColor(groupColor(group))
                 Text(group.rawValue)
-                    .font(.caption)
+                    .font(.callout)
                     .fontWeight(.semibold)
-                    .foregroundColor(theme.chrome.textDim)
+                    .foregroundStyle(.secondary)
                 Text("(\(count))")
-                    .font(.caption)
-                    .foregroundColor(theme.chrome.textDim)
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
                 Spacer()
                 Image(systemName: isGroupExpanded(group) ? "chevron.down" : "chevron.right")
-                    .font(.caption2)
-                    .foregroundColor(theme.chrome.textDim)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
             .contentShape(Rectangle())
         }
@@ -347,9 +347,10 @@ struct PRRowView: View {
                 HStack(spacing: 4) {
                     Text("#\(pr.number)")
                         .font(.caption)
-                        .foregroundColor(theme.chrome.textDim)
+                        .foregroundStyle(.secondary)
                     Text(pr.title)
                         .font(.body)
+                        .foregroundStyle(.primary)
                         .lineLimit(1)
                 }
 
@@ -359,7 +360,7 @@ struct PRRowView: View {
                         .foregroundColor(theme.chrome.cyan)
                     Text(pr.author)
                         .font(.caption)
-                        .foregroundColor(theme.chrome.textDim)
+                        .foregroundStyle(.secondary)
                     if !pr.headBranch.isEmpty {
                         Text(pr.headBranch)
                             .font(.caption)
@@ -367,7 +368,7 @@ struct PRRowView: View {
                     }
                     Text(pr.ageText)
                         .font(.caption)
-                        .foregroundColor(theme.chrome.textDim)
+                        .foregroundStyle(.secondary)
                     CheckSummaryBadge(checks: pr.checks)
                     ReviewDecisionBadge(decision: pr.reviewDecision)
                 }
@@ -378,7 +379,7 @@ struct PRRowView: View {
             if pr.additions > 0 || pr.deletions > 0 {
                 Text("+\(pr.additions) -\(pr.deletions)")
                     .font(.caption)
-                    .foregroundColor(theme.chrome.textDim)
+                    .foregroundStyle(.secondary)
                     .frame(minWidth: 60, alignment: .trailing)
             } else if pr.checks.total == 0 {
                 // Unenriched — reserve space with loading indicator

@@ -64,8 +64,8 @@ public struct ProjectPRsTab: View {
             // Toolbar
             HStack(spacing: 8) {
                 Text("\(openCount) pull request\(openCount == 1 ? "" : "s")")
-                    .font(.caption)
-                    .foregroundColor(theme.chrome.textDim)
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
 
                 Spacer()
 
@@ -73,7 +73,7 @@ public struct ProjectPRsTab: View {
                     hideDrafts.toggle()
                 } label: {
                     Image(systemName: hideDrafts ? "eye.slash" : "eye")
-                        .font(.caption)
+                        .font(.callout)
                 }
                 .buttonStyle(IconButtonStyle())
                 .help(hideDrafts ? "Show drafts" : "Hide drafts")
@@ -82,7 +82,7 @@ public struct ProjectPRsTab: View {
                     onRefresh()
                 } label: {
                     Image(systemName: "arrow.clockwise")
-                        .font(.caption)
+                        .font(.callout)
                 }
                 .buttonStyle(IconButtonStyle())
                 .help("Refresh pull requests")
@@ -122,10 +122,10 @@ public struct ProjectPRsTab: View {
         VStack(spacing: 8) {
             Image(systemName: "arrow.triangle.pull")
                 .font(.largeTitle)
-                .foregroundColor(theme.chrome.textDim)
+                .foregroundStyle(.secondary)
             Text("No pull requests")
                 .font(.headline)
-                .foregroundColor(theme.chrome.textDim)
+                .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
@@ -162,6 +162,7 @@ private struct ProjectPRRowView: View {
                         .foregroundColor(theme.chrome.purple)
                     Text(pr.title)
                         .font(.body)
+                        .foregroundStyle(.primary)
                         .lineLimit(1)
                 }
 
@@ -174,7 +175,7 @@ private struct ProjectPRRowView: View {
                     }
                     Text(pr.ageText)
                         .font(.caption)
-                        .foregroundColor(theme.chrome.textDim)
+                        .foregroundStyle(.secondary)
                     CheckSummaryBadge(checks: pr.checks)
                     ReviewDecisionBadge(decision: pr.reviewDecision)
                 }
@@ -189,7 +190,7 @@ private struct ProjectPRRowView: View {
                     Text("-\(pr.deletions)")
                         .foregroundColor(theme.chrome.red)
                 }
-                .font(.caption2)
+                .font(.caption)
             }
         }
         .padding(.vertical, 4)
