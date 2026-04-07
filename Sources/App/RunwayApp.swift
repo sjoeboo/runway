@@ -68,6 +68,14 @@ struct RunwayApp: App {
                 Button("Find in Terminal") { store.showTerminalSearch.toggle() }
                     .keyboardShortcut("f", modifiers: .command)
 
+                Divider()
+
+                Button("Split Pane Down") { store.splitHorizontalTrigger += 1 }
+                    .keyboardShortcut("d", modifiers: [.command, .shift])
+
+                Button("Split Pane Right") { store.splitVerticalTrigger += 1 }
+                    .keyboardShortcut("d", modifiers: .command)
+
                 Button("Search Sessions") { store.focusSidebarSearch = true }
                     .keyboardShortcut("k", modifiers: .command)
 
@@ -379,6 +387,14 @@ struct ContentView: View {
                     showTerminalSearch: Binding(
                         get: { store.showTerminalSearch },
                         set: { store.showTerminalSearch = $0 }
+                    ),
+                    splitHorizontalTrigger: Binding(
+                        get: { store.splitHorizontalTrigger },
+                        set: { store.splitHorizontalTrigger = $0 }
+                    ),
+                    splitVerticalTrigger: Binding(
+                        get: { store.splitVerticalTrigger },
+                        set: { store.splitVerticalTrigger = $0 }
                     )
                 )
             } else {

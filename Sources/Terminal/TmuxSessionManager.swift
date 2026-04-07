@@ -132,11 +132,39 @@ public actor TmuxSessionManager {
         try await runTmux(args: ["send-keys", "-t", sessionName, "-l", text])
     }
 
+    /// Split the current pane in a tmux session.
+    ///
+    /// - Parameters:
+    ///   - sessionName: The tmux session to split a pane in.
+    ///   - direction: `.horizontal` splits top/bottom, `.vertical` splits left/right.
+    public func splitWindow(sessionName: String, direction: TmuxSplitDirection) async throws {
+        try await runTmux(args: [
+            "split-window", direction.flag, "-t", sessionName,
+        ])
+    }
+
     // MARK: - Private
 
     @discardableResult
     private func runTmux(args: [String]) async throws -> String {
         try await ShellRunner.runTmux(args: args)
+    }
+}
+
+// MARK: - Split Direction
+
+/// Direction for splitting a tmux pane.
+public enum TmuxSplitDirection: Sendable {
+    /// Split left/right (vertical divider).
+    case vertical
+    /// Split top/bottom (horizontal divider).
+    case horizontal
+
+    var flag: String {
+        switch self {
+        case .vertical: "-h"
+        case .horizontal: "-v"
+        }
     }
 }
 
