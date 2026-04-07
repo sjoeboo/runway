@@ -29,7 +29,11 @@ public final class RunwayStore {
     var prLastFetched: Date?
     var isLoadingPRs: Bool = false
     private var prPollTask: Task<Void, Never>?
+    private var sessionPRPollTask: Task<Void, Never>?
     private var lastPRFingerprint: PRFingerprint?
+    /// Per-session PR fetch timestamps — mirrors Hangar's sessionFetched map with 60s TTL.
+    private var sessionPRFetchedAt: [String: Date] = [:]
+    private let sessionPRTTL: TimeInterval = 60
     var currentView: AppView = .sessions
     var showNewSessionDialog: Bool = false
     var showNewProjectDialog: Bool = false
@@ -108,6 +112,7 @@ public final class RunwayStore {
             // Seed the fingerprint so the first poll doesn't trigger a redundant fetch
             lastPRFingerprint = await prManager.prFingerprint(filter: .mine)
             startPRPoll()
+            startSessionPRPoll()
         }
 
         // Start hook server + inject Claude hooks (sequenced — inject needs the port)
@@ -394,6 +399,8 @@ public final class RunwayStore {
         sessions.removeAll { $0.id == id }
         try? database?.deleteSession(id: id)
         TerminalSessionCache.shared.removeAll(forSessionID: id)
+        sessionPRs.removeValue(forKey: id)
+        sessionPRFetchedAt.removeValue(forKey: id)
         if selectedSessionID == id {
             selectedSessionID = nextSelection
         }
@@ -782,9 +789,11 @@ public final class RunwayStore {
     }
 
     /// Link PRs to sessions — concurrent, like Hangar.
+    /// Sets TTL timestamps so the independent freshen loop doesn't immediately re-fetch.
     private func linkSessionPRs() async {
         let worktreeSessions = sessions.filter { $0.worktreeBranch != nil }
         guard !worktreeSessions.isEmpty else { return }
+        let now = Date()
 
         await withTaskGroup(of: (String, PullRequest?).self) { group in
             for session in worktreeSessions {
@@ -794,8 +803,11 @@ public final class RunwayStore {
                 }
             }
             for await (sessionID, pr) in group {
+                sessionPRFetchedAt[sessionID] = now
                 if let pr {
                     sessionPRs[sessionID] = pr
+                } else {
+                    sessionPRs.removeValue(forKey: sessionID)
                 }
             }
         }
@@ -821,6 +833,52 @@ public final class RunwayStore {
                 if fingerprint != self.lastPRFingerprint {
                     self.lastPRFingerprint = fingerprint
                     await self.fetchPRs()
+                }
+            }
+        }
+    }
+
+    /// Independent session→PR linking loop, modeled on Hangar's UpdateSessionPR with 60s TTL.
+    /// Runs every 15 seconds but only re-fetches sessions whose cache is stale (>60s old).
+    /// This decouples session PR detection from the heavier global fetch→enrich pipeline.
+    func startSessionPRPoll() {
+        sessionPRPollTask?.cancel()
+        sessionPRPollTask = Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(15))
+                guard !Task.isCancelled, let self else { return }
+                await self.freshenSessionPRs()
+            }
+        }
+    }
+
+    /// Check each worktree session's PR status, respecting per-session TTL.
+    /// Only fetches for sessions whose cache has expired — lightweight when nothing is stale.
+    private func freshenSessionPRs() async {
+        let now = Date()
+        let worktreeSessions = sessions.filter { $0.worktreeBranch != nil }
+        guard !worktreeSessions.isEmpty else { return }
+
+        // Find sessions that need refreshing (stale or never fetched)
+        let stale = worktreeSessions.filter { session in
+            guard let fetchedAt = sessionPRFetchedAt[session.id] else { return true }
+            return now.timeIntervalSince(fetchedAt) >= sessionPRTTL
+        }
+        guard !stale.isEmpty else { return }
+
+        await withTaskGroup(of: (String, PullRequest?).self) { group in
+            for session in stale {
+                group.addTask { [prManager] in
+                    let pr = try? await prManager.fetchPRForWorktree(path: session.path)
+                    return (session.id, pr)
+                }
+            }
+            for await (sessionID, pr) in group {
+                sessionPRFetchedAt[sessionID] = now
+                if let pr {
+                    sessionPRs[sessionID] = pr
+                } else {
+                    sessionPRs.removeValue(forKey: sessionID)
                 }
             }
         }
