@@ -25,17 +25,17 @@ public struct SessionHeaderView: View {
                         Text(session.title)
                             .font(.subheadline)
                             .fontWeight(.semibold)
-                            .foregroundColor(theme.chrome.text)
+                            .foregroundStyle(.primary)
                         Text(session.status.rawValue.capitalized)
                             .font(.caption)
-                            .foregroundColor(theme.chrome.textDim)
+                            .foregroundStyle(.secondary)
                     }
 
                     Spacer()
 
                     // Tool + permission mode badge
                     Text("\(session.tool.displayName.lowercased()) · \(session.permissionMode.badgeLabel)")
-                        .font(.caption2)
+                        .font(.caption)
                         .foregroundColor(session.permissionMode.badgeForeground(chrome: theme.chrome))
                         .padding(.horizontal, 7)
                         .padding(.vertical, 3)
@@ -48,19 +48,19 @@ public struct SessionHeaderView: View {
                     HStack(spacing: 0) {
                         HStack(spacing: 5) {
                             Image(systemName: "arrow.triangle.branch")
-                                .font(.caption2)
-                                .foregroundColor(theme.chrome.textDim)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
                             Text(branch)
-                                .font(.system(.caption, design: .monospaced))
+                                .font(.system(.callout, design: .monospaced))
                                 .foregroundColor(theme.chrome.cyan)
 
                             if let pr = linkedPR {
                                 Text("→")
-                                    .font(.caption)
-                                    .foregroundColor(theme.chrome.textDim)
+                                    .font(.callout)
+                                    .foregroundStyle(.secondary)
                                 Text(pr.baseBranch)
-                                    .font(.system(.caption, design: .monospaced))
-                                    .foregroundColor(theme.chrome.textDim)
+                                    .font(.system(.callout, design: .monospaced))
+                                    .foregroundStyle(.secondary)
                             }
                         }
 
@@ -77,7 +77,7 @@ public struct SessionHeaderView: View {
                                     }
                                 } label: {
                                     Text("#\(pr.number)")
-                                        .font(.caption)
+                                        .font(.callout)
                                         .fontWeight(.medium)
                                         .foregroundColor(pr.numberColor(chrome: theme.chrome))
                                 }
@@ -98,7 +98,7 @@ public struct SessionHeaderView: View {
                                         Text("−\(pr.deletions)")
                                             .foregroundColor(theme.chrome.red)
                                     }
-                                    .font(.caption)
+                                    .font(.callout)
                                 }
                             }
                         }
@@ -106,7 +106,7 @@ public struct SessionHeaderView: View {
                 }
             }
             .padding(.horizontal, 14)
-            .padding(.vertical, 8)
+            .padding(.vertical, 10)
             .background(theme.chrome.surface.opacity(0.3))
 
             Divider()
