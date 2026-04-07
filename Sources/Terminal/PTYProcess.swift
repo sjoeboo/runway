@@ -29,6 +29,7 @@ public final class PTYProcess: @unchecked Sendable {
     private var _isAlive: Bool = true
     private let lock = NSLock()
     private let readSource: DispatchSourceRead
+    private let processSource: DispatchSourceProcess
     private let outputHandler: @Sendable (Data) -> Void
     private let exitHandler: @Sendable (Int32) -> Void
 
@@ -104,12 +105,22 @@ public final class PTYProcess: @unchecked Sendable {
         let flags = fcntl(masterFD, F_GETFL)
         _ = fcntl(masterFD, F_SETFL, flags | O_NONBLOCK)
 
+        let fd = masterFD
+
         self.readSource = DispatchSource.makeReadSource(
             fileDescriptor: masterFD,
             queue: DispatchQueue(label: "runway.pty.\(pid)", qos: .userInteractive)
         )
 
-        let fd = masterFD
+        // Monitor child exit via kqueue (event-driven, no thread blocked).
+        // Initialized before event handlers that capture [weak self] so all
+        // stored properties are set before self is referenced.
+        self.processSource = DispatchSource.makeProcessSource(
+            identifier: pid,
+            eventMask: .exit,
+            queue: DispatchQueue(label: "runway.pty.exit.\(pid)", qos: .utility)
+        )
+
         self.readSource.setEventHandler { [weak self] in
             var buffer = [UInt8](repeating: 0, count: 8192)
             let bytesRead = read(fd, &buffer, buffer.count)
@@ -125,18 +136,19 @@ public final class PTYProcess: @unchecked Sendable {
             close(fd)
         }
 
-        self.readSource.resume()
-
-        // Monitor child exit in background
-        DispatchQueue.global(qos: .utility).async { [weak self] in
-            var status: Int32 = 0
-            waitpid(pid, &status, 0)
+        self.processSource.setEventHandler { [weak self] in
             self?.handleExit()
+            // Reap the zombie — WNOHANG because we already know it exited.
+            var status: Int32 = 0
+            waitpid(pid, &status, WNOHANG)
             // WIFEXITED/WEXITSTATUS are C macros unavailable in Swift
             let exited = (status & 0x7F) == 0
             let exitCode: Int32 = exited ? (status >> 8) & 0xFF : -1
             exitHandler(exitCode)
         }
+
+        self.readSource.resume()
+        self.processSource.resume()
     }
 
     /// Write data to the PTY master (sends to child's stdin).
@@ -179,6 +191,7 @@ public final class PTYProcess: @unchecked Sendable {
         }
         if shouldCancel {
             readSource.cancel()
+            processSource.cancel()
         }
     }
 }
