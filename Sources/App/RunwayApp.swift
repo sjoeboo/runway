@@ -51,6 +51,8 @@ struct RunwayApp: App {
                     .keyboardShortcut("1", modifiers: .command)
                 Button("Pull Requests") { store.currentView = .prs }
                     .keyboardShortcut("2", modifiers: .command)
+                Button("Toggle Changes") { store.toggleChangesSidebar() }
+                    .keyboardShortcut("3", modifiers: .command)
             }
             CommandGroup(after: .newItem) {
                 Button("New Session") {
@@ -328,6 +330,11 @@ struct ContentView: View {
                 if newValue != nil {
                     store.selectedProjectID = nil
                 }
+                store.viewingDiffFile = nil
+                store.viewingDiffPatch = nil
+                if store.changesVisible {
+                    store.fetchChangesForCurrentSession()
+                }
             }
     }
 
@@ -399,7 +406,24 @@ struct ContentView: View {
                     splitVerticalTrigger: Binding(
                         get: { store.splitVerticalTrigger },
                         set: { store.splitVerticalTrigger = $0 }
-                    )
+                    ),
+                    changesVisible: Binding(
+                        get: { store.changesVisible },
+                        set: { store.changesVisible = $0 }
+                    ),
+                    changesMode: Binding(
+                        get: { store.changesMode },
+                        set: { newMode in
+                            store.changesMode = newMode
+                            store.fetchChangesForCurrentSession()
+                        }
+                    ),
+                    changes: store.sessionChanges[sessionID] ?? [],
+                    viewingDiffFile: store.viewingDiffFile,
+                    diffPatch: store.viewingDiffPatch,
+                    onSelectDiffFile: { file in store.selectDiffFile(file) },
+                    onDismissDiff: { store.dismissDiffView() },
+                    onToggleChanges: { store.toggleChangesSidebar() }
                 )
             } else {
                 EmptyStateView(

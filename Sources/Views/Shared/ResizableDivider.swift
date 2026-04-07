@@ -6,6 +6,7 @@ struct ResizableDivider: View {
     @Binding var width: Double
     var minWidth: Double = 200
     var maxWidth: Double = 600
+    var inverted: Bool = false
 
     @State private var isDragging = false
     @State private var dragStart: Double = 0
@@ -30,7 +31,8 @@ struct ResizableDivider: View {
                             isDragging = true
                             dragStart = width
                         }
-                        let new = dragStart + value.translation.width
+                        let delta = inverted ? -value.translation.width : value.translation.width
+                        let new = dragStart + delta
                         width = min(max(new, minWidth), maxWidth)
                     }
                     .onEnded { _ in

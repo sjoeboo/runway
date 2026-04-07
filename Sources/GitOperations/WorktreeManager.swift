@@ -125,6 +125,53 @@ public actor WorktreeManager {
         return parseDiffStat(output)
     }
 
+    /// Get per-file changes for a given mode.
+    ///
+    /// - Parameters:
+    ///   - path: Path to the git repository (or worktree)
+    ///   - mode: `.working` diffs against HEAD; `.branch` diffs against the merge-base with the default branch
+    /// - Returns: Array of `FileChange` values, one per changed file
+    public func changedFiles(path: String, mode: ChangesMode) async -> [FileChange] {
+        do {
+            let base: String
+            switch mode {
+            case .working:
+                base = "HEAD"
+            case .branch:
+                let defaultBranch = await detectDefaultBranch(repoPath: path)
+                base =
+                    (try? await runGit(in: path, args: ["merge-base", defaultBranch, "HEAD"]))
+                    .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) } ?? "HEAD"
+            }
+
+            let numstat = (try? await runGit(in: path, args: ["diff", "--numstat", base])) ?? ""
+            let nameStatus = (try? await runGit(in: path, args: ["diff", "--name-status", base])) ?? ""
+            return parseChangedFiles(numstat: numstat, nameStatus: nameStatus)
+        }
+    }
+
+    /// Get the unified diff for a single file.
+    ///
+    /// - Parameters:
+    ///   - path: Path to the git repository (or worktree)
+    ///   - file: Relative path to the file within the repository
+    ///   - mode: `.working` diffs against HEAD; `.branch` diffs against the merge-base with the default branch
+    /// - Returns: Unified diff string, or `nil` if unavailable
+    public func fileDiff(path: String, file: String, mode: ChangesMode) async -> String? {
+        let base: String
+        switch mode {
+        case .working:
+            base = "HEAD"
+        case .branch:
+            let defaultBranch = await detectDefaultBranch(repoPath: path)
+            base =
+                (try? await runGit(in: path, args: ["merge-base", defaultBranch, "HEAD"]))
+                .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) } ?? "HEAD"
+        }
+
+        return try? await runGit(in: path, args: ["diff", base, "--", file])
+    }
+
     /// Detect the default branch for a repository.
     ///
     /// Uses `git symbolic-ref refs/remotes/origin/HEAD` (local, no network).
@@ -218,6 +265,119 @@ public actor WorktreeManager {
 
         return DiffSummary(files: files, additions: additions, deletions: deletions)
     }
+}
+
+// MARK: - Parsing
+
+/// Parse `git diff --numstat` and `git diff --name-status` output into an array of `FileChange` values.
+///
+/// - Parameters:
+///   - numstat: Output of `git diff --numstat <base>`
+///   - nameStatus: Output of `git diff --name-status <base>`
+/// - Returns: Array of `FileChange`, one per changed file
+public func parseChangedFiles(numstat: String, nameStatus: String) -> [FileChange] {
+    // Parse name-status first: maps path → (status, canonical path)
+    // Rename lines have three fields: R<N>\told\tnew
+    var statusMap: [String: (status: FileChangeStatus, canonicalPath: String)] = [:]
+
+    for line in nameStatus.components(separatedBy: "\n") {
+        let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { continue }
+        let parts = trimmed.components(separatedBy: "\t")
+        guard parts.count >= 2 else { continue }
+        let code = parts[0]
+        let status = FileChangeStatus(gitCode: code)
+        if status == .renamed, parts.count >= 3 {
+            let oldPath = parts[1]
+            let newPath = parts[2]
+            // Key by old path so numstat can look it up; canonical is newPath
+            statusMap[oldPath] = (status: .renamed, canonicalPath: newPath)
+        } else {
+            let filePath = parts[1]
+            statusMap[filePath] = (status: status, canonicalPath: filePath)
+        }
+    }
+
+    // Parse numstat: additions\tdeletions\tpath
+    // Renamed files appear as: adds\tdels\t{old => new}/rest  or  old => new
+    var changes: [FileChange] = []
+
+    for line in numstat.components(separatedBy: "\n") {
+        let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { continue }
+        let parts = trimmed.components(separatedBy: "\t")
+        guard parts.count >= 3 else { continue }
+
+        let addStr = parts[0]
+        let delStr = parts[1]
+        let rawPath = parts[2]
+
+        let additions = Int(addStr) ?? 0
+        let deletions = Int(delStr) ?? 0
+
+        // Resolve canonical path from status map if this is a rename
+        // First try direct lookup, then resolve rename paths from `{old => new}` notation
+        if let entry = statusMap[rawPath] {
+            changes.append(
+                FileChange(
+                    path: entry.canonicalPath,
+                    status: entry.status,
+                    additions: additions,
+                    deletions: deletions
+                ))
+        } else if rawPath.contains("=>") {
+            // Rename path like "src/{Old => New}/File.swift" or "Old.swift => New.swift"
+            let resolvedPath = resolveRenamePath(rawPath)
+            // Find the matching entry in statusMap by canonical path
+            if let entry = statusMap.values.first(where: { $0.canonicalPath == resolvedPath }) {
+                changes.append(
+                    FileChange(
+                        path: entry.canonicalPath,
+                        status: entry.status,
+                        additions: additions,
+                        deletions: deletions
+                    ))
+            } else {
+                // Fallback: use resolved path with renamed status
+                changes.append(
+                    FileChange(
+                        path: resolvedPath,
+                        status: .renamed,
+                        additions: additions,
+                        deletions: deletions
+                    ))
+            }
+        } else {
+            // Path not in statusMap — use as-is with modified status (shouldn't happen normally)
+            changes.append(
+                FileChange(
+                    path: rawPath,
+                    status: .modified,
+                    additions: additions,
+                    deletions: deletions
+                ))
+        }
+    }
+
+    return changes
+}
+
+/// Resolve a git rename path like `src/{Old => New}/File.swift` to `src/New/File.swift`.
+private func resolveRenamePath(_ path: String) -> String {
+    // Pattern: prefix/{old => new}/suffix  →  prefix/new/suffix
+    // Pattern: old => new                  →  new
+    if let braceOpen = path.firstIndex(of: "{"), let braceClose = path.firstIndex(of: "}") {
+        let prefix = String(path[path.startIndex..<braceOpen])
+        let suffix = String(path[path.index(after: braceClose)...])
+        let inner = String(path[path.index(after: braceOpen)..<braceClose])
+        let innerParts = inner.components(separatedBy: " => ")
+        let newPart = innerParts.count >= 2 ? innerParts[1] : inner
+        return prefix + newPart + suffix
+    } else if path.contains(" => ") {
+        let parts = path.components(separatedBy: " => ")
+        return parts.count >= 2 ? parts[1] : path
+    }
+    return path
 }
 
 // MARK: - Types

@@ -1,0 +1,171 @@
+<h2>Design Section 1: Layout & Interaction</h2>
+<p class="subtitle">How the changes sidebar integrates into the session detail view</p>
+
+<div class="section">
+  <h3>Overall Layout</h3>
+  <div class="mockup">
+    <div class="mockup-header">Session Detail — Changes Sidebar Open</div>
+    <div class="mockup-body" style="display:flex; height:400px; font-family:system-ui; font-size:12px;">
+      <!-- Terminal area -->
+      <div style="flex:1; display:flex; flex-direction:column; background:#1a1a2e; color:#e0e0e0; overflow:hidden;">
+        <div style="padding:8px 12px; background:#16162a; border-bottom:1px solid #333; display:flex; justify-content:space-between; align-items:center;">
+          <div style="display:flex; gap:8px; align-items:center;">
+            <span style="color:#4ade80;">●</span>
+            <span style="font-weight:600; color:#fff;">auth-refactor</span>
+            <span style="color:#888;">← main</span>
+            <span style="color:#6366f1; font-size:11px;">#42</span>
+            <span style="color:#4ade80; font-size:11px;">+127</span>
+            <span style="color:#f87171; font-size:11px;">-34</span>
+          </div>
+          <div style="display:flex; gap:6px; align-items:center;">
+            <span style="color:#888; font-size:11px;">Claude</span>
+            <div title="Toggle changes sidebar" style="cursor:pointer; padding:2px 6px; border-radius:4px; background:#2a2a4a; color:#a78bfa; font-size:13px;">⎘</div>
+          </div>
+        </div>
+        <div style="flex:1; padding:12px; font-family:monospace; font-size:11px; line-height:1.6; color:#ccc;">
+          <div style="color:#888;">$ claude</div>
+          <div style="color:#4ade80;">⏺ I'll refactor the auth middleware to use JWT tokens...</div>
+          <div style="color:#888; margin-top:8px;">$ git commit -m "feat: add JWT token validation"</div>
+          <div>[main abc1234] feat: add JWT token validation</div>
+          <div style="color:#888; margin-top:8px;">$ claude</div>
+          <div style="color:#4ade80;">⏺ Now I'll update the tests...</div>
+          <div style="color:#f0f0f0; margin-top:12px; opacity:0.5;">▌</div>
+        </div>
+        <div style="padding:8px 12px; background:#16162a; border-top:1px solid #333;">
+          <div style="background:#222244; border-radius:6px; padding:6px 10px; color:#666; font-size:11px;">Send a message...</div>
+        </div>
+      </div>
+
+      <!-- Resizable divider -->
+      <div style="width:4px; background:#333; cursor:col-resize; display:flex; align-items:center; justify-content:center;">
+        <div style="width:2px; height:30px; background:#555; border-radius:1px;"></div>
+      </div>
+
+      <!-- Changes sidebar -->
+      <div style="width:260px; background:#12121f; color:#e0e0e0; display:flex; flex-direction:column; border-left:1px solid #2a2a3a;">
+        <!-- Header with toggle -->
+        <div style="padding:8px 12px; border-bottom:1px solid #2a2a3a; display:flex; justify-content:space-between; align-items:center;">
+          <span style="font-weight:600; font-size:12px;">Changes</span>
+          <div style="display:flex; gap:2px; background:#1a1a2e; border-radius:4px; padding:1px;">
+            <div style="padding:2px 8px; border-radius:3px; font-size:10px; background:#2a2a4a; color:#fff;">Branch</div>
+            <div style="padding:2px 8px; border-radius:3px; font-size:10px; color:#888;">Working</div>
+          </div>
+        </div>
+        <!-- Summary -->
+        <div style="padding:6px 12px; font-size:10px; color:#888; border-bottom:1px solid #1a1a2e;">
+          8 files changed &nbsp; <span style="color:#4ade80;">+127</span> &nbsp; <span style="color:#f87171;">-34</span>
+        </div>
+        <!-- File tree -->
+        <div style="flex:1; overflow-y:auto; padding:4px 0;">
+          <!-- src directory -->
+          <div style="padding:3px 8px; display:flex; align-items:center; gap:4px; cursor:pointer;">
+            <span style="color:#888; font-size:10px;">▼</span>
+            <span style="color:#a78bfa;">📁</span>
+            <span style="font-size:11px; color:#ccc;">src/auth/</span>
+          </div>
+          <!-- Files under src/auth -->
+          <div style="padding:3px 8px 3px 28px; display:flex; align-items:center; justify-content:space-between; cursor:pointer; background:#1a1a3a; border-radius:3px; margin:1px 4px;">
+            <div style="display:flex; align-items:center; gap:4px;">
+              <span style="color:#4ade80; font-size:9px;">M</span>
+              <span style="font-size:11px; color:#e0e0e0;">middleware.ts</span>
+            </div>
+            <div style="font-size:10px;">
+              <span style="color:#4ade80;">+45</span> <span style="color:#f87171;">-12</span>
+            </div>
+          </div>
+          <div style="padding:3px 8px 3px 28px; display:flex; align-items:center; justify-content:space-between; cursor:pointer; margin:1px 4px;">
+            <div style="display:flex; align-items:center; gap:4px;">
+              <span style="color:#4ade80; font-size:9px;">A</span>
+              <span style="font-size:11px; color:#e0e0e0;">jwt.ts</span>
+            </div>
+            <div style="font-size:10px;">
+              <span style="color:#4ade80;">+38</span>
+            </div>
+          </div>
+          <div style="padding:3px 8px 3px 28px; display:flex; align-items:center; justify-content:space-between; cursor:pointer; margin:1px 4px;">
+            <div style="display:flex; align-items:center; gap:4px;">
+              <span style="color:#f87171; font-size:9px;">D</span>
+              <span style="font-size:11px; color:#888; text-decoration:line-through;">legacy-auth.ts</span>
+            </div>
+            <div style="font-size:10px;">
+              <span style="color:#f87171;">-22</span>
+            </div>
+          </div>
+          <!-- tests directory -->
+          <div style="padding:3px 8px; display:flex; align-items:center; gap:4px; cursor:pointer; margin-top:2px;">
+            <span style="color:#888; font-size:10px;">▼</span>
+            <span style="color:#a78bfa;">📁</span>
+            <span style="font-size:11px; color:#ccc;">tests/auth/</span>
+          </div>
+          <div style="padding:3px 8px 3px 28px; display:flex; align-items:center; justify-content:space-between; cursor:pointer; margin:1px 4px;">
+            <div style="display:flex; align-items:center; gap:4px;">
+              <span style="color:#4ade80; font-size:9px;">M</span>
+              <span style="font-size:11px; color:#e0e0e0;">middleware.test.ts</span>
+            </div>
+            <div style="font-size:10px;">
+              <span style="color:#4ade80;">+32</span> <span style="color:#f87171;">-8</span>
+            </div>
+          </div>
+          <div style="padding:3px 8px 3px 28px; display:flex; align-items:center; justify-content:space-between; cursor:pointer; margin:1px 4px;">
+            <div style="display:flex; align-items:center; gap:4px;">
+              <span style="color:#4ade80; font-size:9px;">A</span>
+              <span style="font-size:11px; color:#e0e0e0;">jwt.test.ts</span>
+            </div>
+            <div style="font-size:10px;">
+              <span style="color:#4ade80;">+22</span>
+            </div>
+          </div>
+          <!-- config file (root level) -->
+          <div style="padding:3px 8px; display:flex; align-items:center; justify-content:space-between; cursor:pointer; margin:1px 4px;">
+            <div style="display:flex; align-items:center; gap:4px;">
+              <span style="color:#eab308; font-size:9px;">M</span>
+              <span style="font-size:11px; color:#e0e0e0;">package.json</span>
+            </div>
+            <div style="font-size:10px;">
+              <span style="color:#4ade80;">+2</span> <span style="color:#f87171;">-1</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section" style="margin-top:24px;">
+  <h3>Collapsed State</h3>
+  <div class="mockup">
+    <div class="mockup-header">Session Detail — Changes Sidebar Closed (default)</div>
+    <div class="mockup-body" style="display:flex; height:120px; font-family:system-ui; font-size:12px;">
+      <div style="flex:1; display:flex; flex-direction:column; background:#1a1a2e; color:#e0e0e0;">
+        <div style="padding:8px 12px; background:#16162a; border-bottom:1px solid #333; display:flex; justify-content:space-between; align-items:center;">
+          <div style="display:flex; gap:8px; align-items:center;">
+            <span style="color:#4ade80;">●</span>
+            <span style="font-weight:600; color:#fff;">auth-refactor</span>
+            <span style="color:#888;">← main</span>
+          </div>
+          <div style="display:flex; gap:6px; align-items:center;">
+            <span style="color:#888; font-size:11px;">Claude</span>
+            <div title="Toggle changes sidebar (⌘3)" style="cursor:pointer; padding:2px 6px; border-radius:4px; background:transparent; color:#666; font-size:13px;">⎘</div>
+          </div>
+        </div>
+        <div style="flex:1; background:#1a1a2e; display:flex; align-items:center; justify-content:center; color:#555; font-size:11px; font-family:monospace;">
+          terminal fills full width
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section" style="margin-top:24px;">
+  <h3>Key Interactions</h3>
+  <ul style="font-size:14px; line-height:1.8; color:#ccc;">
+    <li><strong>Toggle:</strong> Header button + <code>Cmd+3</code> keyboard shortcut</li>
+    <li><strong>Mode switch:</strong> "Branch" vs "Working" segmented control in sidebar header</li>
+    <li><strong>Click file:</strong> Terminal area replaced with DiffView for that file; back button returns to terminal</li>
+    <li><strong>Expand/collapse dirs:</strong> Click directory row to toggle children</li>
+    <li><strong>Resize:</strong> Drag the ResizableDivider between terminal and sidebar</li>
+    <li><strong>Status indicators:</strong> A = added (green), M = modified (yellow), D = deleted (red)</li>
+    <li><strong>Default state:</strong> Collapsed — no sidebar visible, terminal fills full detail area</li>
+    <li><strong>Width persistence:</strong> Sidebar width saved to @AppStorage, restored on next open</li>
+  </ul>
+</div>
