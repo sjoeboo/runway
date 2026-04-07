@@ -159,6 +159,61 @@ public struct ReviewDecisionBadge: View {
     }
 }
 
+// MARK: - MergeStatusBadge
+
+/// Capsule badge showing PR merge status (Clean, Conflicts, Behind, Blocked, etc.).
+///
+/// Hidden when merge status is unknown or not yet enriched.
+public struct MergeStatusBadge: View {
+    let mergeable: MergeableState?
+    let mergeStateStatus: MergeStateStatus?
+    @Environment(\.theme) private var theme
+
+    public init(mergeable: MergeableState?, mergeStateStatus: MergeStateStatus?) {
+        self.mergeable = mergeable
+        self.mergeStateStatus = mergeStateStatus
+    }
+
+    public var body: some View {
+        if let badge = badgeInfo {
+            Text(badge.text)
+                .font(.caption)
+                .fontWeight(.medium)
+                .foregroundColor(badge.color)
+                .padding(.horizontal, 6)
+                .padding(.vertical, 2)
+                .background(badge.color.opacity(0.15))
+                .clipShape(Capsule())
+        }
+    }
+
+    private var badgeInfo: (text: String, color: Color)? {
+        // Conflicts override everything
+        if mergeable == .conflicting {
+            return ("\u{26A0} Conflicts", theme.chrome.red)
+        }
+
+        switch mergeStateStatus {
+        case .blocked:
+            return ("\u{2298} Blocked", theme.chrome.orange)
+        case .behind:
+            return ("\u{2193} Behind", theme.chrome.yellow)
+        case .dirty:
+            return ("\u{26A0} Dirty", theme.chrome.orange)
+        case .unstable:
+            return ("~ Unstable", theme.chrome.yellow)
+        case .clean, .hasHooks:
+            return ("\u{2713} Clean", theme.chrome.green)
+        case .unknown, .none:
+            // Also check if mergeable is known even without mergeStateStatus
+            if mergeable == .mergeable {
+                return ("\u{2713} Mergeable", theme.chrome.green)
+            }
+            return nil
+        }
+    }
+}
+
 // MARK: - SessionStatusIndicator
 
 /// Colored dot/circle showing the current session status.
