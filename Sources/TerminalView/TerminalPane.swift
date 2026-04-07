@@ -295,13 +295,67 @@ class TerminalContainerView: NSView {
         .copy
     }
 
+    private static let imageExtensions: Set<String> = ["png", "jpg", "jpeg", "gif", "webp", "tiff", "bmp"]
+
     override func performDragOperation(_ sender: NSDraggingInfo) -> Bool {
-        guard let items = sender.draggingPasteboard.readObjects(forClasses: [NSURL.self]) as? [URL] else {
-            return false
-        }
-        let paths = items.map { "@" + $0.path }
-        terminalRef?.send(txt: paths.joined(separator: " "))
+        let pb = sender.draggingPasteboard
+
+        // For image drops (screenshots, image files), save a stable copy to temp.
+        // macOS screenshot drags use file promises — the URL points to an ephemeral
+        // TemporaryItems path that vanishes once the drag ends.
+        guard let path = resolveDropPath(from: pb) else { return false }
+        sendAsPaste(path)
         return true
+    }
+
+    private func resolveDropPath(from pb: NSPasteboard) -> String? {
+        // Prefer raw image data — avoids ephemeral file promise paths
+        if let pngData = pb.data(forType: .png) {
+            return saveTempImage(pngData, ext: "png")
+        }
+        if let tiffData = pb.data(forType: .tiff),
+            let image = NSImage(data: tiffData),
+            let tiffRep = image.tiffRepresentation,
+            let bitmapRep = NSBitmapImageRep(data: tiffRep),
+            let pngData = bitmapRep.representation(using: .png, properties: [:])
+        {
+            return saveTempImage(pngData, ext: "png")
+        }
+        // Fall back to file URL for non-image files (or images from Finder)
+        if let items = pb.readObjects(forClasses: [NSURL.self]) as? [URL], let first = items.first {
+            let ext = first.pathExtension.lowercased()
+            if Self.imageExtensions.contains(ext), let data = try? Data(contentsOf: first) {
+                return saveTempImage(data, ext: ext)
+            }
+            return first.path
+        }
+        return nil
+    }
+
+    private func saveTempImage(_ data: Data, ext: String) -> String? {
+        let tempDir = FileManager.default.temporaryDirectory
+        let filename = "runway_drop_\(ProcessInfo.processInfo.globallyUniqueString).\(ext)"
+        let url = tempDir.appendingPathComponent(filename)
+        do {
+            try data.write(to: url)
+            return url.path
+        } catch {
+            return nil
+        }
+    }
+
+    private static let bracketedPasteStart: [UInt8] = [0x1b, 0x5b, 0x32, 0x30, 0x30, 0x7e]  // ESC [ 200 ~
+    private static let bracketedPasteEnd: [UInt8] = [0x1b, 0x5b, 0x32, 0x30, 0x31, 0x7e]  // ESC [ 201 ~
+
+    private func sendAsPaste(_ text: String) {
+        guard let terminal = terminalRef else { return }
+        if terminal.terminal.bracketedPasteMode {
+            terminal.send(data: Self.bracketedPasteStart[0...])
+            terminal.send(txt: text)
+            terminal.send(data: Self.bracketedPasteEnd[0...])
+        } else {
+            terminal.send(txt: text)
+        }
     }
 
     func embed(_ terminal: NSView) {
@@ -311,7 +365,7 @@ class TerminalContainerView: NSView {
         }
         terminal.translatesAutoresizingMaskIntoConstraints = false
         addSubview(terminal)
-        registerForDraggedTypes([.fileURL])
+        registerForDraggedTypes([.fileURL, .png, .tiff])
         NSLayoutConstraint.activate([
             terminal.topAnchor.constraint(equalTo: topAnchor),
             terminal.bottomAnchor.constraint(equalTo: bottomAnchor),
