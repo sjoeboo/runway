@@ -242,3 +242,56 @@ private func withTempGitRepo(_ body: (String) async throws -> Void) async throws
         #expect(after.count == 1)
     }
 }
+
+@Test func isBranchMergedReturnsTrueForMergedBranch() async throws {
+    try await withTempGitRepo { repoPath in
+        let manager = WorktreeManager()
+        let currentBranch = await manager.currentBranch(path: repoPath) ?? "main"
+
+        // Create a branch at the same commit (already "merged")
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/bin/sh")
+        process.arguments = ["-c", "git branch already-merged"]
+        process.currentDirectoryURL = URL(fileURLWithPath: repoPath)
+        process.standardOutput = FileHandle.nullDevice
+        process.standardError = FileHandle.nullDevice
+        try process.run()
+        process.waitUntilExit()
+
+        let merged = try await manager.isBranchMerged(
+            repoPath: repoPath, branch: "already-merged", into: currentBranch
+        )
+        #expect(merged == true)
+    }
+}
+
+@Test func isBranchMergedReturnsFalseForUnmergedBranch() async throws {
+    try await withTempGitRepo { repoPath in
+        let manager = WorktreeManager()
+        let currentBranch = await manager.currentBranch(path: repoPath) ?? "main"
+
+        // Create a branch with an extra commit (not merged into current)
+        let commands = [
+            "git checkout -b unmerged-feature",
+            "echo 'new' > feature.txt",
+            "git add feature.txt",
+            "git commit -m 'feature commit'",
+            "git checkout \(currentBranch)",
+        ]
+        for cmd in commands {
+            let process = Process()
+            process.executableURL = URL(fileURLWithPath: "/bin/sh")
+            process.arguments = ["-c", cmd]
+            process.currentDirectoryURL = URL(fileURLWithPath: repoPath)
+            process.standardOutput = FileHandle.nullDevice
+            process.standardError = FileHandle.nullDevice
+            try process.run()
+            process.waitUntilExit()
+        }
+
+        let merged = try await manager.isBranchMerged(
+            repoPath: repoPath, branch: "unmerged-feature", into: currentBranch
+        )
+        #expect(merged == false)
+    }
+}
