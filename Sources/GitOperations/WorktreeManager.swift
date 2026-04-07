@@ -90,7 +90,9 @@ public actor WorktreeManager {
     public func isBranchMerged(repoPath: String, branch: String, into target: String) async throws -> Bool {
         let output = try await runGit(in: repoPath, args: ["branch", "--merged", target])
         return output.components(separatedBy: "\n")
-            .map { $0.trimmingCharacters(in: .whitespaces).replacingOccurrences(of: "* ", with: "") }
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .map { $0.hasPrefix("* ") ? String($0.dropFirst(2)) : $0 }
+            .filter { !$0.isEmpty }
             .contains(branch)
     }
 
