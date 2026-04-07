@@ -86,8 +86,11 @@ jobs:
           # Verify archive exists
           ls -la "$ARCHIVE"
 
-          # sign_update -s passes the EdDSA key directly
-          SIGN_OUTPUT=$("${{ steps.sparkle.outputs.bin }}/sign_update" "$ARCHIVE" -s "$SPARKLE_PRIVATE_KEY")
+          # Write key to temp file and pass via -f (env var detection unreliable in CI)
+          KEY_FILE=$(mktemp)
+          printenv SPARKLE_PRIVATE_KEY > "$KEY_FILE"
+          SIGN_OUTPUT=$("${{ steps.sparkle.outputs.bin }}/sign_update" "$ARCHIVE" -f "$KEY_FILE")
+          rm -f "$KEY_FILE"
           echo "signature=$SIGN_OUTPUT" >> "$GITHUB_OUTPUT"
           echo "Signed: $SIGN_OUTPUT"
 
