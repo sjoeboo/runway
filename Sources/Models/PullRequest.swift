@@ -21,6 +21,8 @@ public struct PullRequest: Identifiable, Codable, Sendable {
     public var updatedAt: Date
     public var enrichedAt: Date?
     public var origin: Set<PROrigin>
+    public var mergeable: MergeableState?
+    public var mergeStateStatus: MergeStateStatus?
 
     public init(
         number: Int,
@@ -40,7 +42,9 @@ public struct PullRequest: Identifiable, Codable, Sendable {
         createdAt: Date = Date(),
         updatedAt: Date = Date(),
         enrichedAt: Date? = nil,
-        origin: Set<PROrigin> = []
+        origin: Set<PROrigin> = [],
+        mergeable: MergeableState? = nil,
+        mergeStateStatus: MergeStateStatus? = nil
     ) {
         self.id = "\(repo)#\(number)"
         self.number = number
@@ -61,6 +65,8 @@ public struct PullRequest: Identifiable, Codable, Sendable {
         self.updatedAt = updatedAt
         self.enrichedAt = enrichedAt
         self.origin = origin
+        self.mergeable = mergeable
+        self.mergeStateStatus = mergeStateStatus
     }
 
     public var needsEnrichment: Bool {
@@ -83,6 +89,24 @@ public enum PRState: String, Codable, Sendable {
     case draft = "DRAFT"
     case merged = "MERGED"
     case closed = "CLOSED"
+}
+
+// MARK: - Mergeable State
+
+public enum MergeableState: String, Codable, Sendable {
+    case mergeable = "MERGEABLE"
+    case conflicting = "CONFLICTING"
+    case unknown = "UNKNOWN"
+}
+
+public enum MergeStateStatus: String, Codable, Sendable {
+    case clean = "CLEAN"
+    case dirty = "DIRTY"
+    case blocked = "BLOCKED"
+    case behind = "BEHIND"
+    case unstable = "UNSTABLE"
+    case hasHooks = "HAS_HOOKS"
+    case unknown = "UNKNOWN"
 }
 
 // MARK: - Merge Strategy
@@ -181,6 +205,8 @@ public struct PRDetail: Codable, Sendable {
     public var additions: Int
     public var deletions: Int
     public var changedFiles: Int
+    public var mergeable: MergeableState?
+    public var mergeStateStatus: MergeStateStatus?
 
     public init(
         body: String = "",
@@ -194,7 +220,9 @@ public struct PRDetail: Codable, Sendable {
         baseBranch: String = "",
         additions: Int = 0,
         deletions: Int = 0,
-        changedFiles: Int = 0
+        changedFiles: Int = 0,
+        mergeable: MergeableState? = nil,
+        mergeStateStatus: MergeStateStatus? = nil
     ) {
         self.body = body
         self.reviews = reviews
@@ -208,6 +236,8 @@ public struct PRDetail: Codable, Sendable {
         self.additions = additions
         self.deletions = deletions
         self.changedFiles = changedFiles
+        self.mergeable = mergeable
+        self.mergeStateStatus = mergeStateStatus
     }
 }
 

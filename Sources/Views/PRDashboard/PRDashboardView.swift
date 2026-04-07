@@ -17,6 +17,7 @@ public struct PRDashboardView: View {
     var onRequestChanges: ((PullRequest, String) -> Void)?
     var onMerge: ((PullRequest, MergeStrategy) -> Void)?
     var onToggleDraft: ((PullRequest) -> Void)?
+    var onUpdateBranch: ((PullRequest, Bool) -> Void)?
     var onSendToSession: ((PullRequest, String) -> Void)?
     var onReviewPR: ((PullRequest) -> Void)?
 
@@ -42,6 +43,7 @@ public struct PRDashboardView: View {
         onRequestChanges: ((PullRequest, String) -> Void)? = nil,
         onMerge: ((PullRequest, MergeStrategy) -> Void)? = nil,
         onToggleDraft: ((PullRequest) -> Void)? = nil,
+        onUpdateBranch: ((PullRequest, Bool) -> Void)? = nil,
         onSendToSession: ((PullRequest, String) -> Void)? = nil,
         onReviewPR: ((PullRequest) -> Void)? = nil
     ) {
@@ -58,6 +60,7 @@ public struct PRDashboardView: View {
         self.onRequestChanges = onRequestChanges
         self.onMerge = onMerge
         self.onToggleDraft = onToggleDraft
+        self.onUpdateBranch = onUpdateBranch
         self.onSendToSession = onSendToSession
         self.onReviewPR = onReviewPR
     }
@@ -271,6 +274,9 @@ public struct PRDashboardView: View {
                     onRequestChanges: { body in onRequestChanges?(pr, body) },
                     onMerge: { strategy in onMerge?(pr, strategy) },
                     onToggleDraft: { onToggleDraft?(pr) },
+                    onUpdateBranch: onUpdateBranch.map { callback in
+                        { rebase in callback(pr, rebase) }
+                    },
                     onSendToSession: onSendToSession.map { callback in
                         { context in callback(pr, context) }
                     }
