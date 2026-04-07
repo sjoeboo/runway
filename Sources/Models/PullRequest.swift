@@ -23,6 +23,7 @@ public struct PullRequest: Identifiable, Codable, Sendable {
     public var origin: Set<PROrigin>
     public var mergeable: MergeableState?
     public var mergeStateStatus: MergeStateStatus?
+    public var autoMergeEnabled: Bool
 
     public init(
         number: Int,
@@ -44,7 +45,8 @@ public struct PullRequest: Identifiable, Codable, Sendable {
         enrichedAt: Date? = nil,
         origin: Set<PROrigin> = [],
         mergeable: MergeableState? = nil,
-        mergeStateStatus: MergeStateStatus? = nil
+        mergeStateStatus: MergeStateStatus? = nil,
+        autoMergeEnabled: Bool = false
     ) {
         self.id = "\(repo)#\(number)"
         self.number = number
@@ -67,6 +69,7 @@ public struct PullRequest: Identifiable, Codable, Sendable {
         self.origin = origin
         self.mergeable = mergeable
         self.mergeStateStatus = mergeStateStatus
+        self.autoMergeEnabled = autoMergeEnabled
     }
 
     public var needsEnrichment: Bool {
@@ -207,6 +210,7 @@ public struct PRDetail: Codable, Sendable {
     public var changedFiles: Int
     public var mergeable: MergeableState?
     public var mergeStateStatus: MergeStateStatus?
+    public var autoMergeEnabled: Bool
 
     public init(
         body: String = "",
@@ -222,7 +226,8 @@ public struct PRDetail: Codable, Sendable {
         deletions: Int = 0,
         changedFiles: Int = 0,
         mergeable: MergeableState? = nil,
-        mergeStateStatus: MergeStateStatus? = nil
+        mergeStateStatus: MergeStateStatus? = nil,
+        autoMergeEnabled: Bool = false
     ) {
         self.body = body
         self.reviews = reviews
@@ -238,6 +243,7 @@ public struct PRDetail: Codable, Sendable {
         self.changedFiles = changedFiles
         self.mergeable = mergeable
         self.mergeStateStatus = mergeStateStatus
+        self.autoMergeEnabled = autoMergeEnabled
     }
 }
 
