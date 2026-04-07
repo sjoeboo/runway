@@ -81,6 +81,21 @@ public actor WorktreeManager {
         return parseWorktreeList(output)
     }
 
+    /// Prune stale worktree references (e.g., directories that were manually deleted).
+    public func pruneWorktrees(repoPath: String) async throws {
+        try await runGit(in: repoPath, args: ["worktree", "prune"])
+    }
+
+    /// Check whether a branch has been fully merged into a target branch.
+    public func isBranchMerged(repoPath: String, branch: String, into target: String) async throws -> Bool {
+        let output = try await runGit(in: repoPath, args: ["branch", "--merged", target])
+        return output.components(separatedBy: "\n")
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .map { $0.hasPrefix("* ") ? String($0.dropFirst(2)) : $0 }
+            .filter { !$0.isEmpty }
+            .contains(branch)
+    }
+
     /// Remove a worktree and optionally delete its branch.
     public func removeWorktree(
         repoPath: String,

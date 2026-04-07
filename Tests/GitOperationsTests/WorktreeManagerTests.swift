@@ -201,3 +201,97 @@ private func withTempGitRepo(_ body: (String) async throws -> Void) async throws
         }
     }
 }
+
+@Test func pruneWorktreesOnCleanRepo() async throws {
+    try await withTempGitRepo { repoPath in
+        let manager = WorktreeManager()
+        // Should not throw on a clean repo with nothing to prune
+        try await manager.pruneWorktrees(repoPath: repoPath)
+        let worktrees = try await manager.listWorktrees(repoPath: repoPath)
+        #expect(worktrees.count == 1)
+    }
+}
+
+@Test func pruneWorktreesRemovesStaleReference() async throws {
+    try await withTempGitRepo { repoPath in
+        let manager = WorktreeManager()
+        let currentBranch = await manager.currentBranch(path: repoPath) ?? "main"
+
+        try FileManager.default.createDirectory(
+            atPath: "\(repoPath)/.worktrees",
+            withIntermediateDirectories: true
+        )
+
+        let worktreePath = try await manager.createWorktree(
+            repoPath: repoPath,
+            branchName: "stale-wt",
+            baseBranch: currentBranch
+        )
+
+        // Simulate a manually-deleted worktree (directory gone, git ref remains)
+        try FileManager.default.removeItem(atPath: worktreePath)
+
+        // Before prune: git still knows about the worktree
+        let before = try await manager.listWorktrees(repoPath: repoPath)
+        #expect(before.count == 2)
+
+        // Prune cleans up the stale reference
+        try await manager.pruneWorktrees(repoPath: repoPath)
+
+        let after = try await manager.listWorktrees(repoPath: repoPath)
+        #expect(after.count == 1)
+    }
+}
+
+@Test func isBranchMergedReturnsTrueForMergedBranch() async throws {
+    try await withTempGitRepo { repoPath in
+        let manager = WorktreeManager()
+        let currentBranch = await manager.currentBranch(path: repoPath) ?? "main"
+
+        // Create a branch at the same commit (already "merged")
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/bin/sh")
+        process.arguments = ["-c", "git branch already-merged"]
+        process.currentDirectoryURL = URL(fileURLWithPath: repoPath)
+        process.standardOutput = FileHandle.nullDevice
+        process.standardError = FileHandle.nullDevice
+        try process.run()
+        process.waitUntilExit()
+
+        let merged = try await manager.isBranchMerged(
+            repoPath: repoPath, branch: "already-merged", into: currentBranch
+        )
+        #expect(merged == true)
+    }
+}
+
+@Test func isBranchMergedReturnsFalseForUnmergedBranch() async throws {
+    try await withTempGitRepo { repoPath in
+        let manager = WorktreeManager()
+        let currentBranch = await manager.currentBranch(path: repoPath) ?? "main"
+
+        // Create a branch with an extra commit (not merged into current)
+        let commands = [
+            "git checkout -b unmerged-feature",
+            "echo 'new' > feature.txt",
+            "git add feature.txt",
+            "git commit -m 'feature commit'",
+            "git checkout \(currentBranch)",
+        ]
+        for cmd in commands {
+            let process = Process()
+            process.executableURL = URL(fileURLWithPath: "/bin/sh")
+            process.arguments = ["-c", cmd]
+            process.currentDirectoryURL = URL(fileURLWithPath: repoPath)
+            process.standardOutput = FileHandle.nullDevice
+            process.standardError = FileHandle.nullDevice
+            try process.run()
+            process.waitUntilExit()
+        }
+
+        let merged = try await manager.isBranchMerged(
+            repoPath: repoPath, branch: "unmerged-feature", into: currentBranch
+        )
+        #expect(merged == false)
+    }
+}
