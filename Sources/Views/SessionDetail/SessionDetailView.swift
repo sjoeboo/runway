@@ -73,8 +73,10 @@ public struct SessionDetailView: View {
                         onSelectFile: { file in onSelectDiffFile?(file) }
                     )
                     .frame(width: CGFloat(sidebarWidth))
+                    .transition(.move(edge: .trailing).combined(with: .opacity))
                 }
             }
+            .animation(.easeOut(duration: 0.2), value: changesVisible)
             SendTextBar(isVisible: $showSendBar) { text in
                 if let terminal = TerminalSessionCache.shared.mainTerminal(forSessionID: session.id) {
                     terminal.send(txt: text + "\r")

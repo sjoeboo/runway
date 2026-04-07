@@ -158,7 +158,7 @@ private struct FileRow: View {
     private var statusColor: Color {
         switch change.status {
         case .added: theme.chrome.green
-        case .modified: theme.chrome.orange
+        case .modified: theme.chrome.yellow
         case .deleted: theme.chrome.red
         case .renamed: theme.chrome.cyan
         }
