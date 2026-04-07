@@ -198,6 +198,9 @@ public final class RunwayStore {
                     }
                 }
             }
+
+            // Clean up orphaned worktrees (exist on disk but not in DB)
+            await cleanOrphanedWorktrees()
         } catch {
             print("[Runway] Failed to load state: \(error)")
         }
@@ -205,6 +208,73 @@ public final class RunwayStore {
         // Background prefetch PRs so data is ready when user opens PR dashboard
         loadCachedPRs()
         Task { await fetchPRs() }
+    }
+
+    /// Remove worktrees that exist on disk but have no matching session in the database.
+    /// Mirrors the tmux orphan cleanup in `loadState()`. Branches are only deleted
+    /// if they have been fully merged into the project's default branch.
+    private func cleanOrphanedWorktrees() async {
+        // Collect all worktree paths owned by existing sessions
+        let ownedPaths = Set(
+            sessions
+                .filter { $0.worktreeBranch != nil }
+                .map { $0.path }
+        )
+
+        var removedCount = 0
+        var preservedBranches = 0
+
+        for project in projects {
+            // Prune stale git references first (e.g., manually-deleted directories)
+            try? await worktreeManager.pruneWorktrees(repoPath: project.path)
+
+            guard let worktrees = try? await worktreeManager.listWorktrees(repoPath: project.path) else {
+                continue
+            }
+
+            let worktreePrefix = "\(project.path)/.worktrees/"
+            let orphans = worktrees.filter { wt in
+                let resolvedPath = URL(fileURLWithPath: wt.path).resolvingSymlinksInPath().path
+                let isManaged =
+                    resolvedPath.hasPrefix(worktreePrefix)
+                    || wt.path.hasPrefix(worktreePrefix)
+                let isOwned =
+                    ownedPaths.contains(wt.path)
+                    || ownedPaths.contains(resolvedPath)
+                return isManaged && !isOwned
+            }
+
+            for orphan in orphans {
+                let branchName = URL(fileURLWithPath: orphan.path).lastPathComponent
+                let merged =
+                    (try? await worktreeManager.isBranchMerged(
+                        repoPath: project.path, branch: branchName, into: project.defaultBranch
+                    )) ?? false
+
+                do {
+                    try await worktreeManager.removeWorktree(
+                        repoPath: project.path,
+                        worktreePath: orphan.path,
+                        deleteBranch: merged
+                    )
+                    removedCount += 1
+                    if !merged { preservedBranches += 1 }
+                } catch {
+                    print("[Runway] Failed to remove orphaned worktree \(orphan.path): \(error)")
+                }
+            }
+        }
+
+        if removedCount > 0 {
+            let message: String
+            if preservedBranches > 0 {
+                message =
+                    "Cleaned up \(removedCount) orphaned worktree\(removedCount == 1 ? "" : "s") (\(preservedBranches) branch\(preservedBranches == 1 ? "" : "es") preserved \u{2014} unmerged)"
+            } else {
+                message = "Cleaned up \(removedCount) orphaned worktree\(removedCount == 1 ? "" : "s")"
+            }
+            statusMessage = .info(message)
+        }
     }
 
     // MARK: - New Session Request (from dialog)
