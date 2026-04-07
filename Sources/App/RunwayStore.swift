@@ -61,6 +61,14 @@ public final class RunwayStore {
         Set(sessionPRs.values.map(\.id))
     }
 
+    // MARK: - Changes Sidebar
+    var changesVisible: Bool = false
+    var changesMode: ChangesMode = .branch
+    var sessionChanges: [String: [FileChange]] = [:]
+    var viewingDiffFile: FileChange? = nil
+    var viewingDiffPatch: String? = nil
+    private var changesRefreshTask: Task<Void, Never>?
+
     var selectedProjectID: String?
     var projectIssues: [String: [GitHubIssue]] = [:]
     var isLoadingIssues: Bool = false
@@ -1288,6 +1296,71 @@ extension RunwayStore: SidebarActions {
     public func reviewPR(_ pr: PullRequest) {
         reviewPRCandidate = pr
         showReviewPRSheet = true
+    }
+
+    // MARK: - Changes Sidebar Actions
+
+    func toggleChangesSidebar() {
+        changesVisible.toggle()
+        if changesVisible {
+            viewingDiffFile = nil
+            viewingDiffPatch = nil
+            startChangesRefresh()
+        } else {
+            stopChangesRefresh()
+            viewingDiffFile = nil
+            viewingDiffPatch = nil
+        }
+    }
+
+    func selectDiffFile(_ file: FileChange) {
+        guard let sessionID = selectedSessionID,
+            let session = sessions.first(where: { $0.id == sessionID })
+        else { return }
+        viewingDiffFile = file
+        Task {
+            let patch = await worktreeManager.fileDiff(
+                path: session.path,
+                file: file.path,
+                mode: changesMode
+            )
+            viewingDiffPatch = patch
+        }
+    }
+
+    func dismissDiffView() {
+        viewingDiffFile = nil
+        viewingDiffPatch = nil
+    }
+
+    func fetchChangesForCurrentSession() {
+        guard let sessionID = selectedSessionID,
+            let session = sessions.first(where: { $0.id == sessionID })
+        else { return }
+        Task {
+            let changes = await worktreeManager.changedFiles(
+                path: session.path,
+                mode: changesMode
+            )
+            sessionChanges[sessionID] = changes
+        }
+    }
+
+    private func startChangesRefresh() {
+        stopChangesRefresh()
+        fetchChangesForCurrentSession()
+        changesRefreshTask = Task {
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(10))
+                guard !Task.isCancelled, changesVisible else { break }
+                fetchChangesForCurrentSession()
+            }
+        }
+    }
+
+    private func stopChangesRefresh() {
+        changesRefreshTask?.cancel()
+        changesRefreshTask = nil
     }
 }
 

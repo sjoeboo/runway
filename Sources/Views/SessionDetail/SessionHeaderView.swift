@@ -7,12 +7,22 @@ public struct SessionHeaderView: View {
     let session: Session
     var linkedPR: PullRequest?
     var onSelectPR: ((PullRequest) -> Void)?
+    var changesVisible: Bool = false
+    var onToggleChanges: (() -> Void)? = nil
     @Environment(\.theme) private var theme
 
-    public init(session: Session, linkedPR: PullRequest? = nil, onSelectPR: ((PullRequest) -> Void)? = nil) {
+    public init(
+        session: Session,
+        linkedPR: PullRequest? = nil,
+        onSelectPR: ((PullRequest) -> Void)? = nil,
+        changesVisible: Bool = false,
+        onToggleChanges: (() -> Void)? = nil
+    ) {
         self.session = session
         self.linkedPR = linkedPR
         self.onSelectPR = onSelectPR
+        self.changesVisible = changesVisible
+        self.onToggleChanges = onToggleChanges
     }
 
     public var body: some View {
@@ -33,14 +43,27 @@ public struct SessionHeaderView: View {
 
                     Spacer()
 
-                    // Tool + permission mode badge
-                    Text("\(session.tool.displayName.lowercased()) · \(session.permissionMode.badgeLabel)")
-                        .font(.caption)
-                        .foregroundColor(session.permissionMode.badgeForeground(chrome: theme.chrome))
-                        .padding(.horizontal, 7)
-                        .padding(.vertical, 3)
-                        .background(session.permissionMode.badgeBackground(chrome: theme.chrome))
-                        .clipShape(Capsule())
+                    HStack(spacing: 8) {
+                        // Changes sidebar toggle
+                        if onToggleChanges != nil {
+                            Button(action: { onToggleChanges?() }) {
+                                Image(systemName: "doc.text.magnifyingglass")
+                                    .font(.caption)
+                                    .foregroundColor(changesVisible ? theme.chrome.accent : theme.chrome.textDim)
+                            }
+                            .buttonStyle(.plain)
+                            .help("Toggle changes sidebar (⌘3)")
+                        }
+
+                        // Tool + permission mode badge
+                        Text("\(session.tool.displayName.lowercased()) · \(session.permissionMode.badgeLabel)")
+                            .font(.caption)
+                            .foregroundColor(session.permissionMode.badgeForeground(chrome: theme.chrome))
+                            .padding(.horizontal, 7)
+                            .padding(.vertical, 3)
+                            .background(session.permissionMode.badgeBackground(chrome: theme.chrome))
+                            .clipShape(Capsule())
+                    }
                 }
 
                 // Row 2 — Git & PR Context (only if branch is set)
