@@ -310,29 +310,20 @@ struct ContentView: View {
         detailContent
             // Force re-render when selectionVersion changes (fixes nil→nil no-op on first launch)
             .id(store.selectionVersion)
+            .onChange(of: store.selectedSessionID) { _, newValue in
+                // When a session is selected (e.g. via List selection binding),
+                // clear selectedProjectID so the session detail takes priority.
+                if newValue != nil {
+                    store.selectedProjectID = nil
+                }
+            }
     }
 
     @ViewBuilder
     private var detailContent: some View {
         switch store.currentView {
         case .sessions:
-            if let sessionID = store.selectedSessionID,
-                let session = store.sessions.first(where: { $0.id == sessionID })
-            {
-                SessionDetailView(
-                    session: session,
-                    linkedPR: store.sessionPRs[sessionID],
-                    onSelectPR: { pr in Task { await store.selectPR(pr) } },
-                    showSendBar: Binding(
-                        get: { store.showSendBar },
-                        set: { store.showSendBar = $0 }
-                    ),
-                    showTerminalSearch: Binding(
-                        get: { store.showTerminalSearch },
-                        set: { store.showTerminalSearch = $0 }
-                    )
-                )
-            } else if let projectID = store.selectedProjectID,
+            if let projectID = store.selectedProjectID,
                 let project = store.projects.first(where: { $0.id == projectID })
             {
                 ProjectPageView(
@@ -373,6 +364,22 @@ struct ContentView: View {
                     onUpdateProject: { store.updateProjectSettings($0) },
                     onDetectRepo: { await store.detectGHRepo(for: project) },
                     onFetchLabels: { Task { await store.fetchLabels(forProject: projectID) } }
+                )
+            } else if let sessionID = store.selectedSessionID,
+                let session = store.sessions.first(where: { $0.id == sessionID })
+            {
+                SessionDetailView(
+                    session: session,
+                    linkedPR: store.sessionPRs[sessionID],
+                    onSelectPR: { pr in Task { await store.selectPR(pr) } },
+                    showSendBar: Binding(
+                        get: { store.showSendBar },
+                        set: { store.showSendBar = $0 }
+                    ),
+                    showTerminalSearch: Binding(
+                        get: { store.showTerminalSearch },
+                        set: { store.showTerminalSearch = $0 }
+                    )
                 )
             } else {
                 EmptyStateView(
