@@ -176,7 +176,7 @@ public struct MergeStatusBadge: View {
 
     public var body: some View {
         if let badge = badgeInfo {
-            Text(badge.text)
+            Label(badge.text, systemImage: badge.icon)
                 .font(.caption)
                 .fontWeight(.medium)
                 .foregroundColor(badge.color)
@@ -187,27 +187,26 @@ public struct MergeStatusBadge: View {
         }
     }
 
-    private var badgeInfo: (text: String, color: Color)? {
+    private var badgeInfo: (text: String, icon: String, color: Color)? {
         // Conflicts override everything
         if mergeable == .conflicting {
-            return ("\u{26A0} Conflicts", theme.chrome.red)
+            return ("Conflicts", "exclamationmark.triangle", theme.chrome.red)
         }
 
         switch mergeStateStatus {
         case .blocked:
-            return ("\u{2298} Blocked", theme.chrome.orange)
+            return ("Blocked", "nosign", theme.chrome.orange)
         case .behind:
-            return ("\u{2193} Behind", theme.chrome.yellow)
+            return ("Behind", "arrow.down", theme.chrome.yellow)
         case .dirty:
-            return ("\u{26A0} Dirty", theme.chrome.orange)
+            return ("Dirty", "exclamationmark.triangle", theme.chrome.orange)
         case .unstable:
-            return ("~ Unstable", theme.chrome.yellow)
+            return ("Unstable", "waveform.badge.exclamationmark", theme.chrome.yellow)
         case .clean, .hasHooks:
-            return ("\u{2713} Clean", theme.chrome.green)
+            return ("Clean", "checkmark", theme.chrome.green)
         case .unknown, .none:
-            // Also check if mergeable is known even without mergeStateStatus
             if mergeable == .mergeable {
-                return ("\u{2713} Mergeable", theme.chrome.green)
+                return ("Mergeable", "checkmark", theme.chrome.green)
             }
             return nil
         }

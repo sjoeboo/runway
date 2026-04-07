@@ -377,7 +377,7 @@ public struct IssueDetailDrawer: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(theme.chrome.surface)
-        .cornerRadius(6)
+        .clipShape(RoundedRectangle(cornerRadius: 6))
     }
 
     @ViewBuilder

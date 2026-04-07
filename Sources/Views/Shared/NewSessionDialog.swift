@@ -21,6 +21,8 @@ public struct NewSessionDialog: View {
     @State private var initialPrompt: String = ""
     @State private var validationError: String?
 
+    @FocusState private var titleFocused: Bool
+
     // Normal session state
     @State private var title: String = ""
     @State private var tool: Tool = .claude
@@ -124,6 +126,7 @@ public struct NewSessionDialog: View {
         .fixedSize(horizontal: false, vertical: true)
         .onAppear {
             permissionMode = defaultPermissionMode
+            titleFocused = true
         }
     }
 
@@ -132,12 +135,19 @@ public struct NewSessionDialog: View {
     @ViewBuilder
     private var normalSessionFields: some View {
         // Title
-        field("Session Name", text: $title, placeholder: "feature-name")
-            .onChange(of: title) {
-                if useWorktree && !branchManuallyEdited {
-                    branchName = autobranchName(from: title)
-                }
+        VStack(alignment: .leading, spacing: 4) {
+            Text("Session Name")
+                .font(.caption)
+                .foregroundColor(theme.chrome.textDim)
+            TextField("feature-name", text: $title)
+                .textFieldStyle(.roundedBorder)
+                .focused($titleFocused)
+        }
+        .onChange(of: title) {
+            if useWorktree && !branchManuallyEdited {
+                branchName = autobranchName(from: title)
             }
+        }
 
         // Project picker
         VStack(alignment: .leading, spacing: 4) {
@@ -267,7 +277,7 @@ public struct NewSessionDialog: View {
                 .frame(minHeight: 60, maxHeight: 120)
                 .scrollContentBackground(.hidden)
                 .background(Color(nsColor: .textBackgroundColor))
-                .cornerRadius(6)
+                .clipShape(RoundedRectangle(cornerRadius: 6))
                 .overlay(
                     RoundedRectangle(cornerRadius: 6)
                         .stroke(Color(nsColor: .separatorColor), lineWidth: 1)

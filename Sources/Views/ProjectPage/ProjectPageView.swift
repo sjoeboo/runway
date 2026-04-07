@@ -285,7 +285,7 @@ private struct TabButton: View {
                 Rectangle()
                     .fill(isActive ? theme.chrome.accent : Color.clear)
                     .frame(height: 2)
-                    .cornerRadius(1)
+                    .clipShape(RoundedRectangle(cornerRadius: 1))
             }
         }
         .buttonStyle(.plain)

@@ -93,10 +93,12 @@ public struct NewProjectDialog: View {
         panel.allowsMultipleSelection = false
         panel.message = "Select project directory"
 
-        if panel.runModal() == .OK, let url = panel.url {
-            path = url.path
-            if name.isEmpty {
-                name = url.lastPathComponent
+        panel.begin { response in
+            if response == .OK, let url = panel.url {
+                path = url.path
+                if name.isEmpty {
+                    name = url.lastPathComponent
+                }
             }
         }
     }

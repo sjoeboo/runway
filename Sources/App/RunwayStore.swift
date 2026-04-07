@@ -514,9 +514,7 @@ public final class RunwayStore {
                         repoPath: repoPath, worktreePath: wtPath, deleteBranch: true
                     )
                 } catch {
-                    await MainActor.run {
-                        statusMessage = .error("Worktree cleanup failed: \(error.localizedDescription)")
-                    }
+                    statusMessage = .error("Worktree cleanup failed: \(error.localizedDescription)")
                 }
             }
         }
@@ -643,8 +641,9 @@ public final class RunwayStore {
                 do {
                     try await hookServer.start()
                 } catch {
-                    // Previous port unavailable — fall back to ephemeral
+                    // Previous port unavailable — stop old listener and fall back to ephemeral
                     print("[Runway] Previous port \(previousPort) unavailable, using ephemeral")
+                    await hookServer.stop()
                     hookServer = HookServer()
                     try await hookServer.start()
                 }
@@ -735,14 +734,14 @@ public final class RunwayStore {
                 continue
             }
 
-            // Read last 15 lines from the cached terminal view
+            // Read last 10 lines from the cached terminal view (matches StatusDetector.detect)
             guard let terminal = TerminalSessionCache.shared.mainTerminal(forSessionID: session.id) else {
                 continue
             }
 
             let terminalAccess = terminal.getTerminal()
             let rows = terminalAccess.rows
-            let startRow = max(0, rows - 15)
+            let startRow = max(0, rows - 10)
             var lines: [String] = []
             for row in startRow..<rows {
                 if let line = terminalAccess.getLine(row: row) {
@@ -1454,7 +1453,7 @@ extension RunwayStore: SidebarActions {
 // MARK: - Status Message
 
 struct StatusMessage: Equatable {
-    enum Kind { case success, info, error }
+    enum Kind: Equatable { case success, info, error }
     let text: String
     let kind: Kind
 

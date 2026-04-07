@@ -264,7 +264,7 @@ struct ContentView: View {
         .padding(.vertical, 6)
         .background(toastColor(for: msg.kind))
         .foregroundStyle(.white)
-        .cornerRadius(6)
+        .clipShape(RoundedRectangle(cornerRadius: 6))
         .padding(.bottom, 8)
         .transition(reduceMotion ? .opacity : .move(edge: .bottom).combined(with: .opacity))
         .animation(reduceMotion ? .none : .easeInOut(duration: 0.3), value: msg)

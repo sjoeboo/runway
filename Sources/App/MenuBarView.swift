@@ -13,7 +13,9 @@ struct MenuBarView: View {
     }
 
     private var recentSessions: [Session] {
-        store.sessions
+        let activeIDs = Set(activeSessions.map(\.id))
+        return store.sessions
+            .filter { !activeIDs.contains($0.id) }
             .sorted { $0.lastAccessedAt > $1.lastAccessedAt }
             .prefix(5)
             .map { $0 }

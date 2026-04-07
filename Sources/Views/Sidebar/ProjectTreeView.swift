@@ -249,11 +249,11 @@ struct ProjectSection: View {
                             isRenaming = false
                         }
                         .textFieldStyle(.plain)
-                        .font(.system(.title3, weight: .semibold))
+                        .font(.system(.subheadline, weight: .semibold))
                         .onAppear { editName = project.name }
                 } else {
                     Text(project.name)
-                        .font(.system(.title3, weight: .semibold))
+                        .font(.system(.subheadline, weight: .semibold))
                         .foregroundColor(theme.chrome.text)
                         .onTapGesture {
                             actions.selectProject(project.id)
@@ -440,7 +440,7 @@ struct SessionRowView: View {
                     .padding(.horizontal, 4)
                     .padding(.vertical, 1)
                     .background(theme.chrome.surface)
-                    .cornerRadius(4)
+                    .clipShape(RoundedRectangle(cornerRadius: 4))
             }
         }
         .padding(.vertical, 4)

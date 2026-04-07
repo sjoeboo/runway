@@ -198,7 +198,7 @@ public struct TerminalTabView: View {
         .padding(.vertical, 5)
         .background(isSelected ? theme.chrome.background : theme.chrome.surface)
         .foregroundColor(isSelected ? theme.chrome.text : theme.chrome.textDim)
-        .cornerRadius(4)
+        .clipShape(RoundedRectangle(cornerRadius: 4))
         .contentShape(Rectangle())
         .onTapGesture { selectedTabID = tab.id }
     }

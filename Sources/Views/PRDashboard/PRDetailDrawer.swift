@@ -512,7 +512,7 @@ public struct PRDetailDrawer: View {
         .padding(.vertical, 6)
         .padding(.horizontal, 8)
         .background(checkRunBackground(run.status))
-        .cornerRadius(6)
+        .clipShape(RoundedRectangle(cornerRadius: 6))
     }
 
     @ViewBuilder
@@ -698,7 +698,7 @@ public struct PRDetailDrawer: View {
                         .padding(.horizontal, 6)
                         .padding(.vertical, 2)
                         .background(reviewColor(review.state).opacity(0.1))
-                        .cornerRadius(4)
+                        .clipShape(RoundedRectangle(cornerRadius: 4))
                 }
                 if !review.body.isEmpty {
                     renderMarkdown(review.body, inlineOnly: true)
@@ -710,7 +710,7 @@ public struct PRDetailDrawer: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(theme.chrome.surface)
-        .cornerRadius(6)
+        .clipShape(RoundedRectangle(cornerRadius: 6))
     }
 
     private func reviewIcon(_ state: String) -> String {
@@ -741,7 +741,7 @@ public struct PRDetailDrawer: View {
         .padding(8)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(theme.chrome.surface)
-        .cornerRadius(6)
+        .clipShape(RoundedRectangle(cornerRadius: 6))
     }
 
     private func reviewColor(_ state: String) -> SwiftUI.Color {

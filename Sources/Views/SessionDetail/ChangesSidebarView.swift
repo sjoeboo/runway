@@ -33,8 +33,8 @@ struct ChangesSidebarView: View {
             Spacer()
 
             Picker("", selection: $mode) {
-                Text("Branch").tag(ChangesMode.branch)
-                Text("Working").tag(ChangesMode.working)
+                Text("vs Main").tag(ChangesMode.branch)
+                Text("Uncommitted").tag(ChangesMode.working)
             }
             .pickerStyle(.segmented)
             .frame(width: 130)

@@ -142,7 +142,7 @@ private struct FileRow: View {
             .padding(.vertical, 3)
             .padding(.horizontal, 8)
             .background(isSelected ? theme.chrome.accent.opacity(0.15) : .clear)
-            .cornerRadius(3)
+            .clipShape(RoundedRectangle(cornerRadius: 3))
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
