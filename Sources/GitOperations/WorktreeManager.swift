@@ -203,9 +203,21 @@ public actor WorktreeManager {
     }
 
     private func sanitizeBranchName(_ name: String) -> String {
-        name.replacingOccurrences(of: " ", with: "-")
-            .replacingOccurrences(of: "/", with: "-")
+        var result =
+            name
             .lowercased()
+            .replacingOccurrences(of: " ", with: "-")
+            .replacingOccurrences(of: "/", with: "-")
+        // Remove git-invalid characters: ~ ^ : ? * [ ] \ @ { }
+        let invalidChars = CharacterSet(charactersIn: "~^:?*[]\\@{}")
+        result = result.components(separatedBy: invalidChars).joined()
+        // Collapse consecutive dots (.. is invalid) and hyphens
+        while result.contains("..") { result = result.replacingOccurrences(of: "..", with: ".") }
+        while result.contains("--") { result = result.replacingOccurrences(of: "--", with: "-") }
+        // Remove leading dots/hyphens and trailing .lock
+        result = result.trimmingCharacters(in: CharacterSet(charactersIn: ".-"))
+        if result.hasSuffix(".lock") { result = String(result.dropLast(5)) }
+        return result.isEmpty ? "session" : result
     }
 
     private func parseWorktreeList(_ output: String) -> [WorktreeInfo] {

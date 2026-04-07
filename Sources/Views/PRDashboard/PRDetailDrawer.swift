@@ -570,6 +570,7 @@ public struct PRDetailDrawer: View {
         var oldLine = 0
         var newLine = 0
 
+        var lineIndex = 0
         for rawLine in patch.components(separatedBy: "\n") {
             if rawLine.hasPrefix("@@") {
                 let parts = rawLine.components(separatedBy: " ")
@@ -581,15 +582,23 @@ public struct PRDetailDrawer: View {
                     let oldNums = oldPart.dropFirst().components(separatedBy: ",")
                     oldLine = Int(oldNums[0]) ?? 0
                 }
-                lines.append(DiffLine(type: .hunk, content: rawLine, oldLineNo: nil, newLineNo: nil))
+                lines.append(DiffLine(index: lineIndex, type: .hunk, content: rawLine, oldLineNo: nil, newLineNo: nil))
+                lineIndex += 1
             } else if rawLine.hasPrefix("+") {
-                lines.append(DiffLine(type: .addition, content: String(rawLine.dropFirst()), oldLineNo: nil, newLineNo: newLine))
+                lines.append(
+                    DiffLine(index: lineIndex, type: .addition, content: String(rawLine.dropFirst()), oldLineNo: nil, newLineNo: newLine))
+                lineIndex += 1
                 newLine += 1
             } else if rawLine.hasPrefix("-") {
-                lines.append(DiffLine(type: .deletion, content: String(rawLine.dropFirst()), oldLineNo: oldLine, newLineNo: nil))
+                lines.append(
+                    DiffLine(index: lineIndex, type: .deletion, content: String(rawLine.dropFirst()), oldLineNo: oldLine, newLineNo: nil))
+                lineIndex += 1
                 oldLine += 1
             } else if rawLine.hasPrefix(" ") {
-                lines.append(DiffLine(type: .context, content: String(rawLine.dropFirst()), oldLineNo: oldLine, newLineNo: newLine))
+                lines.append(
+                    DiffLine(index: lineIndex, type: .context, content: String(rawLine.dropFirst()), oldLineNo: oldLine, newLineNo: newLine)
+                )
+                lineIndex += 1
                 oldLine += 1
                 newLine += 1
             }

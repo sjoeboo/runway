@@ -41,19 +41,19 @@ public enum ChangesMode: String, Sendable, Equatable {
 // MARK: - FileTreeNode
 
 public enum FileTreeNode: Identifiable, Sendable {
-    case directory(name: String, children: [FileTreeNode], additions: Int, deletions: Int)
+    case directory(name: String, fullPath: String, children: [FileTreeNode], additions: Int, deletions: Int)
     case file(FileChange)
 
     public var id: String {
         switch self {
-        case .directory(let name, _, _, _): "dir:\(name)"
+        case .directory(_, let fullPath, _, _, _): "dir:\(fullPath)"
         case .file(let fc): fc.path
         }
     }
 
     public var name: String {
         switch self {
-        case .directory(let name, _, _, _):
+        case .directory(let name, _, _, _, _):
             return name
         case .file(let fc):
             if let lastSlash = fc.path.lastIndex(of: "/") {
@@ -65,14 +65,14 @@ public enum FileTreeNode: Identifiable, Sendable {
 
     public var additions: Int {
         switch self {
-        case .directory(_, _, let adds, _): adds
+        case .directory(_, _, _, let adds, _): adds
         case .file(let fc): fc.additions
         }
     }
 
     public var deletions: Int {
         switch self {
-        case .directory(_, _, _, let dels): dels
+        case .directory(_, _, _, _, let dels): dels
         case .file(let fc): fc.deletions
         }
     }
@@ -109,10 +109,11 @@ public func buildFileTree(_ changes: [FileChange], prefix: String = "") -> [File
         let adds = children.reduce(0) { $0 + $1.additions }
         let dels = children.reduce(0) { $0 + $1.deletions }
 
-        if subtree.count == 1, case .directory(let childName, let grandchildren, _, _) = subtree[0] {
-            nodes.append(.directory(name: "\(dir)/\(childName)", children: grandchildren, additions: adds, deletions: dels))
+        if subtree.count == 1, case .directory(let childName, _, let grandchildren, _, _) = subtree[0] {
+            nodes.append(
+                .directory(name: "\(dir)/\(childName)", fullPath: newPrefix, children: grandchildren, additions: adds, deletions: dels))
         } else {
-            nodes.append(.directory(name: "\(dir)/", children: subtree, additions: adds, deletions: dels))
+            nodes.append(.directory(name: "\(dir)/", fullPath: newPrefix, children: subtree, additions: adds, deletions: dels))
         }
     }
 

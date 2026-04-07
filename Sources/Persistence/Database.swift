@@ -187,6 +187,13 @@ public final class Database: Sendable {
             }
         }
 
+        migrator.registerMigration("v10_indexes") { db in
+            try db.execute(sql: "CREATE INDEX IF NOT EXISTS idx_sessions_projectid ON sessions(projectID)")
+            try db.execute(sql: "CREATE INDEX IF NOT EXISTS idx_sessions_status ON sessions(status)")
+            try db.execute(sql: "CREATE INDEX IF NOT EXISTS idx_pr_cache_fetchedat ON pr_cache(fetchedAt)")
+            try db.execute(sql: "CREATE INDEX IF NOT EXISTS idx_issue_cache_fetchedat ON issue_cache(fetchedAt)")
+        }
+
         try migrator.migrate(dbQueue)
     }
 

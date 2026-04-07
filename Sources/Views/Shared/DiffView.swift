@@ -172,6 +172,7 @@ public struct DiffFile: Identifiable, Sendable {
         var deletions = 0
         var oldLine = 0
         var newLine = 0
+        var lineIndex = 0
 
         for rawLine in patch.components(separatedBy: "\n") {
             if rawLine.hasPrefix("diff --git") {
@@ -198,17 +199,25 @@ public struct DiffFile: Identifiable, Sendable {
                     let oldNums = oldPart.dropFirst().components(separatedBy: ",")
                     oldLine = Int(oldNums[0]) ?? 0
                 }
-                currentLines.append(DiffLine(type: .hunk, content: rawLine, oldLineNo: nil, newLineNo: nil))
+                currentLines.append(DiffLine(index: lineIndex, type: .hunk, content: rawLine, oldLineNo: nil, newLineNo: nil))
+                lineIndex += 1
             } else if rawLine.hasPrefix("+") {
                 additions += 1
-                currentLines.append(DiffLine(type: .addition, content: String(rawLine.dropFirst()), oldLineNo: nil, newLineNo: newLine))
+                currentLines.append(
+                    DiffLine(index: lineIndex, type: .addition, content: String(rawLine.dropFirst()), oldLineNo: nil, newLineNo: newLine))
+                lineIndex += 1
                 newLine += 1
             } else if rawLine.hasPrefix("-") {
                 deletions += 1
-                currentLines.append(DiffLine(type: .deletion, content: String(rawLine.dropFirst()), oldLineNo: oldLine, newLineNo: nil))
+                currentLines.append(
+                    DiffLine(index: lineIndex, type: .deletion, content: String(rawLine.dropFirst()), oldLineNo: oldLine, newLineNo: nil))
+                lineIndex += 1
                 oldLine += 1
             } else if rawLine.hasPrefix(" ") {
-                currentLines.append(DiffLine(type: .context, content: String(rawLine.dropFirst()), oldLineNo: oldLine, newLineNo: newLine))
+                currentLines.append(
+                    DiffLine(index: lineIndex, type: .context, content: String(rawLine.dropFirst()), oldLineNo: oldLine, newLineNo: newLine)
+                )
+                lineIndex += 1
                 oldLine += 1
                 newLine += 1
             }
@@ -230,8 +239,8 @@ public struct DiffLine: Identifiable, Sendable {
     public let oldLineNo: Int?
     public let newLineNo: Int?
 
-    public init(type: DiffLineType, content: String, oldLineNo: Int?, newLineNo: Int?) {
-        self.id = "\(type)-\(oldLineNo ?? -1)-\(newLineNo ?? -1)-\(content.hashValue)"
+    public init(index: Int, type: DiffLineType, content: String, oldLineNo: Int?, newLineNo: Int?) {
+        self.id = "line-\(index)"
         self.type = type
         self.content = content
         self.oldLineNo = oldLineNo

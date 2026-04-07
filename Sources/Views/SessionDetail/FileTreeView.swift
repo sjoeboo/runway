@@ -20,7 +20,7 @@ struct FileTreeView: View {
     @ViewBuilder
     private func nodeRow(_ node: FileTreeNode) -> some View {
         switch node {
-        case .directory(let name, let children, _, let dels):
+        case .directory(let name, _, let children, _, let dels):
             DirectoryRow(
                 name: name,
                 children: children,
@@ -78,7 +78,7 @@ private struct DirectoryRow: View {
                 ForEach(children) { child in
                     Group {
                         switch child {
-                        case .directory(let childName, let grandchildren, let adds, let dels):
+                        case .directory(let childName, _, let grandchildren, let adds, let dels):
                             DirectoryRow(
                                 name: childName,
                                 children: grandchildren,

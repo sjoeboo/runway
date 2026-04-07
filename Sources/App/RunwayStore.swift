@@ -213,9 +213,8 @@ public final class RunwayStore {
             print("[Runway] Failed to load state: \(error)")
         }
 
-        // Background prefetch PRs so data is ready when user opens PR dashboard
+        // Reload cached PRs after reconciliation (init already schedules fetchPRs)
         loadCachedPRs()
-        Task { await fetchPRs() }
     }
 
     /// Remove worktrees that exist on disk but have no matching session in the database.
@@ -421,9 +420,13 @@ public final class RunwayStore {
         guard let idx = sessions.firstIndex(where: { $0.id == id }) else { return }
         let session = sessions[idx]
 
-        // Kill existing tmux session
+        // Kill existing tmux sessions (main + shell tabs)
         let tmuxName = "runway-\(id)"
         if tmuxAvailable {
+            let shellSessions = await tmuxManager.listSessions(prefix: "runway-\(id)-shell")
+            for shell in shellSessions {
+                try? await tmuxManager.killSession(name: shell.name)
+            }
             try? await tmuxManager.killSession(name: tmuxName)
         }
 
@@ -496,9 +499,14 @@ public final class RunwayStore {
             selectedSessionID = nextSelection
         }
 
-        // Clean up tmux session and optionally worktree
+        // Clean up tmux session (main + shell tabs) and optionally worktree
         Task {
             if tmuxAvailable {
+                // Kill shell tab sessions first (runway-{id}-shell1, etc.)
+                let shellSessions = await tmuxManager.listSessions(prefix: "runway-\(id)-shell")
+                for shell in shellSessions {
+                    try? await tmuxManager.killSession(name: shell.name)
+                }
                 try? await tmuxManager.killSession(name: "runway-\(id)")
             }
 
@@ -546,6 +554,12 @@ public final class RunwayStore {
     }
 
     public func deleteProject(id: String) {
+        // Delete all sessions belonging to this project first
+        let childSessions = sessions.filter { $0.projectID == id }
+        for session in childSessions {
+            deleteSession(id: session.id)
+        }
+
         projects.removeAll { $0.id == id }
         try? database?.deleteProject(id: id)
     }
@@ -700,12 +714,16 @@ public final class RunwayStore {
 
     // MARK: - Buffer-based Status Detection
 
+    private var bufferDetectionTask: Task<Void, Never>?
+
     /// Polls terminal buffers to detect session status for sessions without hook events.
     /// Runs every 3 seconds and updates status based on terminal content analysis.
     func startBufferDetection() {
-        Task { @MainActor in
+        bufferDetectionTask?.cancel()
+        bufferDetectionTask = Task { @MainActor in
             while !Task.isCancelled {
                 try? await Task.sleep(for: .seconds(3))
+                guard !sessions.isEmpty else { continue }
                 pollTerminalBuffers()
             }
         }

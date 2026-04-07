@@ -45,6 +45,7 @@ import Testing
     let child2 = FileChange(path: "src/b.ts", status: .added, additions: 20, deletions: 0)
     let dir = FileTreeNode.directory(
         name: "src/",
+        fullPath: "src/",
         children: [.file(child1), .file(child2)],
         additions: 30,
         deletions: 5
@@ -81,7 +82,7 @@ import Testing
     // Find the directory node
     let dirNode = tree.first { $0.name == "src/auth/" }
     #expect(dirNode != nil)
-    if case .directory(_, let children, let adds, let dels) = dirNode {
+    if case .directory(_, _, let children, let adds, let dels) = dirNode {
         #expect(children.count == 2)
         #expect(adds == 83)
         #expect(dels == 12)
@@ -95,7 +96,7 @@ import Testing
     ]
     let tree = buildFileTree(changes)
     #expect(tree.count == 1)
-    if case .directory(let name, let children, _, _) = tree[0] {
+    if case .directory(let name, _, let children, _, _) = tree[0] {
         #expect(name == "src/deep/nested/")
         #expect(children.count == 1)
     } else {
