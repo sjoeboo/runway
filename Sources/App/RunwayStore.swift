@@ -471,6 +471,7 @@ public final class RunwayStore {
     // MARK: - Session Lifecycle
 
     func updateSessionStatus(id: String, status: SessionStatus) {
+        let previousStatus = sessions.first(where: { $0.id == id })?.status
         if let idx = sessions.firstIndex(where: { $0.id == id }) {
             sessions[idx].status = status
         }
@@ -481,6 +482,11 @@ public final class RunwayStore {
         }
         let waitingCount = sessions.filter { $0.status == .waiting }.count
         notificationManager.updateDockBadge(waitingCount: waitingCount)
+
+        // Clear delivered notifications when a session is no longer waiting
+        if previousStatus == .waiting, status != .waiting {
+            notificationManager.clearDeliveredNotifications(forSessionID: id)
+        }
     }
 
     public func restartSession(id: String) async {
@@ -914,8 +920,7 @@ public final class RunwayStore {
             if let detected = statusDetector.detect(content: content, profile: profile),
                 detected != session.status
             {
-                sessions[i].status = detected
-                try? database?.updateSessionStatus(id: session.id, status: detected)
+                updateSessionStatus(id: session.id, status: detected)
             }
         }
     }
