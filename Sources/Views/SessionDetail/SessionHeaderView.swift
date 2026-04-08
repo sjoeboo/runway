@@ -44,19 +44,6 @@ public struct SessionHeaderView: View {
                     Spacer()
 
                     HStack(spacing: 8) {
-                        // Changes sidebar toggle
-                        if onToggleChanges != nil {
-                            Button(action: { onToggleChanges?() }) {
-                                Image(systemName: "doc.text.magnifyingglass")
-                                    .font(.body)
-                                    .foregroundColor(changesVisible ? theme.chrome.accent : theme.chrome.textDim)
-                                    .frame(width: 28, height: 28)
-                            }
-                            .buttonStyle(.plain)
-                            .help("Toggle changes sidebar (⌘3)")
-                            .accessibilityLabel("Toggle changes sidebar")
-                        }
-
                         // Tool + permission mode badge
                         Text("\(session.tool.displayName.lowercased()) · \(session.permissionMode.badgeLabel)")
                             .font(.caption)
