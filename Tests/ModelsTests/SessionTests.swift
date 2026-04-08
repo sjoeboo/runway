@@ -56,3 +56,14 @@ import Testing
     let session = Session(title: "review", path: "/tmp", prNumber: 247)
     #expect(session.prNumber == 247)
 }
+
+@Test func sessionIssueNumberDefaults() {
+    let session = Session(title: "Test", path: "/tmp")
+    #expect(session.issueNumber == nil)
+    #expect(session.lastActivityText == nil)
+}
+
+@Test func sessionIssueNumberSet() {
+    let session = Session(title: "Fix #42", path: "/tmp", issueNumber: 42)
+    #expect(session.issueNumber == 42)
+}

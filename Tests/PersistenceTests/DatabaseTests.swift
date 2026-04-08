@@ -109,6 +109,58 @@ import Testing
     #expect(fetched?.prNumber == nil)
 }
 
+@Test func saveAndFetchSessionEvents() throws {
+    let db = try Database(inMemory: true)
+    let event = SessionEvent(sessionID: "test-session", eventType: "UserPromptSubmit", prompt: "Fix the bug")
+    try db.saveEvent(event)
+
+    let events = try db.events(forSessionID: "test-session")
+    #expect(events.count == 1)
+    #expect(events.first?.prompt == "Fix the bug")
+    #expect(events.first?.eventType == "UserPromptSubmit")
+}
+
+@Test func sessionEventsCapAtThousand() throws {
+    let db = try Database(inMemory: true)
+    for i in 0..<1005 {
+        let event = SessionEvent(sessionID: "s1", eventType: "UserPromptSubmit", prompt: "Prompt \(i)")
+        try db.saveEvent(event)
+    }
+    let events = try db.events(forSessionID: "s1", limit: 2000)
+    #expect(events.count <= 1000)
+}
+
+@Test func sessionIssueNumberPersistence() throws {
+    let db = try Database(inMemory: true)
+    let session = Session(title: "Fix issue", path: "/tmp", issueNumber: 42)
+    try db.saveSession(session)
+
+    let loaded = try db.allSessions()
+    #expect(loaded.first?.issueNumber == 42)
+}
+
+@Test func updateSessionIssueNumber() throws {
+    let db = try Database(inMemory: true)
+    let session = Session(title: "Test", path: "/tmp")
+    try db.saveSession(session)
+
+    try db.updateSessionIssueNumber(id: session.id, issueNumber: 99)
+    let loaded = try db.allSessions()
+    #expect(loaded.first?.issueNumber == 99)
+}
+
+@Test func sessionEventsOrderedByCreatedAtDesc() throws {
+    let db = try Database(inMemory: true)
+    let e1 = SessionEvent(sessionID: "s1", eventType: "SessionStart", createdAt: Date(timeIntervalSince1970: 100))
+    let e2 = SessionEvent(sessionID: "s1", eventType: "UserPromptSubmit", createdAt: Date(timeIntervalSince1970: 200))
+    try db.saveEvent(e1)
+    try db.saveEvent(e2)
+
+    let events = try db.events(forSessionID: "s1")
+    #expect(events.count == 2)
+    #expect(events.first?.eventType == "UserPromptSubmit")  // most recent first
+}
+
 @Test func prCacheRoundTripsNewFields() throws {
     let db = try Database(inMemory: true)
 
