@@ -15,7 +15,9 @@ public final class TerminalSessionCache {
     /// When exceeded, the least-recently-accessed entry is evicted.
     /// Eviction is cheap — the underlying tmux session persists independently;
     /// re-attaching later simply creates a new SwiftTerm view.
-    public let maxSize: Int = 10
+    /// Sized generously because re-attach causes a visible "replay" as tmux
+    /// dumps the pane buffer through the new PTY.
+    public let maxSize: Int = 30
 
     private var views: [String: LocalProcessTerminalView] = [:]
 
