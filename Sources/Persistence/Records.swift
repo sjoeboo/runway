@@ -15,6 +15,7 @@ struct SessionRecord: Codable, FetchableRecord, MutablePersistableRecord {
     var status: String
     var worktreeBranch: String?
     var prNumber: Int?
+    var issueNumber: Int?
     var parentID: String?
     var command: String?
     var permissionMode: String
@@ -31,6 +32,7 @@ struct SessionRecord: Codable, FetchableRecord, MutablePersistableRecord {
         self.status = session.status.rawValue
         self.worktreeBranch = session.worktreeBranch
         self.prNumber = session.prNumber
+        self.issueNumber = session.issueNumber
         self.parentID = session.parentID
         self.command = session.command
         self.permissionMode = session.permissionMode.rawValue
@@ -49,6 +51,7 @@ struct SessionRecord: Codable, FetchableRecord, MutablePersistableRecord {
             status: SessionStatus(rawValue: status) ?? .stopped,
             worktreeBranch: worktreeBranch,
             prNumber: prNumber,
+            issueNumber: issueNumber,
             parentID: parentID,
             command: command,
             permissionMode: PermissionMode(rawValue: permissionMode) ?? .default,
@@ -122,6 +125,45 @@ struct ProjectRecord: Codable, FetchableRecord, MutablePersistableRecord {
             ghHost: ghHost,
             issuesEnabled: issuesEnabled,
             branchPrefix: branchPrefix
+        )
+    }
+}
+
+// MARK: - Session Event Record
+
+struct SessionEventRecord: Codable, FetchableRecord, MutablePersistableRecord {
+    static let databaseTableName = "session_events"
+
+    var id: String
+    var sessionID: String
+    var eventType: String
+    var prompt: String?
+    var toolName: String?
+    var message: String?
+    var notificationType: String?
+    var createdAt: Date
+
+    init(_ event: SessionEvent) {
+        self.id = event.id
+        self.sessionID = event.sessionID
+        self.eventType = event.eventType
+        self.prompt = event.prompt
+        self.toolName = event.toolName
+        self.message = event.message
+        self.notificationType = event.notificationType
+        self.createdAt = event.createdAt
+    }
+
+    func toEvent() -> SessionEvent {
+        SessionEvent(
+            id: id,
+            sessionID: sessionID,
+            eventType: eventType,
+            prompt: prompt,
+            toolName: toolName,
+            message: message,
+            notificationType: notificationType,
+            createdAt: createdAt
         )
     }
 }

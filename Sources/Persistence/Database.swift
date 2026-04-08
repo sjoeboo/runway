@@ -198,6 +198,28 @@ public final class Database: Sendable {
             try db.execute(sql: "CREATE INDEX IF NOT EXISTS idx_issue_cache_fetchedat ON issue_cache(fetchedAt)")
         }
 
+        migrator.registerMigration("v11_session_issue_number") { db in
+            try db.alter(table: "sessions") { t in
+                t.add(column: "issueNumber", .integer)
+            }
+        }
+
+        migrator.registerMigration("v12_session_events") { db in
+            try db.create(table: "session_events") { t in
+                t.column("id", .text).primaryKey()
+                t.column("sessionID", .text).notNull()
+                t.column("eventType", .text).notNull()
+                t.column("prompt", .text)
+                t.column("toolName", .text)
+                t.column("message", .text)
+                t.column("notificationType", .text)
+                t.column("createdAt", .datetime).notNull()
+            }
+            try db.execute(
+                sql: "CREATE INDEX idx_session_events_session ON session_events(sessionID, createdAt)"
+            )
+        }
+
         try migrator.migrate(dbQueue)
     }
 
@@ -267,6 +289,53 @@ public final class Database: Sendable {
             try db.execute(
                 sql: "UPDATE projects SET sortOrder = ? WHERE id = ?",
                 arguments: [sortOrder, id]
+            )
+        }
+    }
+
+    // MARK: - Session Event CRUD
+
+    public func saveEvent(_ event: SessionEvent) throws {
+        try dbQueue.write { db in
+            var record = SessionEventRecord(event)
+            try record.save(db)
+
+            // Cap at 1000 events per session
+            let count =
+                try SessionEventRecord
+                .filter(Column("sessionID") == event.sessionID)
+                .fetchCount(db)
+            if count > 1000 {
+                let excess = count - 1000
+                let oldest =
+                    try SessionEventRecord
+                    .filter(Column("sessionID") == event.sessionID)
+                    .order(Column("createdAt"))
+                    .limit(excess)
+                    .fetchAll(db)
+                for old in oldest {
+                    try old.delete(db)
+                }
+            }
+        }
+    }
+
+    public func events(forSessionID sessionID: String, limit: Int = 100) throws -> [SessionEvent] {
+        try dbQueue.read { db in
+            try SessionEventRecord
+                .filter(Column("sessionID") == sessionID)
+                .order(Column("createdAt").desc)
+                .limit(limit)
+                .fetchAll(db)
+                .map { $0.toEvent() }
+        }
+    }
+
+    public func updateSessionIssueNumber(id: String, issueNumber: Int?) throws {
+        try dbQueue.write { db in
+            try db.execute(
+                sql: "UPDATE sessions SET issueNumber = ? WHERE id = ?",
+                arguments: [issueNumber, id]
             )
         }
     }
