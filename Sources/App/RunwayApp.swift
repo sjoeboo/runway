@@ -146,6 +146,7 @@ struct ContentView: View {
             ) {
                 NewSessionDialog(
                     projects: store.projects,
+                    profiles: store.agentProfiles.isEmpty ? AgentProfile.builtIn : store.agentProfiles,
                     initialProjectID: store.newSessionProjectID,
                     parentID: store.newSessionParentID,
                     templates: store.availableTemplates(forProjectID: store.newSessionProjectID),

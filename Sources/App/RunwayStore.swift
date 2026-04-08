@@ -19,6 +19,7 @@ public final class RunwayStore {
     var projects: [Project] = []
     var pullRequests: [PullRequest] = []
     var sessionTemplates: [SessionTemplate] = []
+    var agentProfiles: [AgentProfile] = []
 
     var selectedSessionID: String?
     /// Incremented on every selection change to force SwiftUI re-render
@@ -72,6 +73,15 @@ public final class RunwayStore {
         // prDetail is loaded when a PR is selected; return it if it matches
         if selectedPRID == pr.id { return prDetail }
         return nil
+    }
+
+    func profileForSession(_ session: Session) -> AgentProfile {
+        if case .custom(let name) = session.tool,
+            let profile = agentProfiles.first(where: { $0.id == name })
+        {
+            return profile
+        }
+        return AgentProfile.defaultProfile(for: session.tool)
     }
 
     // MARK: - Changes Sidebar
@@ -160,6 +170,7 @@ public final class RunwayStore {
             projects = try db.allProjects()
             sessions = try db.allSessions()
             sessionTemplates = (try? db.allTemplates()) ?? []
+            agentProfiles = AgentProfile.builtIn + AgentProfile.loadUserProfiles()
 
             // Auto-detect default branches only for projects that still have the placeholder "main".
             // Projects with an already-detected non-"main" branch skip the git subprocess call.
@@ -416,20 +427,25 @@ public final class RunwayStore {
         }
 
         let tmuxName = "runway-\(session.id)"
-        let command: String?
-        if session.tool == .claude {
-            command = ([session.tool.command] + session.permissionMode.cliFlags).joined(separator: " ")
-        } else if session.tool != .shell {
-            command = session.tool.command
+        let profile = profileForSession(session)
+        let toolCommand: String?
+        if profile.id == "shell" {
+            toolCommand = nil  // shell sessions use tmux's default shell
         } else {
-            command = nil
+            var parts = [profile.command]
+            parts.append(contentsOf: profile.arguments)
+            // For Claude, add permission mode flags
+            if session.tool == .claude {
+                parts.append(contentsOf: session.permissionMode.cliFlags)
+            }
+            toolCommand = parts.joined(separator: " ")
         }
 
         do {
             try await tmuxManager.createSession(
                 name: tmuxName,
                 workDir: path,
-                command: command,
+                command: toolCommand,
                 env: [
                     "RUNWAY_SESSION_ID": session.id,
                     "RUNWAY_TITLE": session.title,
@@ -482,20 +498,24 @@ public final class RunwayStore {
 
         // Recreate tmux session
         if tmuxAvailable {
-            let command: String?
-            if session.tool == .claude {
-                command = ([session.tool.command] + session.permissionMode.cliFlags).joined(separator: " ")
-            } else if session.tool != .shell {
-                command = session.tool.command
+            let profile = profileForSession(session)
+            let toolCommand: String?
+            if profile.id == "shell" {
+                toolCommand = nil  // shell sessions use tmux's default shell
             } else {
-                command = nil
+                var parts = [profile.command]
+                parts.append(contentsOf: profile.arguments)
+                if session.tool == .claude {
+                    parts.append(contentsOf: session.permissionMode.cliFlags)
+                }
+                toolCommand = parts.joined(separator: " ")
             }
 
             do {
                 try await tmuxManager.createSession(
                     name: tmuxName,
                     workDir: session.path,
-                    command: command,
+                    command: toolCommand,
                     env: [
                         "RUNWAY_SESSION_ID": session.id,
                         "RUNWAY_TITLE": session.title,
@@ -886,7 +906,8 @@ public final class RunwayStore {
             let content = lines.joined(separator: "\n")
             guard !content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { continue }
 
-            if let detected = statusDetector.detect(content: content, tool: session.tool),
+            let profile = profileForSession(session)
+            if let detected = statusDetector.detect(content: content, profile: profile),
                 detected != session.status
             {
                 sessions[i].status = detected

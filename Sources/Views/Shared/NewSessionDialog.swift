@@ -26,7 +26,7 @@ public struct NewSessionDialog: View {
 
     // Normal session state
     @State private var title: String = ""
-    @State private var tool: Tool = .claude
+    @State private var selectedProfileID: String = "claude"
     @State private var useWorktree: Bool = true
     @State private var branchName: String = ""
     @State private var branchManuallyEdited: Bool = false
@@ -37,6 +37,7 @@ public struct NewSessionDialog: View {
     @State private var isCreatingReview: Bool = false
 
     let projects: [Project]
+    let profiles: [AgentProfile]
     let initialProjectID: String?
     let parentID: String?
     let templates: [SessionTemplate]
@@ -47,6 +48,7 @@ public struct NewSessionDialog: View {
 
     public init(
         projects: [Project],
+        profiles: [AgentProfile] = AgentProfile.builtIn,
         initialProjectID: String? = nil,
         parentID: String? = nil,
         templates: [SessionTemplate] = [],
@@ -54,6 +56,7 @@ public struct NewSessionDialog: View {
         onCreateReview: ((ReviewSessionRequest) async throws -> Void)? = nil
     ) {
         self.projects = projects
+        self.profiles = profiles
         self.initialProjectID = initialProjectID
         self.parentID = parentID
         self.templates = templates
@@ -64,6 +67,14 @@ public struct NewSessionDialog: View {
 
     private var projectsWithRepo: [Project] {
         projects.filter { $0.ghRepo != nil }
+    }
+
+    private var selectedTool: Tool {
+        switch selectedProfileID {
+        case "claude": return .claude
+        case "shell": return .shell
+        default: return .custom(selectedProfileID)
+        }
     }
 
     private var selectedProject: Project? {
@@ -181,21 +192,22 @@ public struct NewSessionDialog: View {
             .labelsHidden()
         }
 
-        // Tool picker
+        // Agent picker
         VStack(alignment: .leading, spacing: 4) {
-            Text("Tool")
+            Text("Agent")
                 .font(.caption)
                 .foregroundColor(theme.chrome.textDim)
-            Picker("Tool", selection: $tool) {
-                Text("Claude").tag(Tool.claude)
-                Text("Shell").tag(Tool.shell)
+            Picker("Agent", selection: $selectedProfileID) {
+                ForEach(profiles) { profile in
+                    Label(profile.name, systemImage: profile.icon).tag(profile.id)
+                }
             }
-            .pickerStyle(.segmented)
+            .pickerStyle(.menu)
             .labelsHidden()
         }
 
         // Permission mode (only for Claude sessions)
-        if tool == .claude {
+        if selectedTool == .claude {
             permissionPicker
         }
 
@@ -216,7 +228,7 @@ public struct NewSessionDialog: View {
         }
 
         // Initial prompt (only for Claude sessions)
-        if tool == .claude {
+        if selectedTool == .claude {
             promptEditor
         }
     }
@@ -417,11 +429,11 @@ public struct NewSessionDialog: View {
             projectID: selectedProjectID,
             parentID: parentID,
             path: path,
-            tool: tool,
+            tool: selectedTool,
             useWorktree: useWorktree,
             branchName: useWorktree ? branchName : nil,
-            permissionMode: tool == .claude ? permissionMode : .default,
-            initialPrompt: (tool == .claude && !initialPrompt.isEmpty) ? initialPrompt : nil
+            permissionMode: selectedTool == .claude ? permissionMode : .default,
+            initialPrompt: (selectedTool == .claude && !initialPrompt.isEmpty) ? initialPrompt : nil
         )
 
         onCreate(request)
