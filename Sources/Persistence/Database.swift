@@ -297,7 +297,7 @@ public final class Database: Sendable {
 
     public func saveEvent(_ event: SessionEvent) throws {
         try dbQueue.write { db in
-            let record = SessionEventRecord(event)
+            var record = SessionEventRecord(event)
             try record.insert(db)
 
             // Cap at 1000 events per session

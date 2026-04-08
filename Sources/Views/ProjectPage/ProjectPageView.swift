@@ -30,6 +30,7 @@ public struct ProjectPageView: View {
     var onEditIssue: ((GitHubIssue, String?, String?) -> Void)?
     var onUpdateIssueLabels: ((GitHubIssue, [String], [String]) -> Void)?
     var onUpdateIssueAssignees: ((GitHubIssue, [String], [String]) -> Void)?
+    var onStartSessionFromIssue: ((GitHubIssue) -> Void)?
     let onSelectPR: (PullRequest) -> Void
     let onRefreshPRs: () -> Void
     var selectedPRID: String?
@@ -70,6 +71,7 @@ public struct ProjectPageView: View {
         onEditIssue: ((GitHubIssue, String?, String?) -> Void)? = nil,
         onUpdateIssueLabels: ((GitHubIssue, [String], [String]) -> Void)? = nil,
         onUpdateIssueAssignees: ((GitHubIssue, [String], [String]) -> Void)? = nil,
+        onStartSessionFromIssue: ((GitHubIssue) -> Void)? = nil,
         onSelectPR: @escaping (PullRequest) -> Void,
         onRefreshPRs: @escaping () -> Void,
         selectedPRID: String? = nil,
@@ -104,6 +106,7 @@ public struct ProjectPageView: View {
         self.onEditIssue = onEditIssue
         self.onUpdateIssueLabels = onUpdateIssueLabels
         self.onUpdateIssueAssignees = onUpdateIssueAssignees
+        self.onStartSessionFromIssue = onStartSessionFromIssue
         self.onSelectPR = onSelectPR
         self.onRefreshPRs = onRefreshPRs
         self.selectedPRID = selectedPRID
@@ -209,7 +212,8 @@ public struct ProjectPageView: View {
                     onReopen: onReopenIssue,
                     onEdit: onEditIssue,
                     onUpdateLabels: onUpdateIssueLabels,
-                    onUpdateAssignees: onUpdateIssueAssignees
+                    onUpdateAssignees: onUpdateIssueAssignees,
+                    onStartSession: onStartSessionFromIssue
                 )
             case .prs:
                 ProjectPRsTab(

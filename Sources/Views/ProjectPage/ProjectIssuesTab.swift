@@ -30,6 +30,7 @@ public struct ProjectIssuesTab: View {
     var onEdit: ((GitHubIssue, String?, String?) -> Void)?
     var onUpdateLabels: ((GitHubIssue, [String], [String]) -> Void)?
     var onUpdateAssignees: ((GitHubIssue, [String], [String]) -> Void)?
+    var onStartSession: ((GitHubIssue) -> Void)?
 
     @AppStorage("issueListWidth") private var issueListWidth: Double = 320
     @Environment(\.theme) private var theme
@@ -53,7 +54,8 @@ public struct ProjectIssuesTab: View {
         onReopen: ((GitHubIssue) -> Void)? = nil,
         onEdit: ((GitHubIssue, String?, String?) -> Void)? = nil,
         onUpdateLabels: ((GitHubIssue, [String], [String]) -> Void)? = nil,
-        onUpdateAssignees: ((GitHubIssue, [String], [String]) -> Void)? = nil
+        onUpdateAssignees: ((GitHubIssue, [String], [String]) -> Void)? = nil,
+        onStartSession: ((GitHubIssue) -> Void)? = nil
     ) {
         self.issues = issues
         self.labels = labels
@@ -72,6 +74,7 @@ public struct ProjectIssuesTab: View {
         self.onEdit = onEdit
         self.onUpdateLabels = onUpdateLabels
         self.onUpdateAssignees = onUpdateAssignees
+        self.onStartSession = onStartSession
     }
 
     private var selectedIssue: GitHubIssue? {
@@ -146,7 +149,8 @@ public struct ProjectIssuesTab: View {
                         onReopen: { onReopen?(issue) },
                         onEdit: { title, body in onEdit?(issue, title, body) },
                         onUpdateLabels: { add, remove in onUpdateLabels?(issue, add, remove) },
-                        onUpdateAssignees: { add, remove in onUpdateAssignees?(issue, add, remove) }
+                        onUpdateAssignees: { add, remove in onUpdateAssignees?(issue, add, remove) },
+                        onStartSession: onStartSession
                     )
                 }
             } else {

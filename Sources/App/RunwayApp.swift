@@ -377,6 +377,9 @@ struct ContentView: View {
                     onUpdateIssueAssignees: { issue, add, remove in
                         Task { await store.updateIssueAssignees(issue, add: add, remove: remove) }
                     },
+                    onStartSessionFromIssue: { issue in
+                        Task { await store.startSessionFromIssue(issue, projectID: projectID) }
+                    },
                     onSelectPR: { pr in Task { await store.selectPR(pr, navigate: false) } },
                     onRefreshPRs: { Task { await store.refreshPRsIfStale() } },
                     selectedPRID: store.selectedPRID,

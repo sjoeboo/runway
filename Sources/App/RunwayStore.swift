@@ -292,6 +292,35 @@ public final class RunwayStore {
         }
     }
 
+    // MARK: - Issue-to-Session Dispatch
+
+    func startSessionFromIssue(_ issue: GitHubIssue, projectID: String) async {
+        guard let project = projects.first(where: { $0.id == projectID }) else { return }
+
+        let slug = issue.title.lowercased()
+            .replacing(/[^a-z0-9\-]/, with: "-")
+            .replacing(/--+/, with: "-")
+            .trimmingCharacters(in: CharacterSet(charactersIn: "-."))
+        let prefix = project.branchPrefix ?? "fix/"
+        let branchName = "\(prefix)\(issue.number)-\(String(slug.prefix(40)))"
+
+        let prompt = "Implement the changes described in issue #\(issue.number): \(issue.title)"
+
+        let request = NewSessionRequest(
+            title: issue.title,
+            projectID: projectID,
+            path: project.path,
+            tool: .claude,
+            useWorktree: true,
+            branchName: branchName,
+            permissionMode: project.permissionMode ?? .default,
+            initialPrompt: prompt,
+            issueNumber: issue.number
+        )
+
+        await handleNewSessionRequest(request)
+    }
+
     // MARK: - New Session Request (from dialog)
 
     func handleNewSessionRequest(_ request: NewSessionRequest) async {
@@ -313,6 +342,7 @@ public final class RunwayStore {
             tool: request.tool,
             status: .starting,
             worktreeBranch: needsWorktree ? request.branchName : nil,
+            issueNumber: request.issueNumber,
             parentID: request.parentID,
             permissionMode: resolvedMode
         )
@@ -696,6 +726,20 @@ public final class RunwayStore {
     private func handleHookEvent(_ event: HookEvent) {
         print("[Runway] Hook event: \(event.event.rawValue) for session \(event.sessionID)")
         lastHookEventTime[event.sessionID] = Date()
+
+        // Persist event to activity log
+        let sessionEvent = SessionEvent(
+            sessionID: event.sessionID,
+            eventType: event.event.rawValue,
+            prompt: event.prompt,
+            toolName: event.toolName,
+            message: event.message,
+            notificationType: event.notificationType
+        )
+        Task.detached { [database] in
+            try? database?.saveEvent(sessionEvent)
+        }
+
         switch event.event {
         case .sessionStart:
             updateSessionStatus(id: event.sessionID, status: .running)
@@ -711,6 +755,13 @@ public final class RunwayStore {
             break
         }
 
+        // Update sidebar activity text for UserPromptSubmit events
+        if event.event == .userPromptSubmit, let prompt = event.prompt {
+            if let idx = sessions.firstIndex(where: { $0.id == event.sessionID }) {
+                sessions[idx].lastActivityText = String(prompt.prefix(80))
+            }
+        }
+
         // Post system notification for high-value events
         if NotificationManager.shouldNotify(event: event.event.rawValue) {
             let title =
@@ -722,6 +773,10 @@ public final class RunwayStore {
                 event: event.event.rawValue
             )
         }
+    }
+
+    func loadEvents(forSessionID sessionID: String) -> [SessionEvent] {
+        (try? database?.events(forSessionID: sessionID, limit: 200)) ?? []
     }
 
     // MARK: - Buffer-based Status Detection
