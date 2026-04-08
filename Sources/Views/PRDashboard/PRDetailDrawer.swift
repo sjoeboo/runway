@@ -1,3 +1,4 @@
+import MarkdownRendering
 import Models
 import SwiftUI
 import Theme
@@ -431,9 +432,7 @@ public struct PRDetailDrawer: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 12) {
                 if let body = detail?.body, !body.isEmpty {
-                    renderMarkdown(body)
-                        .font(.body)
-                        .foregroundColor(theme.chrome.text)
+                    MarkdownView(source: body, theme: theme)
                         .textSelection(.enabled)
                 } else {
                     Text("No description provided")
@@ -730,9 +729,7 @@ public struct PRDetailDrawer: View {
                         .clipShape(RoundedRectangle(cornerRadius: 4))
                 }
                 if !review.body.isEmpty {
-                    renderMarkdown(review.body, inlineOnly: true)
-                        .font(.body)
-                        .foregroundColor(theme.chrome.text)
+                    MarkdownView(source: review.body, theme: theme, mode: .inline)
                 }
             }
             .padding(8)
@@ -762,9 +759,7 @@ public struct PRDetailDrawer: View {
                         .foregroundColor(theme.chrome.accent)
                 }
             }
-            renderMarkdown(comment.body, inlineOnly: true)
-                .font(.body)
-                .foregroundColor(theme.chrome.text)
+            MarkdownView(source: comment.body, theme: theme, mode: .inline)
                 .textSelection(.enabled)
         }
         .padding(8)
@@ -790,9 +785,8 @@ public struct PRDetailDrawer: View {
                     .font(.caption2)
                     .foregroundColor(theme.chrome.textDim)
             }
-            Text(comment.body)
+            MarkdownView(source: comment.body, theme: theme, mode: .inline)
                 .font(.caption)
-                .foregroundColor(theme.chrome.textDim)
                 .textSelection(.enabled)
 
             if let onSendToSession {
@@ -845,29 +839,6 @@ public struct PRDetailDrawer: View {
         }
     }
 
-    /// Render markdown as styled Text. Use `inlineOnly: true` for comments/reviews
-    /// (preserves whitespace), `false` for PR body (supports headings, lists).
-    private func renderMarkdown(_ source: String, inlineOnly: Bool = false) -> Text {
-        let syntax: AttributedString.MarkdownParsingOptions.InterpretedSyntax =
-            inlineOnly ? .inlineOnlyPreservingWhitespace : .full
-        if let attributed = try? AttributedString(
-            markdown: source, options: .init(interpretedSyntax: syntax)
-        ) {
-            return Text(attributed)
-        }
-        return Text(source)
-    }
-
-    private func stripHTML(_ html: String) -> String {
-        // Strip HTML tags for plain text display
-        html.replacingOccurrences(of: "<[^>]+>", with: "", options: .regularExpression)
-            .replacingOccurrences(of: "&amp;", with: "&")
-            .replacingOccurrences(of: "&lt;", with: "<")
-            .replacingOccurrences(of: "&gt;", with: ">")
-            .replacingOccurrences(of: "&quot;", with: "\"")
-            .replacingOccurrences(of: "&#39;", with: "'")
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-    }
 }
 
 // MARK: - Tab Enum
