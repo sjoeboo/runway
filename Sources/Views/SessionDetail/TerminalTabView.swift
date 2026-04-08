@@ -349,7 +349,9 @@ public struct TerminalTabView: View {
     private func splitDown() {
         guard let tab = selectedTab, let tmuxName = tab.config.tmuxSessionName else { return }
         Task {
-            try? await tmuxManager.splitWindow(sessionName: tmuxName, direction: .horizontal)
+            try? await tmuxManager.splitWindow(
+                sessionName: tmuxName, direction: .horizontal, workDir: session.path
+            )
         }
     }
 
@@ -357,7 +359,9 @@ public struct TerminalTabView: View {
     private func splitRight() {
         guard let tab = selectedTab, let tmuxName = tab.config.tmuxSessionName else { return }
         Task {
-            try? await tmuxManager.splitWindow(sessionName: tmuxName, direction: .vertical)
+            try? await tmuxManager.splitWindow(
+                sessionName: tmuxName, direction: .vertical, workDir: session.path
+            )
         }
     }
 

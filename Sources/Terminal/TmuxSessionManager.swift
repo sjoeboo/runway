@@ -140,10 +140,17 @@ public actor TmuxSessionManager {
     /// - Parameters:
     ///   - sessionName: The tmux session to split a pane in.
     ///   - direction: `.horizontal` splits top/bottom, `.vertical` splits left/right.
-    public func splitWindow(sessionName: String, direction: TmuxSplitDirection) async throws {
-        try await runTmux(args: [
-            "split-window", direction.flag, "-t", sessionName,
-        ])
+    ///   - workDir: Working directory for the new pane. Uses session default if nil.
+    public func splitWindow(
+        sessionName: String,
+        direction: TmuxSplitDirection,
+        workDir: String? = nil
+    ) async throws {
+        var args = ["split-window", direction.flag, "-t", sessionName]
+        if let workDir {
+            args += ["-c", workDir]
+        }
+        try await runTmux(args: args)
     }
 
     // MARK: - Private
