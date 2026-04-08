@@ -47,6 +47,9 @@ public struct ProjectPageView: View {
     let onUpdateProject: (Project) -> Void
     let onDetectRepo: () async -> (repo: String, host: String?)?
     let onFetchLabels: () -> Void
+    var templates: [SessionTemplate] = []
+    var onSaveTemplate: ((SessionTemplate) -> Void)?
+    var onDeleteTemplate: ((String) -> Void)?
 
     @Environment(\.theme) private var theme
     @State private var selectedTab: ProjectTab = .issues
@@ -87,7 +90,10 @@ public struct ProjectPageView: View {
         onDisableAutoMergePR: ((PullRequest) -> Void)? = nil,
         onUpdateProject: @escaping (Project) -> Void,
         onDetectRepo: @escaping () async -> (repo: String, host: String?)?,
-        onFetchLabels: @escaping () -> Void
+        onFetchLabels: @escaping () -> Void,
+        templates: [SessionTemplate] = [],
+        onSaveTemplate: ((SessionTemplate) -> Void)? = nil,
+        onDeleteTemplate: ((String) -> Void)? = nil
     ) {
         self.project = project
         self.issues = issues
@@ -123,6 +129,9 @@ public struct ProjectPageView: View {
         self.onUpdateProject = onUpdateProject
         self.onDetectRepo = onDetectRepo
         self.onFetchLabels = onFetchLabels
+        self.templates = templates
+        self.onSaveTemplate = onSaveTemplate
+        self.onDeleteTemplate = onDeleteTemplate
         self._editableProject = State(initialValue: project)
     }
 
@@ -238,7 +247,10 @@ public struct ProjectPageView: View {
             ProjectSettingsSheet(
                 project: $editableProject,
                 themes: AppTheme.builtIn,
+                templates: templates,
                 onSave: { updated in onUpdateProject(updated) },
+                onSaveTemplate: onSaveTemplate,
+                onDeleteTemplate: onDeleteTemplate,
                 onDetectRepo: onDetectRepo
             )
         }

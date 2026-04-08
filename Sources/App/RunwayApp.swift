@@ -396,7 +396,10 @@ struct ContentView: View {
                     onDisableAutoMergePR: { pr in Task { await store.disableAutoMerge(pr) } },
                     onUpdateProject: { store.updateProjectSettings($0) },
                     onDetectRepo: { await store.detectGHRepo(for: project) },
-                    onFetchLabels: { Task { await store.fetchLabels(forProject: projectID) } }
+                    onFetchLabels: { Task { await store.fetchLabels(forProject: projectID) } },
+                    templates: store.sessionTemplates.filter { $0.projectID == nil || $0.projectID == projectID },
+                    onSaveTemplate: { template in store.saveTemplate(template) },
+                    onDeleteTemplate: { id in store.deleteTemplate(id) }
                 )
             } else if let sessionID = store.selectedSessionID,
                 let session = store.sessions.first(where: { $0.id == sessionID })
