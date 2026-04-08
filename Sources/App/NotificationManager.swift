@@ -91,6 +91,21 @@ public final class NotificationManager: NSObject, UNUserNotificationCenterDelega
         }
     }
 
+    /// Removes delivered notifications for a specific session from the notification center.
+    func clearDeliveredNotifications(forSessionID sessionID: String) {
+        guard isBundled else { return }
+        let center = UNUserNotificationCenter.current()
+        center.getDeliveredNotifications { notifications in
+            let matching =
+                notifications
+                .filter { $0.request.content.userInfo["sessionID"] as? String == sessionID }
+                .map(\.request.identifier)
+            if !matching.isEmpty {
+                center.removeDeliveredNotifications(withIdentifiers: matching)
+            }
+        }
+    }
+
     // MARK: - UNUserNotificationCenterDelegate
 
     /// Show notifications even when the app is in the foreground.
