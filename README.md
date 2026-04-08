@@ -22,7 +22,7 @@
 | **🔍** | **Live status detection** | See at a glance whether each agent is running, waiting, idle, or errored |
 | **📋** | **GitHub PR dashboard** | Review, approve, merge, request changes, toggle automerge, and view CI checks — all without leaving the app |
 | **📌** | **GitHub Issues** | View, create, and manage issues per project |
-| **🔔** | **Notifications** | Native macOS notifications for permission requests and session completion |
+| **🔔** | **Notifications** | Native macOS notifications for permission requests and session completion, with enable/disable toggle in Settings |
 | **🎨** | **Theme system** | 6 built-in themes + user-installable custom themes from `~/.runway/themes/` |
 | **📂** | **Project organization** | Group sessions by project with per-project settings for theme, permissions, and branch prefix |
 | **⌨️** | **Keyboard-driven** | 15 shortcuts — `Cmd+K` search, `Cmd+N` new session, `Cmd+D` split pane, `Cmd+3` changes, and more |
@@ -124,6 +124,7 @@ Built-in PR management powered by `gh` CLI:
 - **Send to Session**: navigate to the linked session with the send bar open
 - **Inline comment grouping**: comments grouped by file with count badges and send-to-session action
 - **Conversation timeline**: reviews and comments interleaved chronologically with colored accents for review decisions
+- **GFM markdown rendering**: PR and issue descriptions render full GitHub Flavored Markdown — syntax highlighting, tables, task lists, and more
 
 ### GitHub Issues
 
@@ -131,7 +132,7 @@ Per-project issue management:
 
 - **Enable per project** in Project Settings (auto-detects repo via git remote)
 - **Issue list** with labels and status
-- **Issue detail view** — full-parity detail drawer matching the PR experience
+- **Issue detail view** — full-parity detail drawer matching the PR experience, with GFM markdown rendering
 - **Create issues** with title, body, and label selection
 - **Start Session** from an issue — creates a session linked to the issue with activity tracking
 - **Open in browser** for full GitHub UI when needed

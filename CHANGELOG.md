@@ -5,6 +5,23 @@ All notable changes to Runway are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.4.0] — 2026-04-08
+
+### Added
+
+- **GFM markdown rendering** — PR and issue detail views now render full GitHub Flavored Markdown with syntax highlighting, tables, task lists, and more ([#236](https://github.com/sjoeboo/runway/pull/236))
+- **Notification preferences** — Toggle notifications on or off from Settings ([#233](https://github.com/sjoeboo/runway/pull/233))
+
+### Fixed
+
+- **Notification crash** — Added proper `UNUserNotificationCenterDelegate` to prevent crash when interacting with notifications ([#234](https://github.com/sjoeboo/runway/pull/234))
+
+### Maintenance
+
+- Added Dependabot configuration for automated dependency updates ([#235](https://github.com/sjoeboo/runway/pull/235))
+
+[0.4.0]: https://github.com/sjoeboo/runway/compare/v0.3.0...v0.4.0
+
 ## [0.3.0] — 2026-04-07
 
 ### Added
