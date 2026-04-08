@@ -7,6 +7,14 @@ import UserNotifications
 public final class NotificationManager {
     private var authorized = false
 
+    /// User preference key — matches @AppStorage("notificationsEnabled") in SettingsView.
+    static let enabledKey = "notificationsEnabled"
+
+    /// Whether notifications are enabled. Defaults to true when unset.
+    var isEnabled: Bool {
+        UserDefaults.standard.object(forKey: Self.enabledKey) as? Bool ?? true
+    }
+
     /// UNUserNotificationCenter requires a valid .app bundle — crashes when
     /// running via `swift run` from the .build directory. Guard all access.
     private var isBundled: Bool {
@@ -38,7 +46,7 @@ public final class NotificationManager {
         sessionTitle: String,
         event: String
     ) {
-        guard authorized, isBundled else { return }
+        guard isEnabled, authorized, isBundled else { return }
 
         let content = UNMutableNotificationContent()
         content.userInfo = ["sessionID": sessionID]
@@ -68,8 +76,9 @@ public final class NotificationManager {
     }
 
     /// Updates the dock badge with the count of waiting sessions.
+    /// Clears the badge when notifications are disabled.
     func updateDockBadge(waitingCount: Int) {
-        if waitingCount > 0 {
+        if isEnabled, waitingCount > 0 {
             NSApp.dockTile.badgeLabel = "\(waitingCount)"
         } else {
             NSApp.dockTile.badgeLabel = nil
