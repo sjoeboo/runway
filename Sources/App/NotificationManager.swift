@@ -4,7 +4,7 @@ import UserNotifications
 
 /// Manages macOS system notifications for session state changes.
 @MainActor
-public final class NotificationManager {
+public final class NotificationManager: NSObject, UNUserNotificationCenterDelegate {
     private var authorized = false
 
     /// User preference key — matches @AppStorage("notificationsEnabled") in SettingsView.
@@ -15,6 +15,9 @@ public final class NotificationManager {
         UserDefaults.standard.object(forKey: Self.enabledKey) as? Bool ?? true
     }
 
+    /// Called when a notification is tapped — passes the sessionID back to the store.
+    var onNotificationTapped: ((String) -> Void)?
+
     /// UNUserNotificationCenter requires a valid .app bundle — crashes when
     /// running via `swift run` from the .build directory. Guard all access.
     private var isBundled: Bool {
@@ -23,6 +26,7 @@ public final class NotificationManager {
 
     func requestAuthorization() {
         guard isBundled else { return }
+        UNUserNotificationCenter.current().delegate = self
         Task {
             do {
                 authorized = try await UNUserNotificationCenter.current()
@@ -82,6 +86,28 @@ public final class NotificationManager {
             NSApp.dockTile.badgeLabel = "\(waitingCount)"
         } else {
             NSApp.dockTile.badgeLabel = nil
+        }
+    }
+
+    // MARK: - UNUserNotificationCenterDelegate
+
+    /// Show notifications even when the app is in the foreground.
+    nonisolated public func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
+        willPresent notification: UNNotification
+    ) async -> UNNotificationPresentationOptions {
+        [.banner, .sound]
+    }
+
+    /// Handle notification taps — navigate to the session.
+    nonisolated public func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
+        didReceive response: UNNotificationResponse
+    ) async {
+        let sessionID = response.notification.request.content.userInfo["sessionID"] as? String
+        guard let sessionID else { return }
+        await MainActor.run {
+            onNotificationTapped?(sessionID)
         }
     }
 }
