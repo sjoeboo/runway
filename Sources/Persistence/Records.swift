@@ -167,3 +167,48 @@ struct SessionEventRecord: Codable, FetchableRecord, MutablePersistableRecord {
         )
     }
 }
+
+// MARK: - Session Template Record
+
+struct SessionTemplateRecord: Codable, FetchableRecord, MutablePersistableRecord {
+    static let databaseTableName = "session_templates"
+
+    var id: String
+    var name: String
+    var projectID: String?
+    var tool: String
+    var useWorktree: Bool
+    var branchPrefix: String?
+    var permissionMode: String
+    var initialPromptTemplate: String
+    var sortOrder: Int
+    var createdAt: Date
+
+    init(_ template: SessionTemplate) {
+        self.id = template.id
+        self.name = template.name
+        self.projectID = template.projectID
+        self.tool = SessionRecord.encodeTool(template.tool)
+        self.useWorktree = template.useWorktree
+        self.branchPrefix = template.branchPrefix
+        self.permissionMode = template.permissionMode.rawValue
+        self.initialPromptTemplate = template.initialPromptTemplate
+        self.sortOrder = template.sortOrder
+        self.createdAt = template.createdAt
+    }
+
+    func toTemplate() -> SessionTemplate {
+        SessionTemplate(
+            id: id,
+            name: name,
+            projectID: projectID,
+            tool: SessionRecord.decodeTool(tool),
+            useWorktree: useWorktree,
+            branchPrefix: branchPrefix,
+            permissionMode: PermissionMode(rawValue: permissionMode) ?? .default,
+            initialPromptTemplate: initialPromptTemplate,
+            sortOrder: sortOrder,
+            createdAt: createdAt
+        )
+    }
+}

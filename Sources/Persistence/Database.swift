@@ -220,6 +220,21 @@ public final class Database: Sendable {
             )
         }
 
+        migrator.registerMigration("v13_session_templates") { db in
+            try db.create(table: "session_templates") { t in
+                t.column("id", .text).primaryKey()
+                t.column("name", .text).notNull()
+                t.column("projectID", .text)
+                t.column("tool", .text).notNull().defaults(to: "claude")
+                t.column("useWorktree", .boolean).notNull().defaults(to: true)
+                t.column("branchPrefix", .text)
+                t.column("permissionMode", .text).notNull().defaults(to: "default")
+                t.column("initialPromptTemplate", .text).notNull().defaults(to: "")
+                t.column("sortOrder", .integer).notNull().defaults(to: 0)
+                t.column("createdAt", .datetime).notNull()
+            }
+        }
+
         try migrator.migrate(dbQueue)
     }
 
@@ -466,6 +481,40 @@ public final class Database: Sendable {
         let cutoff = Date().addingTimeInterval(-maxAge)
         try dbQueue.write { db in
             try db.execute(sql: "DELETE FROM issue_cache WHERE fetchedAt < ?", arguments: [cutoff])
+        }
+    }
+
+    // MARK: - Session Template CRUD
+
+    public func allTemplates() throws -> [SessionTemplate] {
+        try dbQueue.read { db in
+            try SessionTemplateRecord
+                .order(Column("sortOrder"), Column("createdAt"))
+                .fetchAll(db)
+                .map { $0.toTemplate() }
+        }
+    }
+
+    public func templates(forProjectID projectID: String?) throws -> [SessionTemplate] {
+        try dbQueue.read { db in
+            try SessionTemplateRecord
+                .filter(Column("projectID") == projectID)
+                .order(Column("sortOrder"), Column("createdAt"))
+                .fetchAll(db)
+                .map { $0.toTemplate() }
+        }
+    }
+
+    public func saveTemplate(_ template: SessionTemplate) throws {
+        try dbQueue.write { db in
+            var record = SessionTemplateRecord(template)
+            try record.save(db)
+        }
+    }
+
+    public func deleteTemplate(id: String) throws {
+        try dbQueue.write { db in
+            _ = try SessionTemplateRecord.deleteOne(db, key: id)
         }
     }
 

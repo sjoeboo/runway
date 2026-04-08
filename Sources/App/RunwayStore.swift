@@ -18,6 +18,7 @@ public final class RunwayStore {
     var sessions: [Session] = []
     var projects: [Project] = []
     var pullRequests: [PullRequest] = []
+    var sessionTemplates: [SessionTemplate] = []
 
     var selectedSessionID: String?
     /// Incremented on every selection change to force SwiftUI re-render
@@ -158,6 +159,7 @@ public final class RunwayStore {
         do {
             projects = try db.allProjects()
             sessions = try db.allSessions()
+            sessionTemplates = (try? db.allTemplates()) ?? []
 
             // Auto-detect default branches only for projects that still have the placeholder "main".
             // Projects with an already-detected non-"main" branch skip the git subprocess call.
@@ -564,6 +566,32 @@ public final class RunwayStore {
                 }
             }
         }
+    }
+
+    // MARK: - Session Template Management
+
+    func saveTemplate(_ template: SessionTemplate) {
+        do {
+            try database?.saveTemplate(template)
+            sessionTemplates = (try? database?.allTemplates()) ?? []
+        } catch {
+            print("[Runway] Failed to save template: \(error)")
+        }
+    }
+
+    func deleteTemplate(_ id: String) {
+        do {
+            try database?.deleteTemplate(id: id)
+            sessionTemplates.removeAll { $0.id == id }
+        } catch {
+            print("[Runway] Failed to delete template: \(error)")
+        }
+    }
+
+    /// All templates available for a project: built-in + global + project-specific
+    func availableTemplates(forProjectID projectID: String?) -> [SessionTemplate] {
+        let custom = sessionTemplates.filter { $0.projectID == nil || $0.projectID == projectID }
+        return SessionTemplate.builtIn + custom
     }
 
     // MARK: - Project Management
