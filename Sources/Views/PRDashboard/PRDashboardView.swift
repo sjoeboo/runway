@@ -313,7 +313,7 @@ public struct PRDashboardView: View {
             selectedTab = tab
         }) {
             Text("\(tab.rawValue) (\(count))")
-                .font(.subheadline)
+                .font(.callout)
                 .fontWeight(selectedTab == tab ? .semibold : .regular)
                 .foregroundColor(selectedTab == tab ? theme.chrome.accent : theme.chrome.textDim)
                 .padding(.horizontal, 12)

@@ -26,7 +26,7 @@ struct ChangesSidebarView: View {
     private var header: some View {
         HStack {
             Text("Changes")
-                .font(.subheadline)
+                .font(.callout)
                 .fontWeight(.semibold)
                 .foregroundColor(theme.chrome.text)
 
@@ -37,7 +37,7 @@ struct ChangesSidebarView: View {
                 Text("Uncommitted").tag(ChangesMode.working)
             }
             .pickerStyle(.segmented)
-            .frame(width: 130)
+            .fixedSize()
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 8)
@@ -53,7 +53,7 @@ struct ChangesSidebarView: View {
             Text("-\(totalDeletions)")
                 .foregroundColor(theme.chrome.red)
         }
-        .font(.body)
+        .font(.callout)
         .foregroundColor(theme.chrome.textDim)
         .padding(.horizontal, 10)
         .padding(.vertical, 5)

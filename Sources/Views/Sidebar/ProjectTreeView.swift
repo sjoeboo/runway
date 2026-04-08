@@ -213,33 +213,47 @@ struct ProjectSection: View {
     }
 
     var body: some View {
-        Section(isExpanded: $isExpanded) {
-            ForEach(rootSessions) { session in
-                SessionRowView(
-                    session: session,
-                    linkedPR: sessionPRs[session.id],
-                    isProvisioningWorktree: provisioningWorktreeIDs.contains(session.id),
-                    actions: actions
-                )
-                .tag(session.id)
-
-                // Child sessions indented under parent
-                ForEach(children(of: session.id)) { child in
+        Section {
+            if isExpanded {
+                ForEach(rootSessions) { session in
                     SessionRowView(
-                        session: child,
-                        linkedPR: sessionPRs[child.id],
-                        isProvisioningWorktree: provisioningWorktreeIDs.contains(child.id),
+                        session: session,
+                        linkedPR: sessionPRs[session.id],
+                        isProvisioningWorktree: provisioningWorktreeIDs.contains(session.id),
                         actions: actions
                     )
-                    .padding(.leading, 20)
-                    .tag(child.id)
+                    .tag(session.id)
+
+                    // Child sessions indented under parent
+                    ForEach(children(of: session.id)) { child in
+                        SessionRowView(
+                            session: child,
+                            linkedPR: sessionPRs[child.id],
+                            isProvisioningWorktree: provisioningWorktreeIDs.contains(child.id),
+                            actions: actions
+                        )
+                        .padding(.leading, 20)
+                        .tag(child.id)
+                    }
                 }
-            }
-            .onMove { fromOffsets, toOffset in
-                actions.reorderSessions(in: project.id, fromOffsets: fromOffsets, toOffset: toOffset)
+                .onMove { fromOffsets, toOffset in
+                    actions.reorderSessions(in: project.id, fromOffsets: fromOffsets, toOffset: toOffset)
+                }
             }
         } header: {
             HStack(spacing: 4) {
+                Image(systemName: "chevron.right")
+                    .font(.caption)
+                    .foregroundColor(theme.chrome.textDim)
+                    .rotationEffect(.degrees(isExpanded ? 90 : 0))
+                    .animation(.easeInOut(duration: 0.15), value: isExpanded)
+                    .frame(width: 16)
+                    .onTapGesture {
+                        withAnimation(.easeInOut(duration: 0.15)) {
+                            isExpanded.toggle()
+                        }
+                    }
+
                 if isRenaming {
                     TextField("Project name", text: $editName)
                         .onSubmit {
@@ -249,11 +263,11 @@ struct ProjectSection: View {
                             isRenaming = false
                         }
                         .textFieldStyle(.plain)
-                        .font(.system(.subheadline, weight: .semibold))
+                        .font(.system(.callout, weight: .semibold))
                         .onAppear { editName = project.name }
                 } else {
                     Text(project.name)
-                        .font(.system(.subheadline, weight: .semibold))
+                        .font(.system(.callout, weight: .semibold))
                         .foregroundColor(theme.chrome.text)
                         .accessibilityLabel("Project: \(project.name)")
                         .accessibilityHint("Tap to open project settings")
