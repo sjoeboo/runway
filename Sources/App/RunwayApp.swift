@@ -234,6 +234,11 @@ struct ContentView: View {
         return "Runway"
     }
 
+    private var selectedSession: Session? {
+        guard let id = store.selectedSessionID else { return nil }
+        return store.sessions.first { $0.id == id }
+    }
+
     // MARK: - Status Toast
 
     private func statusToast(_ msg: StatusMessage) -> some View {
@@ -477,6 +482,75 @@ struct ContentView: View {
     private var toolbarContent: some ToolbarContent {
         ToolbarItem(placement: .navigation) {
             viewPicker
+        }
+
+        // New Session — always visible
+        ToolbarItem(placement: .primaryAction) {
+            Button {
+                store.newSessionProjectID = nil
+                store.showNewSessionDialog = true
+            } label: {
+                Label("New Session", systemImage: "plus.rectangle")
+            }
+            .help("New Session (⌘N)")
+        }
+
+        // Session-specific actions — only when a session is selected
+        if selectedSession != nil {
+            ToolbarItem(placement: .automatic) {
+                Button {
+                    store.toggleChangesSidebar()
+                } label: {
+                    Label(
+                        "Changes",
+                        systemImage: "doc.text.magnifyingglass"
+                    )
+                }
+                .help("Toggle changes sidebar (⌘3)")
+                .accessibilityLabel("Toggle changes sidebar")
+            }
+
+            ToolbarItemGroup(placement: .automatic) {
+                Button {
+                    store.splitHorizontalTrigger += 1
+                } label: {
+                    Label("Split Down", systemImage: "rectangle.split.1x2")
+                }
+                .help("Split pane down (⌘⇧D)")
+
+                Button {
+                    store.splitVerticalTrigger += 1
+                } label: {
+                    Label("Split Right", systemImage: "rectangle.split.2x1")
+                }
+                .help("Split pane right (⌘D)")
+            }
+        }
+
+        // Status counts — always visible when there are active sessions
+        ToolbarItem(placement: .automatic) {
+            toolbarSessionCounts
+        }
+    }
+
+    @ViewBuilder
+    private var toolbarSessionCounts: some View {
+        let running = store.sessions.filter { $0.status == .running }.count
+        let waiting = store.sessions.filter { $0.status == .waiting }.count
+        if running > 0 || waiting > 0 {
+            HStack(spacing: 6) {
+                if running > 0 {
+                    Label("\(running)", systemImage: "bolt.fill")
+                        .font(.caption)
+                        .foregroundStyle(.green)
+                }
+                if waiting > 0 {
+                    Label("\(waiting)", systemImage: "hand.raised.fill")
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                }
+            }
+            .help("\(running) running, \(waiting) waiting")
         }
     }
 }
