@@ -404,6 +404,7 @@ struct ContentView: View {
                     session: session,
                     tmuxManager: store.tmuxManager,
                     linkedPR: store.sessionPRs[sessionID],
+                    prDetail: store.prDetailForSession(sessionID),
                     onSelectPR: { pr in Task { await store.selectPR(pr) } },
                     showSendBar: Binding(
                         get: { store.showSendBar },
