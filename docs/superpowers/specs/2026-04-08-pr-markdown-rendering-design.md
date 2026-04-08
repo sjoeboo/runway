@@ -124,14 +124,14 @@ This automatically adapts when users switch Runway themes.
 
 ### Call Sites (6 total)
 
-| Location | File | Mode |
-|---|---|---|
-| PR body | `PRDetailDrawer.overviewTab` | `.full` |
-| Review body | `PRDetailDrawer.reviewCard` | `.inline` |
-| PR comment | `PRDetailDrawer.commentCard` | `.inline` |
-| Inline code comment | `PRDetailDrawer.inlineCommentCard` | `.inline` |
-| Issue body | `IssueDetailDrawer.overviewTab` | `.full` |
-| Issue comment | `IssueDetailDrawer.commentCard` | `.inline` |
+| Location | File | Current | Mode |
+|---|---|---|---|
+| PR body | `PRDetailDrawer.overviewTab` | `renderMarkdown(body)` | `.full` |
+| Review body | `PRDetailDrawer.reviewCard` | `renderMarkdown(review.body, inlineOnly: true)` | `.inline` |
+| PR comment | `PRDetailDrawer.commentCard` | `renderMarkdown(comment.body, inlineOnly: true)` | `.inline` |
+| Inline code comment | `PRDetailDrawer.inlineCommentCard` | `Text(comment.body)` (plain, upgrade) | `.inline` |
+| Issue body | `IssueDetailDrawer.overviewTab` | `renderMarkdown(body)` | `.full` |
+| Issue comment | `IssueDetailDrawer.commentCard` | `renderMarkdown(comment.body, inlineOnly: true)` | `.inline` |
 
 ### Migration
 
