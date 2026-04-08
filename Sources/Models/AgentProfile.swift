@@ -96,7 +96,7 @@ extension AgentProfile {
         icon: "sparkle"
     )
 
-    /// Shell — minimal detection, no hooks.
+    /// Shell — minimal detection via prompt suffix characters, no hooks.
     public static let shell = AgentProfile(
         id: "shell",
         name: "Shell",
@@ -104,8 +104,8 @@ extension AgentProfile {
         arguments: [],
         runningPatterns: [],
         waitingPatterns: [],
-        idlePatterns: [],
-        lineStartIdlePatterns: ["$ ", "% ", "# ", "❯ "],
+        idlePatterns: ["$", "%", "#", "❯"],
+        lineStartIdlePatterns: [],
         spinnerChars: [],
         hookEnabled: false,
         icon: "terminal"
@@ -122,7 +122,7 @@ extension AgentProfile {
         case .custom(let name):
             return AgentProfile(
                 id: name, name: name, command: name,
-                lineStartIdlePatterns: ["$ ", "% ", "# ", "❯ "],
+                idlePatterns: ["$", "%", "#", "❯"],
                 icon: "terminal.fill"
             )
         }
