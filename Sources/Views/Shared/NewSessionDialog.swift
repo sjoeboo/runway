@@ -5,6 +5,7 @@ import Theme
 /// The kind of session being created.
 private enum SessionKind: String, CaseIterable {
     case normal = "New Session"
+    case fromTemplate = "From Template"
     case prReview = "PR Review"
 }
 
@@ -38,19 +39,24 @@ public struct NewSessionDialog: View {
     let projects: [Project]
     let initialProjectID: String?
     let parentID: String?
+    let templates: [SessionTemplate]
     let onCreate: (NewSessionRequest) -> Void
     let onCreateReview: ((ReviewSessionRequest) async throws -> Void)?
+
+    @State private var selectedTemplateID: String?
 
     public init(
         projects: [Project],
         initialProjectID: String? = nil,
         parentID: String? = nil,
+        templates: [SessionTemplate] = [],
         onCreate: @escaping (NewSessionRequest) -> Void,
         onCreateReview: ((ReviewSessionRequest) async throws -> Void)? = nil
     ) {
         self.projects = projects
         self.initialProjectID = initialProjectID
         self.parentID = parentID
+        self.templates = templates
         self.onCreate = onCreate
         self.onCreateReview = onCreateReview
         self._selectedProjectID = State(initialValue: initialProjectID)
@@ -86,6 +92,8 @@ public struct NewSessionDialog: View {
                 switch sessionKind {
                 case .normal:
                     normalSessionFields
+                case .fromTemplate:
+                    templateSessionFields
                 case .prReview:
                     prReviewFields
                 }
@@ -110,15 +118,25 @@ public struct NewSessionDialog: View {
                         .foregroundColor(theme.chrome.textDim)
                 }
 
-                Button(sessionKind == .normal ? "Create" : "Create Review") {
-                    if sessionKind == .normal {
+                Button(sessionKind == .prReview ? "Create Review" : "Create") {
+                    switch sessionKind {
+                    case .normal:
                         createNormalSession()
-                    } else {
+                    case .fromTemplate:
+                        createFromTemplate()
+                    case .prReview:
                         createReviewSession()
                     }
                 }
                 .keyboardShortcut(.defaultAction)
-                .disabled(sessionKind == .normal ? title.isEmpty : !canCreateReview)
+                .disabled(
+                    {
+                        switch sessionKind {
+                        case .normal: title.isEmpty
+                        case .fromTemplate: title.isEmpty || selectedTemplateID == nil
+                        case .prReview: !canCreateReview
+                        }
+                    }())
             }
         }
         .padding(24)
@@ -200,6 +218,79 @@ public struct NewSessionDialog: View {
         // Initial prompt (only for Claude sessions)
         if tool == .claude {
             promptEditor
+        }
+    }
+
+    // MARK: - Template Session Fields
+
+    @ViewBuilder
+    private var templateSessionFields: some View {
+        // Template picker
+        if templates.isEmpty {
+            Text("No templates available. Create templates in project settings.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        } else {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Template")
+                    .font(.caption)
+                    .foregroundColor(theme.chrome.textDim)
+                Picker("Template", selection: $selectedTemplateID) {
+                    Text("Select a template...").tag(String?.none)
+                    ForEach(templates) { template in
+                        Text(template.name).tag(Optional(template.id))
+                    }
+                }
+                .labelsHidden()
+            }
+        }
+
+        // Title field
+        VStack(alignment: .leading, spacing: 4) {
+            Text("Session Name")
+                .font(.caption)
+                .foregroundColor(theme.chrome.textDim)
+            TextField("Session title", text: $title)
+                .textFieldStyle(.roundedBorder)
+                .focused($titleFocused)
+        }
+
+        // Show template details as read-only summary
+        if let template = templates.first(where: { $0.id == selectedTemplateID }) {
+            Group {
+                HStack(spacing: 8) {
+                    Text("Tool: \(template.tool.displayName)")
+                    Text("·")
+                    Text("Mode: \(template.permissionMode.displayName)")
+                    if template.useWorktree {
+                        Text("·")
+                        Text("Worktree")
+                    }
+                }
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+                if !template.initialPromptTemplate.isEmpty {
+                    Text("Prompt: \(template.initialPromptTemplate)")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(2)
+                }
+            }
+        }
+
+        // Project picker
+        VStack(alignment: .leading, spacing: 4) {
+            Text("Project")
+                .font(.caption)
+                .foregroundColor(theme.chrome.textDim)
+            Picker("Project", selection: $selectedProjectID) {
+                Text("None").tag(nil as String?)
+                ForEach(projects) { project in
+                    Text(project.name).tag(project.id as String?)
+                }
+            }
+            .labelsHidden()
         }
     }
 
@@ -333,6 +424,37 @@ public struct NewSessionDialog: View {
             initialPrompt: (tool == .claude && !initialPrompt.isEmpty) ? initialPrompt : nil
         )
 
+        onCreate(request)
+        dismiss()
+    }
+
+    private func createFromTemplate() {
+        guard let templateID = selectedTemplateID,
+            let template = templates.first(where: { $0.id == templateID }),
+            !title.isEmpty
+        else {
+            validationError = "Select a template and enter a title"
+            return
+        }
+
+        let resolvedPrompt = template.resolvedPrompt(title: title)
+        let project = projects.first(where: { $0.id == selectedProjectID })
+        let path = project?.path ?? FileManager.default.currentDirectoryPath
+        let branchName: String? =
+            template.useWorktree
+            ? autobranchName(from: title) : nil
+
+        let request = NewSessionRequest(
+            title: title,
+            projectID: selectedProjectID,
+            parentID: parentID,
+            path: path,
+            tool: template.tool,
+            useWorktree: template.useWorktree,
+            branchName: branchName,
+            permissionMode: template.permissionMode,
+            initialPrompt: resolvedPrompt.isEmpty ? nil : resolvedPrompt
+        )
         onCreate(request)
         dismiss()
     }

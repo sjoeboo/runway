@@ -145,6 +145,7 @@ struct ContentView: View {
                     projects: store.projects,
                     initialProjectID: store.newSessionProjectID,
                     parentID: store.newSessionParentID,
+                    templates: store.availableTemplates(forProjectID: store.newSessionProjectID),
                     onCreate: { request in
                         Task { await store.handleNewSessionRequest(request) }
                         store.newSessionProjectID = nil
