@@ -26,7 +26,7 @@ public actor WorktreeManager {
             (try? await runGit(in: repoPath, args: ["remote"])).map { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty } ?? false
 
         if hasRemote {
-            try? await runGit(in: repoPath, args: ["fetch", "origin", baseBranch])
+            _ = try? await runGit(in: repoPath, args: ["fetch", "origin", baseBranch])
             try await runGit(in: repoPath, args: ["worktree", "add", "-b", sanitized, worktreePath, "origin/\(baseBranch)"])
         } else {
             // No remote — branch from local base branch
@@ -54,7 +54,7 @@ public actor WorktreeManager {
         let worktreePath = "\(repoPath)/.worktrees/\(sanitized)"
 
         // Fetch the branch from origin (non-fatal if no remote)
-        try? await runGit(in: repoPath, args: ["fetch", "origin", branch])
+        _ = try? await runGit(in: repoPath, args: ["fetch", "origin", branch])
 
         // Try creating worktree tracking the remote branch
         do {
@@ -68,7 +68,7 @@ public actor WorktreeManager {
             if FileManager.default.fileExists(atPath: worktreePath) {
                 try? FileManager.default.removeItem(atPath: worktreePath)
                 // Prune stale worktree references
-                try? await runGit(in: repoPath, args: ["worktree", "prune"])
+                _ = try? await runGit(in: repoPath, args: ["worktree", "prune"])
             }
             // Fallback: local branch already exists — reuse it
             try await runGit(
@@ -113,7 +113,7 @@ public actor WorktreeManager {
         if deleteBranch {
             // Extract branch name from worktree path
             let branchName = URL(fileURLWithPath: worktreePath).lastPathComponent
-            try? await runGit(in: repoPath, args: ["branch", "-D", branchName])
+            _ = try? await runGit(in: repoPath, args: ["branch", "-D", branchName])
         }
     }
 
