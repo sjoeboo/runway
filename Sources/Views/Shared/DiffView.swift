@@ -12,12 +12,7 @@ public struct DiffView: View {
 
     public init(files: [DiffFile]) {
         self.files = files
-        // Auto-expand if single file
-        self._expandedFiles = State(
-            initialValue: files.count == 1
-                ? Set(files.map(\.path))
-                : Set()
-        )
+        self._expandedFiles = State(initialValue: Set())
     }
 
     /// Initialize from a raw unified diff string.
@@ -54,40 +49,33 @@ public struct DiffView: View {
         .background(theme.chrome.surface)
     }
 
+    private var singleFile: Bool { files.count == 1 }
+
     private func fileSection(_ file: DiffFile) -> some View {
-        VStack(alignment: .leading, spacing: 0) {
-            // File header (clickable to expand/collapse)
-            Button(action: { toggleFile(file.path) }) {
-                HStack(spacing: 6) {
-                    Image(
-                        systemName: expandedFiles.contains(file.path)
-                            ? "chevron.down" : "chevron.right"
-                    )
-                    .font(.caption2)
-                    .foregroundColor(theme.chrome.textDim)
+        let isExpanded = singleFile || expandedFiles.contains(file.path)
 
-                    Text(file.path)
-                        .font(.custom(fontFamily, size: fontSize - 1))
-                        .foregroundColor(theme.chrome.text)
+        return VStack(alignment: .leading, spacing: 0) {
+            // File header — static when single file, toggleable when multiple
+            if singleFile {
+                fileHeader(file)
+            } else {
+                Button(action: { toggleFile(file.path) }) {
+                    HStack(spacing: 6) {
+                        Image(
+                            systemName: isExpanded
+                                ? "chevron.down" : "chevron.right"
+                        )
+                        .font(.caption2)
+                        .foregroundColor(theme.chrome.textDim)
 
-                    Spacer()
-
-                    HStack(spacing: 4) {
-                        Text("+\(file.additions)")
-                            .foregroundColor(theme.chrome.green)
-                        Text("-\(file.deletions)")
-                            .foregroundColor(theme.chrome.red)
+                        fileHeader(file)
                     }
-                    .font(.custom(fontFamily, size: fontSize - 2))
                 }
-                .padding(.horizontal, 8)
-                .padding(.vertical, 6)
-                .background(theme.chrome.surface.opacity(0.7))
+                .buttonStyle(.plain)
             }
-            .buttonStyle(.plain)
 
-            // Diff content (when expanded)
-            if expandedFiles.contains(file.path) {
+            // Diff content
+            if isExpanded {
                 VStack(alignment: .leading, spacing: 0) {
                     ForEach(file.lines) { line in
                         diffLine(line)
@@ -97,6 +85,27 @@ public struct DiffView: View {
 
             Divider()
         }
+    }
+
+    private func fileHeader(_ file: DiffFile) -> some View {
+        HStack(spacing: 6) {
+            Text(file.path)
+                .font(.custom(fontFamily, size: fontSize - 1))
+                .foregroundColor(theme.chrome.text)
+
+            Spacer()
+
+            HStack(spacing: 4) {
+                Text("+\(file.additions)")
+                    .foregroundColor(theme.chrome.green)
+                Text("-\(file.deletions)")
+                    .foregroundColor(theme.chrome.red)
+            }
+            .font(.custom(fontFamily, size: fontSize - 2))
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 6)
+        .background(theme.chrome.surface.opacity(0.7))
     }
 
     private func diffLine(_ line: DiffLine) -> some View {

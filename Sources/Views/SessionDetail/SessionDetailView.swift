@@ -117,6 +117,7 @@ public struct SessionDetailView: View {
                 .background(theme.chrome.surface.opacity(0.3))
 
                 DiffView(patch: diffPatch)
+                    .id(viewingDiffFile?.path ?? "diff")
             }
         } else {
             TerminalTabView(
