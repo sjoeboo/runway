@@ -13,6 +13,8 @@ let package = Package(
         .package(url: "https://github.com/groue/GRDB.swift.git", from: "7.10.0"),
         .package(url: "https://github.com/migueldeicaza/SwiftTerm.git", revision: "b6ce28a"),
         .package(url: "https://github.com/sparkle-project/Sparkle", from: "2.9.1"),
+        .package(url: "https://github.com/swiftlang/swift-markdown.git", from: "0.4.0"),
+        .package(url: "https://github.com/appstefan/highlightswift.git", from: "1.1.0"),
     ],
     targets: [
         // MARK: - App Entry Point
@@ -97,6 +99,17 @@ let package = Package(
             path: "Sources/Theme"
         ),
 
+        // MARK: - Markdown Rendering
+        .target(
+            name: "MarkdownRendering",
+            dependencies: [
+                "Theme",
+                .product(name: "Markdown", package: "swift-markdown"),
+                .product(name: "HighlightSwift", package: "highlightswift"),
+            ],
+            path: "Sources/MarkdownRendering"
+        ),
+
         // MARK: - SwiftUI Views
         .target(
             name: "Views",
@@ -109,6 +122,7 @@ let package = Package(
                 "GitHubOperations",
                 "StatusDetection",
                 "Theme",
+                "MarkdownRendering",
                 .product(name: "Sparkle", package: "Sparkle"),
             ],
             path: "Sources/Views"
@@ -159,6 +173,15 @@ let package = Package(
             name: "AppTests",
             dependencies: ["App"],
             path: "Tests/AppTests"
+        ),
+        .testTarget(
+            name: "MarkdownRenderingTests",
+            dependencies: [
+                "MarkdownRendering",
+                "Theme",
+                .product(name: "Markdown", package: "swift-markdown"),
+            ],
+            path: "Tests/MarkdownRenderingTests"
         ),
     ]
 )
