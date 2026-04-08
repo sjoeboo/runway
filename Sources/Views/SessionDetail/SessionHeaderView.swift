@@ -33,7 +33,7 @@ public struct SessionHeaderView: View {
                     HStack(spacing: 6) {
                         statusDot
                         Text(session.title)
-                            .font(.subheadline)
+                            .font(.callout)
                             .fontWeight(.semibold)
                             .foregroundStyle(.primary)
                         Text(session.status.rawValue.capitalized)
