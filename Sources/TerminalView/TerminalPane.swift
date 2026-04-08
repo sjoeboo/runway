@@ -37,9 +37,6 @@ public struct TerminalPane: NSViewRepresentable {
             createTerminal()
         }
 
-        // Ensure scrollback is always upgraded, even for cached sessions
-        terminal.changeScrollback(10_000)
-
         container.embed(terminal)
         context.coordinator.terminal = terminal
 
@@ -272,17 +269,15 @@ class MouseSelectionMonitor {
 /// Also registers for file drag-drop so users can drag files into the terminal.
 class TerminalContainerView: NSView {
     private var terminalRef: LocalProcessTerminalView?
-    private var hasSentInitialResize = false
-
     override func layout() {
         super.layout()
-        // After the first layout pass, the container has a real size from Auto Layout.
-        // Force SwiftTerm to re-measure and send SIGWINCH to the PTY so tmux/shell
-        // knows the correct terminal dimensions (fixes vertical input rendering).
-        if !hasSentInitialResize, let terminal = terminalRef,
-            bounds.width > 0, bounds.height > 0
+        // Resize the terminal to match the container's real Auto Layout bounds.
+        // Only send SIGWINCH (via needsLayout) when the frame actually changes —
+        // re-embedding a cached terminal at the same size should be free.
+        if let terminal = terminalRef,
+            bounds.width > 0, bounds.height > 0,
+            terminal.frame.size != bounds.size
         {
-            hasSentInitialResize = true
             terminal.frame = bounds
             terminal.needsLayout = true
         }
