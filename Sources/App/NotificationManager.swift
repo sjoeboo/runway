@@ -7,7 +7,14 @@ import UserNotifications
 public final class NotificationManager {
     private var authorized = false
 
+    /// UNUserNotificationCenter requires a valid .app bundle — crashes when
+    /// running via `swift run` from the .build directory. Guard all access.
+    private var isBundled: Bool {
+        Bundle.main.bundleIdentifier != nil
+    }
+
     func requestAuthorization() {
+        guard isBundled else { return }
         Task {
             do {
                 authorized = try await UNUserNotificationCenter.current()
@@ -31,7 +38,7 @@ public final class NotificationManager {
         sessionTitle: String,
         event: String
     ) {
-        guard authorized else { return }
+        guard authorized, isBundled else { return }
 
         let content = UNMutableNotificationContent()
         content.userInfo = ["sessionID": sessionID]
