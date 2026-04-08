@@ -180,6 +180,7 @@ let package = Package(
                 "MarkdownRendering",
                 "Theme",
                 .product(name: "Markdown", package: "swift-markdown"),
+                .product(name: "HighlightSwift", package: "highlightswift"),
             ],
             path: "Tests/MarkdownRenderingTests"
         ),
