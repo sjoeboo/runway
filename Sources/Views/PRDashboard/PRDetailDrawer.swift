@@ -630,6 +630,35 @@ public struct PRDetailDrawer: View {
     private var conversationTab: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 12) {
+                let inlineComments = detail?.comments.filter { $0.path != nil } ?? []
+
+                // Inline comments grouped by file
+                if !inlineComments.isEmpty {
+                    Text("Inline Comments")
+                        .font(.caption)
+                        .fontWeight(.semibold)
+                        .foregroundColor(theme.chrome.textDim)
+                        .padding(.horizontal, 16)
+                        .padding(.top, 12)
+                        .padding(.bottom, 4)
+
+                    let grouped = Dictionary(grouping: inlineComments, by: { $0.path ?? "" })
+                    ForEach(grouped.keys.sorted(), id: \.self) { path in
+                        Text(path)
+                            .font(.caption)
+                            .fontWeight(.medium)
+                            .foregroundColor(theme.chrome.accent)
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 4)
+
+                        ForEach(grouped[path] ?? []) { comment in
+                            inlineCommentCard(comment)
+                        }
+                    }
+
+                    Divider().padding(.vertical, 8)
+                }
+
                 // Interleave reviews and comments by date
                 let items: [TimelineItem] = {
                     var all: [TimelineItem] = []
@@ -742,6 +771,46 @@ public struct PRDetailDrawer: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(theme.chrome.surface)
         .clipShape(RoundedRectangle(cornerRadius: 6))
+    }
+
+    @ViewBuilder
+    private func inlineCommentCard(_ comment: PRComment) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack {
+                Text(comment.author)
+                    .font(.caption)
+                    .fontWeight(.semibold)
+                if let line = comment.line {
+                    Text("line \(line)")
+                        .font(.caption2)
+                        .foregroundColor(theme.chrome.textDim)
+                }
+                Spacer()
+                Text(comment.createdAt, style: .relative)
+                    .font(.caption2)
+                    .foregroundColor(theme.chrome.textDim)
+            }
+            Text(comment.body)
+                .font(.caption)
+                .foregroundColor(theme.chrome.textDim)
+                .textSelection(.enabled)
+
+            if let onSendToSession {
+                Button {
+                    let path = comment.path ?? ""
+                    let lineInfo = comment.line.map { " line \($0)" } ?? ""
+                    let context = "Address the review comment on \(path)\(lineInfo):\n\n\(comment.body)"
+                    onSendToSession(context)
+                } label: {
+                    Label("Send to Session", systemImage: "paperplane")
+                        .font(.caption2)
+                }
+                .buttonStyle(.plain)
+                .foregroundColor(theme.chrome.accent)
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 6)
     }
 
     private func reviewColor(_ state: String) -> SwiftUI.Color {

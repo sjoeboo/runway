@@ -16,6 +16,7 @@ public struct IssueDetailDrawer: View {
     let onEdit: (String?, String?) -> Void
     let onUpdateLabels: ([String], [String]) -> Void
     let onUpdateAssignees: ([String], [String]) -> Void
+    let onStartSession: ((GitHubIssue) -> Void)?
 
     @State private var selectedTab: IssueDetailTab = .overview
     @State private var inlineCommentText: String = ""
@@ -42,7 +43,8 @@ public struct IssueDetailDrawer: View {
         onReopen: @escaping () -> Void = {},
         onEdit: @escaping (String?, String?) -> Void = { _, _ in },
         onUpdateLabels: @escaping ([String], [String]) -> Void = { _, _ in },
-        onUpdateAssignees: @escaping ([String], [String]) -> Void = { _, _ in }
+        onUpdateAssignees: @escaping ([String], [String]) -> Void = { _, _ in },
+        onStartSession: ((GitHubIssue) -> Void)? = nil
     ) {
         self.issue = issue
         self.detail = detail
@@ -55,6 +57,7 @@ public struct IssueDetailDrawer: View {
         self.onEdit = onEdit
         self.onUpdateLabels = onUpdateLabels
         self.onUpdateAssignees = onUpdateAssignees
+        self.onStartSession = onStartSession
     }
 
     public var body: some View {
@@ -150,6 +153,16 @@ public struct IssueDetailDrawer: View {
 
             // Action bar
             HStack(spacing: 8) {
+                if let onStartSession {
+                    Button {
+                        onStartSession(issue)
+                    } label: {
+                        Label("Start Session", systemImage: "terminal")
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.small)
+                }
+
                 if issue.state == .open {
                     Menu {
                         Button("Completed") { onCloseIssue(.completed) }

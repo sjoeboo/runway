@@ -20,11 +20,12 @@ public final class ThemeManager {
     }
 
     public init(defaultTheme: AppTheme = .tokyoNightStorm) {
-        self.allThemes = AppTheme.builtIn
+        let themes = AppTheme.builtIn + Self.loadUserThemes()
+        self.allThemes = themes
 
         // Restore persisted theme selection
         if let savedID = UserDefaults.standard.string(forKey: "runway.selectedThemeID"),
-            let saved = AppTheme.builtIn.first(where: { $0.id == savedID })
+            let saved = themes.first(where: { $0.id == savedID })
         {
             self.currentTheme = saved
             self.selectedThemeID = savedID
@@ -82,6 +83,40 @@ public final class ThemeManager {
     /// Light themes only.
     public var lightThemes: [AppTheme] {
         allThemes.filter { $0.appearance == .light }
+    }
+
+    private static func loadUserThemes() -> [AppTheme] {
+        let themesDir = FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent(".runway/themes")
+
+        // Create directory if it doesn't exist
+        try? FileManager.default.createDirectory(at: themesDir, withIntermediateDirectories: true)
+
+        guard
+            let files = try? FileManager.default.contentsOfDirectory(
+                at: themesDir, includingPropertiesForKeys: nil)
+        else { return [] }
+
+        return
+            files
+            .filter { $0.pathExtension == "json" }
+            .compactMap { url -> AppTheme? in
+                guard let data = try? Data(contentsOf: url) else { return nil }
+                guard let themeFile = try? JSONDecoder().decode(ThemeFile.self, from: data)
+                else { return nil }
+                let id = "user-\(url.deletingPathExtension().lastPathComponent)"
+                return themeFile.toAppTheme(id: id)
+            }
+    }
+
+    /// Reloads user themes from ~/.runway/themes/
+    public func reloadUserThemes() {
+        let savedID = selectedThemeID
+        allThemes = AppTheme.builtIn + Self.loadUserThemes()
+        // Re-resolve current theme in case it was a user theme that changed
+        if let theme = allThemes.first(where: { $0.id == savedID }) {
+            currentTheme = theme
+        }
     }
 }
 

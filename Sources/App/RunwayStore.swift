@@ -18,6 +18,8 @@ public final class RunwayStore {
     var sessions: [Session] = []
     var projects: [Project] = []
     var pullRequests: [PullRequest] = []
+    var sessionTemplates: [SessionTemplate] = []
+    var agentProfiles: [AgentProfile] = []
 
     var selectedSessionID: String?
     /// Incremented on every selection change to force SwiftUI re-render
@@ -64,6 +66,24 @@ public final class RunwayStore {
         Set(sessionPRs.values.map(\.id))
     }
 
+    /// Returns PRDetail for the selected session's linked PR, if available.
+    /// Fetches the detail asynchronously if not yet loaded.
+    func prDetailForSession(_ sessionID: String) -> PRDetail? {
+        guard let pr = sessionPRs[sessionID] else { return nil }
+        // prDetail is loaded when a PR is selected; return it if it matches
+        if selectedPRID == pr.id { return prDetail }
+        return nil
+    }
+
+    func profileForSession(_ session: Session) -> AgentProfile {
+        if case .custom(let name) = session.tool,
+            let profile = agentProfiles.first(where: { $0.id == name })
+        {
+            return profile
+        }
+        return AgentProfile.defaultProfile(for: session.tool)
+    }
+
     // MARK: - Changes Sidebar
     var changesVisible: Bool = false
     var changesMode: ChangesMode = .branch
@@ -91,6 +111,7 @@ public final class RunwayStore {
     let hookInjector: HookInjector
     let tmuxManager: TmuxSessionManager
     let issueManager: IssueManager
+    let notificationManager: NotificationManager
 
     // MARK: - Init
 
@@ -103,6 +124,7 @@ public final class RunwayStore {
         self.hookInjector = HookInjector()
         self.tmuxManager = TmuxSessionManager()
         self.issueManager = IssueManager()
+        self.notificationManager = NotificationManager()
 
         // Open database — surface failure to user since silent nil means all writes are lost
         do {
@@ -127,6 +149,7 @@ public final class RunwayStore {
             lastPRFingerprint = await prManager.prFingerprint(filter: .mine)
             startPRPoll()
             startSessionPRPoll()
+            notificationManager.requestAuthorization()
         }
 
         // Start hook server + inject Claude hooks (sequenced — inject needs the port)
@@ -146,6 +169,8 @@ public final class RunwayStore {
         do {
             projects = try db.allProjects()
             sessions = try db.allSessions()
+            sessionTemplates = (try? db.allTemplates()) ?? []
+            agentProfiles = AgentProfile.builtIn + AgentProfile.loadUserProfiles()
 
             // Auto-detect default branches only for projects that still have the placeholder "main".
             // Projects with an already-detected non-"main" branch skip the git subprocess call.
@@ -289,6 +314,35 @@ public final class RunwayStore {
         }
     }
 
+    // MARK: - Issue-to-Session Dispatch
+
+    func startSessionFromIssue(_ issue: GitHubIssue, projectID: String) async {
+        guard let project = projects.first(where: { $0.id == projectID }) else { return }
+
+        let slug = issue.title.lowercased()
+            .replacing(/[^a-z0-9\-]/, with: "-")
+            .replacing(/--+/, with: "-")
+            .trimmingCharacters(in: CharacterSet(charactersIn: "-."))
+        let prefix = project.branchPrefix ?? "fix/"
+        let branchName = "\(prefix)\(issue.number)-\(String(slug.prefix(40)))"
+
+        let prompt = "Implement the changes described in issue #\(issue.number): \(issue.title)"
+
+        let request = NewSessionRequest(
+            title: issue.title,
+            projectID: projectID,
+            path: project.path,
+            tool: .claude,
+            useWorktree: true,
+            branchName: branchName,
+            permissionMode: project.permissionMode ?? .default,
+            initialPrompt: prompt,
+            issueNumber: issue.number
+        )
+
+        await handleNewSessionRequest(request)
+    }
+
     // MARK: - New Session Request (from dialog)
 
     func handleNewSessionRequest(_ request: NewSessionRequest) async {
@@ -310,6 +364,7 @@ public final class RunwayStore {
             tool: request.tool,
             status: .starting,
             worktreeBranch: needsWorktree ? request.branchName : nil,
+            issueNumber: request.issueNumber,
             parentID: request.parentID,
             permissionMode: resolvedMode
         )
@@ -372,20 +427,25 @@ public final class RunwayStore {
         }
 
         let tmuxName = "runway-\(session.id)"
-        let command: String?
-        if session.tool == .claude {
-            command = ([session.tool.command] + session.permissionMode.cliFlags).joined(separator: " ")
-        } else if session.tool != .shell {
-            command = session.tool.command
+        let profile = profileForSession(session)
+        let toolCommand: String?
+        if profile.id == "shell" {
+            toolCommand = nil  // shell sessions use tmux's default shell
         } else {
-            command = nil
+            var parts = [profile.command]
+            parts.append(contentsOf: profile.arguments)
+            // For Claude, add permission mode flags
+            if session.tool == .claude {
+                parts.append(contentsOf: session.permissionMode.cliFlags)
+            }
+            toolCommand = parts.joined(separator: " ")
         }
 
         do {
             try await tmuxManager.createSession(
                 name: tmuxName,
                 workDir: path,
-                command: command,
+                command: toolCommand,
                 env: [
                     "RUNWAY_SESSION_ID": session.id,
                     "RUNWAY_TITLE": session.title,
@@ -415,6 +475,8 @@ public final class RunwayStore {
         } catch {
             print("[Runway] Failed to update session status: \(error)")
         }
+        let waitingCount = sessions.filter { $0.status == .waiting }.count
+        notificationManager.updateDockBadge(waitingCount: waitingCount)
     }
 
     public func restartSession(id: String) async {
@@ -436,20 +498,24 @@ public final class RunwayStore {
 
         // Recreate tmux session
         if tmuxAvailable {
-            let command: String?
-            if session.tool == .claude {
-                command = ([session.tool.command] + session.permissionMode.cliFlags).joined(separator: " ")
-            } else if session.tool != .shell {
-                command = session.tool.command
+            let profile = profileForSession(session)
+            let toolCommand: String?
+            if profile.id == "shell" {
+                toolCommand = nil  // shell sessions use tmux's default shell
             } else {
-                command = nil
+                var parts = [profile.command]
+                parts.append(contentsOf: profile.arguments)
+                if session.tool == .claude {
+                    parts.append(contentsOf: session.permissionMode.cliFlags)
+                }
+                toolCommand = parts.joined(separator: " ")
             }
 
             do {
                 try await tmuxManager.createSession(
                     name: tmuxName,
                     workDir: session.path,
-                    command: command,
+                    command: toolCommand,
                     env: [
                         "RUNWAY_SESSION_ID": session.id,
                         "RUNWAY_TITLE": session.title,
@@ -522,6 +588,32 @@ public final class RunwayStore {
         }
     }
 
+    // MARK: - Session Template Management
+
+    func saveTemplate(_ template: SessionTemplate) {
+        do {
+            try database?.saveTemplate(template)
+            sessionTemplates = (try? database?.allTemplates()) ?? []
+        } catch {
+            print("[Runway] Failed to save template: \(error)")
+        }
+    }
+
+    func deleteTemplate(_ id: String) {
+        do {
+            try database?.deleteTemplate(id: id)
+            sessionTemplates.removeAll { $0.id == id }
+        } catch {
+            print("[Runway] Failed to delete template: \(error)")
+        }
+    }
+
+    /// All templates available for a project: built-in + global + project-specific
+    func availableTemplates(forProjectID projectID: String?) -> [SessionTemplate] {
+        let custom = sessionTemplates.filter { $0.projectID == nil || $0.projectID == projectID }
+        return SessionTemplate.builtIn + custom
+    }
+
     // MARK: - Project Management
 
     func createProject(name: String, path: String, defaultBranch: String = "main") {
@@ -575,6 +667,30 @@ public final class RunwayStore {
         selectedProjectID = nil
         if currentView == .prs {
             currentView = .sessions
+        }
+    }
+
+    /// Handles a runway:// deep link URL.
+    func handleDeepLink(_ url: URL) {
+        guard let destination = DeepLinkRouter.parse(url) else {
+            print("[Runway] Unrecognized deep link: \(url)")
+            return
+        }
+
+        switch destination {
+        case .session(let id):
+            selectSession(id)
+            NSApplication.shared.activate()
+
+        case .pr(let number, let repo):
+            if let pr = pullRequests.first(where: { $0.number == number && $0.repo == repo }) {
+                Task { await selectPR(pr) }
+            }
+            NSApplication.shared.activate()
+
+        case .newSession:
+            showNewSessionDialog = true
+            NSApplication.shared.activate()
         }
     }
 
@@ -691,6 +807,20 @@ public final class RunwayStore {
     private func handleHookEvent(_ event: HookEvent) {
         print("[Runway] Hook event: \(event.event.rawValue) for session \(event.sessionID)")
         lastHookEventTime[event.sessionID] = Date()
+
+        // Persist event to activity log
+        let sessionEvent = SessionEvent(
+            sessionID: event.sessionID,
+            eventType: event.event.rawValue,
+            prompt: event.prompt,
+            toolName: event.toolName,
+            message: event.message,
+            notificationType: event.notificationType
+        )
+        Task.detached { [database] in
+            try? database?.saveEvent(sessionEvent)
+        }
+
         switch event.event {
         case .sessionStart:
             updateSessionStatus(id: event.sessionID, status: .running)
@@ -705,6 +835,29 @@ public final class RunwayStore {
         case .notification:
             break
         }
+
+        // Update sidebar activity text for UserPromptSubmit events
+        if event.event == .userPromptSubmit, let prompt = event.prompt {
+            if let idx = sessions.firstIndex(where: { $0.id == event.sessionID }) {
+                sessions[idx].lastActivityText = String(prompt.prefix(80))
+            }
+        }
+
+        // Post system notification for high-value events
+        if NotificationManager.shouldNotify(event: event.event.rawValue) {
+            let title =
+                sessions.first(where: { $0.id == event.sessionID })?.title
+                ?? "Session"
+            notificationManager.postSessionNotification(
+                sessionID: event.sessionID,
+                sessionTitle: title,
+                event: event.event.rawValue
+            )
+        }
+    }
+
+    func loadEvents(forSessionID sessionID: String) -> [SessionEvent] {
+        (try? database?.events(forSessionID: sessionID, limit: 200)) ?? []
     }
 
     // MARK: - Buffer-based Status Detection
@@ -753,7 +906,8 @@ public final class RunwayStore {
             let content = lines.joined(separator: "\n")
             guard !content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { continue }
 
-            if let detected = statusDetector.detect(content: content, tool: session.tool),
+            let profile = profileForSession(session)
+            if let detected = statusDetector.detect(content: content, profile: profile),
                 detected != session.status
             {
                 sessions[i].status = detected

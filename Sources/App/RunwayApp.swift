@@ -38,6 +38,9 @@ struct RunwayApp: App {
                 .environment(store.themeManager)
                 .theme(store.themeManager.currentTheme)
                 .preferredColorScheme(store.themeManager.currentTheme.appearance == .dark ? .dark : .light)
+                .onOpenURL { url in
+                    store.handleDeepLink(url)
+                }
         }
         .windowStyle(.titleBar)
         .windowToolbarStyle(.unified)
@@ -143,8 +146,10 @@ struct ContentView: View {
             ) {
                 NewSessionDialog(
                     projects: store.projects,
+                    profiles: store.agentProfiles.isEmpty ? AgentProfile.builtIn : store.agentProfiles,
                     initialProjectID: store.newSessionProjectID,
                     parentID: store.newSessionParentID,
+                    templates: store.availableTemplates(forProjectID: store.newSessionProjectID),
                     onCreate: { request in
                         Task { await store.handleNewSessionRequest(request) }
                         store.newSessionProjectID = nil
@@ -232,6 +237,11 @@ struct ContentView: View {
             return "Runway — \(session.title)"
         }
         return "Runway"
+    }
+
+    private var selectedSession: Session? {
+        guard let id = store.selectedSessionID else { return nil }
+        return store.sessions.first { $0.id == id }
     }
 
     // MARK: - Status Toast
@@ -372,6 +382,9 @@ struct ContentView: View {
                     onUpdateIssueAssignees: { issue, add, remove in
                         Task { await store.updateIssueAssignees(issue, add: add, remove: remove) }
                     },
+                    onStartSessionFromIssue: { issue in
+                        Task { await store.startSessionFromIssue(issue, projectID: projectID) }
+                    },
                     onSelectPR: { pr in Task { await store.selectPR(pr, navigate: false) } },
                     onRefreshPRs: { Task { await store.refreshPRsIfStale() } },
                     selectedPRID: store.selectedPRID,
@@ -387,7 +400,10 @@ struct ContentView: View {
                     onDisableAutoMergePR: { pr in Task { await store.disableAutoMerge(pr) } },
                     onUpdateProject: { store.updateProjectSettings($0) },
                     onDetectRepo: { await store.detectGHRepo(for: project) },
-                    onFetchLabels: { Task { await store.fetchLabels(forProject: projectID) } }
+                    onFetchLabels: { Task { await store.fetchLabels(forProject: projectID) } },
+                    templates: store.sessionTemplates.filter { $0.projectID == nil || $0.projectID == projectID },
+                    onSaveTemplate: { template in store.saveTemplate(template) },
+                    onDeleteTemplate: { id in store.deleteTemplate(id) }
                 )
             } else if let sessionID = store.selectedSessionID,
                 let session = store.sessions.first(where: { $0.id == sessionID })
@@ -396,6 +412,7 @@ struct ContentView: View {
                     session: session,
                     tmuxManager: store.tmuxManager,
                     linkedPR: store.sessionPRs[sessionID],
+                    prDetail: store.prDetailForSession(sessionID),
                     onSelectPR: { pr in Task { await store.selectPR(pr) } },
                     showSendBar: Binding(
                         get: { store.showSendBar },
@@ -477,6 +494,77 @@ struct ContentView: View {
     private var toolbarContent: some ToolbarContent {
         ToolbarItem(placement: .navigation) {
             viewPicker
+        }
+
+        // New Session — always visible
+        ToolbarItem(placement: .primaryAction) {
+            Button {
+                store.newSessionProjectID = nil
+                store.showNewSessionDialog = true
+            } label: {
+                Label("New Session", systemImage: "plus.rectangle")
+            }
+            .help("New Session (⌘N)")
+        }
+
+        // Session-specific actions — only when a session is selected
+        if selectedSession != nil {
+            ToolbarItem(placement: .automatic) {
+                Button {
+                    store.toggleChangesSidebar()
+                } label: {
+                    Label(
+                        "Changes",
+                        systemImage: "doc.text.magnifyingglass"
+                    )
+                }
+                .help("Toggle changes sidebar (⌘3)")
+                .accessibilityLabel("Toggle changes sidebar")
+            }
+
+            ToolbarItemGroup(placement: .automatic) {
+                Button {
+                    store.splitHorizontalTrigger += 1
+                } label: {
+                    Label("Split Down", systemImage: "rectangle.split.1x2")
+                }
+                .help("Split pane down (⌘⇧D)")
+                .accessibilityLabel("Split pane down")
+
+                Button {
+                    store.splitVerticalTrigger += 1
+                } label: {
+                    Label("Split Right", systemImage: "rectangle.split.2x1")
+                }
+                .help("Split pane right (⌘D)")
+                .accessibilityLabel("Split pane right")
+            }
+        }
+
+        // Status counts — always visible when there are active sessions
+        ToolbarItem(placement: .automatic) {
+            toolbarSessionCounts
+        }
+    }
+
+    @ViewBuilder
+    private var toolbarSessionCounts: some View {
+        let running = store.sessions.filter { $0.status == .running }.count
+        let waiting = store.sessions.filter { $0.status == .waiting }.count
+        if running > 0 || waiting > 0 {
+            HStack(spacing: 6) {
+                if running > 0 {
+                    Label("\(running)", systemImage: "bolt.fill")
+                        .font(.caption)
+                        .foregroundStyle(.green)
+                }
+                if waiting > 0 {
+                    Label("\(waiting)", systemImage: "hand.raised.fill")
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                }
+            }
+            .help("\(running) running, \(waiting) waiting")
         }
     }
 }

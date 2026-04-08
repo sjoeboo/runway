@@ -5,7 +5,10 @@ import Theme
 public struct ProjectSettingsSheet: View {
     @Binding var project: Project
     let themes: [AppTheme]
+    var templates: [SessionTemplate] = []
     let onSave: (Project) -> Void
+    var onSaveTemplate: ((SessionTemplate) -> Void)?
+    var onDeleteTemplate: ((String) -> Void)?
     let onDetectRepo: () async -> (repo: String, host: String?)?
     @Environment(\.dismiss) private var dismiss
 
@@ -21,12 +24,18 @@ public struct ProjectSettingsSheet: View {
     public init(
         project: Binding<Project>,
         themes: [AppTheme],
+        templates: [SessionTemplate] = [],
         onSave: @escaping (Project) -> Void,
+        onSaveTemplate: ((SessionTemplate) -> Void)? = nil,
+        onDeleteTemplate: ((String) -> Void)? = nil,
         onDetectRepo: @escaping () async -> (repo: String, host: String?)?
     ) {
         self._project = project
         self.themes = themes
+        self.templates = templates
         self.onSave = onSave
+        self.onSaveTemplate = onSaveTemplate
+        self.onDeleteTemplate = onDeleteTemplate
         self.onDetectRepo = onDetectRepo
     }
 
@@ -66,6 +75,41 @@ public struct ProjectSettingsSheet: View {
                     TextField("Branch Prefix", text: $branchPrefix, prompt: Text("feature/"))
                         .textFieldStyle(.roundedBorder)
                         .help("Prefix for auto-generated branch names (e.g. feature/, fix/, your-name/)")
+                }
+
+                Section("Templates") {
+                    if templates.isEmpty {
+                        Text("No custom templates")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    } else {
+                        ForEach(templates) { template in
+                            HStack {
+                                VStack(alignment: .leading) {
+                                    Text(template.name)
+                                        .font(.callout)
+                                    Text("\(template.tool.displayName) · \(template.permissionMode.displayName)")
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                }
+                                Spacer()
+                                Button(role: .destructive) {
+                                    onDeleteTemplate?(template.id)
+                                } label: {
+                                    Image(systemName: "trash")
+                                        .font(.caption)
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                    }
+                    Button("New Template") {
+                        let template = SessionTemplate(
+                            name: "New Template",
+                            projectID: project.id
+                        )
+                        onSaveTemplate?(template)
+                    }
                 }
 
                 Section("GitHub Issues") {
@@ -122,7 +166,7 @@ public struct ProjectSettingsSheet: View {
             .padding(.horizontal, 20)
             .padding(.vertical, 14)
         }
-        .frame(width: 400, height: 380)
+        .frame(width: 400, height: 480)
         .onAppear {
             themeID = project.themeID
             permissionMode = project.permissionMode

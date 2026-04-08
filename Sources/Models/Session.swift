@@ -10,12 +10,16 @@ public struct Session: Identifiable, Codable, Sendable {
     public var status: SessionStatus
     public var worktreeBranch: String?
     public var prNumber: Int?
+    public var issueNumber: Int?
     public var parentID: String?
     public var command: String?
     public var permissionMode: PermissionMode
     public var sortOrder: Int
     public var createdAt: Date
     public var lastAccessedAt: Date
+
+    /// Transient, non-persisted field for UI display of last activity.
+    public var lastActivityText: String?
 
     public init(
         id: String = Session.generateID(),
@@ -26,6 +30,7 @@ public struct Session: Identifiable, Codable, Sendable {
         status: SessionStatus = .starting,
         worktreeBranch: String? = nil,
         prNumber: Int? = nil,
+        issueNumber: Int? = nil,
         parentID: String? = nil,
         command: String? = nil,
         permissionMode: PermissionMode = .default,
@@ -41,6 +46,7 @@ public struct Session: Identifiable, Codable, Sendable {
         self.status = status
         self.worktreeBranch = worktreeBranch
         self.prNumber = prNumber
+        self.issueNumber = issueNumber
         self.parentID = parentID
         self.command = command
         self.permissionMode = permissionMode

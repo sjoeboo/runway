@@ -14,114 +14,53 @@ public struct StatusDetector: Sendable {
     /// Reads the last N lines and checks for busy/waiting/idle indicators.
     /// Returns nil if no confident detection can be made.
     public func detect(content: String, tool: Tool) -> SessionStatus? {
+        let profile = AgentProfile.defaultProfile(for: tool)
+        return detect(content: content, profile: profile)
+    }
+
+    /// Detect session status using an agent profile's patterns.
+    public func detect(content: String, profile: AgentProfile) -> SessionStatus? {
         let lines = content.components(separatedBy: "\n")
         let lastLines = lines.suffix(10).joined(separator: "\n")
         let stripped = stripANSI(lastLines)
 
-        switch tool {
-        case .claude:
-            return detectClaude(stripped)
-        case .shell:
-            return detectShell(stripped)
-        case .custom:
-            return detectGeneric(stripped)
-        }
-    }
-
-    // MARK: - Claude Code Detection
-
-    private func detectClaude(_ content: String) -> SessionStatus? {
-        // Busy indicators (running, processing)
-        if containsAny(content, patterns: busyPatterns) {
+        // Running: busy patterns or spinner
+        if containsAny(stripped, patterns: profile.runningPatterns) {
             return .running
         }
-
-        // Spinner characters (braille spinners used by Claude)
-        if containsSpinner(content) {
-            return .running
+        if !profile.spinnerChars.isEmpty {
+            let spinnerSet = Set(profile.spinnerChars.compactMap(\.first))
+            if containsSpinner(stripped, chars: spinnerSet) {
+                return .running
+            }
         }
 
-        // Permission / waiting indicators
-        if containsAny(content, patterns: waitingPatterns) {
+        // Waiting
+        if containsAny(stripped, patterns: profile.waitingPatterns) {
             return .waiting
         }
 
-        // Idle indicators (prompt ready for input)
-        if containsAny(content, patterns: idlePatterns) {
+        // Idle
+        if containsAny(stripped, patterns: profile.idlePatterns) {
+            return .idle
+        }
+        if containsLineStartPattern(stripped, patterns: profile.lineStartIdlePatterns) {
             return .idle
         }
 
-        // Line-start idle patterns (anchored to prevent false positives)
-        if containsLineStartPattern(content, patterns: lineStartIdlePatterns) {
-            return .idle
+        // Fallback: profiles with no running/spinner patterns (like Shell)
+        // If none of the above matched, and the profile has no way to detect "running",
+        // default to .running (since we already checked idle patterns above)
+        if profile.runningPatterns.isEmpty && profile.spinnerChars.isEmpty {
+            return .running
         }
 
         return nil
     }
 
-    private func detectShell(_ content: String) -> SessionStatus? {
-        let trimmed = content.trimmingCharacters(in: .whitespacesAndNewlines)
-        if trimmed.hasSuffix("$") || trimmed.hasSuffix("%") || trimmed.hasSuffix("#") || trimmed.hasSuffix("❯") {
-            return .idle
-        }
-        return .running
-    }
-
-    private func detectGeneric(_ content: String) -> SessionStatus? {
-        detectShell(content)
-    }
-
-    // MARK: - Patterns (ported from detector.go)
-
-    private let busyPatterns = [
-        "ctrl+c to interrupt",
-        "esc to interrupt",
-        "Ctrl+C to interrupt",
-        "⎿",
-        "Working...",
-        "Analyzing",
-        "Reading",
-        "Searching",
-        "Writing",
-        "Editing",
-    ]
-
-    private let waitingPatterns = [
-        "Yes, allow once",
-        "Yes, always allow",
-        "No, deny once",
-        "No, and tell Claude",
-        "approve?",
-        "Approve?",
-        "(Y/n)",
-        "(y/N)",
-        "Allow?",
-        "Try again",
-        "What would you like",
-        "Do you want to",
-    ]
-
-    private let idlePatterns = [
-        "❯ ",
-        "How can I help",
-        "What would you like to do",
-        "Enter your prompt",
-    ]
-
-    /// Patterns that only match at line start (avoids false positives from "> " or "$ " in output).
-    private let lineStartIdlePatterns = [
-        "> ",
-        "$ ",
-    ]
-
-    /// Braille spinner characters used by Claude Code.
-    private let spinnerChars: Set<Character> = [
-        "⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏",
-    ]
-
-    private func containsSpinner(_ content: String) -> Bool {
+    private func containsSpinner(_ content: String, chars: Set<Character>) -> Bool {
         let lastLine = content.components(separatedBy: "\n").last ?? ""
-        return lastLine.contains(where: { spinnerChars.contains($0) })
+        return lastLine.contains(where: { chars.contains($0) })
     }
 
     private func containsAny(_ content: String, patterns: [String]) -> Bool {

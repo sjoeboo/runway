@@ -6,6 +6,7 @@ import Theme
 public struct SessionHeaderView: View {
     let session: Session
     var linkedPR: PullRequest?
+    var prDetail: PRDetail? = nil
     var onSelectPR: ((PullRequest) -> Void)?
     var changesVisible: Bool = false
     var onToggleChanges: (() -> Void)? = nil
@@ -14,12 +15,14 @@ public struct SessionHeaderView: View {
     public init(
         session: Session,
         linkedPR: PullRequest? = nil,
+        prDetail: PRDetail? = nil,
         onSelectPR: ((PullRequest) -> Void)? = nil,
         changesVisible: Bool = false,
         onToggleChanges: (() -> Void)? = nil
     ) {
         self.session = session
         self.linkedPR = linkedPR
+        self.prDetail = prDetail
         self.onSelectPR = onSelectPR
         self.changesVisible = changesVisible
         self.onToggleChanges = onToggleChanges
@@ -44,19 +47,6 @@ public struct SessionHeaderView: View {
                     Spacer()
 
                     HStack(spacing: 8) {
-                        // Changes sidebar toggle
-                        if onToggleChanges != nil {
-                            Button(action: { onToggleChanges?() }) {
-                                Image(systemName: "doc.text.magnifyingglass")
-                                    .font(.body)
-                                    .foregroundColor(changesVisible ? theme.chrome.accent : theme.chrome.textDim)
-                                    .frame(width: 28, height: 28)
-                            }
-                            .buttonStyle(.plain)
-                            .help("Toggle changes sidebar (⌘3)")
-                            .accessibilityLabel("Toggle changes sidebar")
-                        }
-
                         // Tool + permission mode badge
                         Text("\(session.tool.displayName.lowercased()) · \(session.permissionMode.badgeLabel)")
                             .font(.caption)
@@ -114,6 +104,24 @@ public struct SessionHeaderView: View {
 
                                 // Review decision badge
                                 ReviewDecisionBadge(decision: pr.reviewDecision, style: .capsule)
+
+                                // Inline comment count badge
+                                if let detail = prDetail {
+                                    let inlineCount = detail.comments.filter { $0.path != nil }.count
+                                    if inlineCount > 0 {
+                                        HStack(spacing: 2) {
+                                            Image(systemName: "text.bubble")
+                                                .font(.caption2)
+                                            Text("\(inlineCount)")
+                                                .font(.caption)
+                                        }
+                                        .foregroundColor(theme.chrome.accent)
+                                        .padding(.horizontal, 5)
+                                        .padding(.vertical, 2)
+                                        .background(theme.chrome.accent.opacity(0.12))
+                                        .clipShape(Capsule())
+                                    }
+                                }
 
                                 // Diff stats
                                 if pr.additions > 0 || pr.deletions > 0 {

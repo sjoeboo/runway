@@ -41,5 +41,16 @@
     <integer>86400</integer>
     <key>SUAllowsAutomaticUpdates</key>
     <true/>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>com.runway.app</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>runway</string>
+			</array>
+		</dict>
+	</array>
 </dict>
 </plist>

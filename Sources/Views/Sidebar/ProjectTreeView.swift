@@ -391,7 +391,23 @@ struct SessionRowView: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
+                if let activity = session.lastActivityText {
+                    Text(activity)
+                        .font(.caption2)
+                        .foregroundColor(theme.chrome.textDim)
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+                }
                 // Linked PR info
+                if linkedPR == nil, let issueNum = session.issueNumber {
+                    Text("#\(issueNum)")
+                        .font(.caption)
+                        .foregroundColor(theme.chrome.accent)
+                        .padding(.horizontal, 4)
+                        .padding(.vertical, 1)
+                        .background(theme.chrome.accent.opacity(0.15))
+                        .clipShape(Capsule())
+                }
                 if let pr = linkedPR {
                     HStack(spacing: 4) {
                         Button {

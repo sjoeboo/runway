@@ -71,6 +71,19 @@ public struct SettingsView: View {
                     themeRow(theme)
                 }
             }
+
+            Section {
+                Button("Open Themes Folder") {
+                    let url = FileManager.default.homeDirectoryForCurrentUser
+                        .appendingPathComponent(".runway/themes")
+                    NSWorkspace.shared.open(url)
+                }
+                Button("Reload Themes") {
+                    themeManager.reloadUserThemes()
+                }
+            } header: {
+                Text("Custom Themes")
+            }
         }
         .formStyle(.grouped)
         .padding()

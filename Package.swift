@@ -155,5 +155,10 @@ let package = Package(
             dependencies: ["Views", "Models"],
             path: "Tests/ViewsTests"
         ),
+        .testTarget(
+            name: "AppTests",
+            dependencies: ["App"],
+            path: "Tests/AppTests"
+        ),
     ]
 )
