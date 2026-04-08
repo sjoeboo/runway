@@ -161,6 +161,39 @@ import Testing
     #expect(events.first?.eventType == "UserPromptSubmit")  // most recent first
 }
 
+@Test func saveAndFetchTemplates() throws {
+    let db = try Database(inMemory: true)
+    let template = SessionTemplate(name: "Quick Fix", projectID: "p1", permissionMode: .acceptEdits)
+    try db.saveTemplate(template)
+
+    let all = try db.allTemplates()
+    #expect(all.count == 1)
+    #expect(all.first?.name == "Quick Fix")
+    #expect(all.first?.permissionMode == .acceptEdits)
+}
+
+@Test func deleteTemplate() throws {
+    let db = try Database(inMemory: true)
+    let template = SessionTemplate(name: "Test")
+    try db.saveTemplate(template)
+    try db.deleteTemplate(id: template.id)
+
+    let all = try db.allTemplates()
+    #expect(all.isEmpty)
+}
+
+@Test func templatesFilteredByProject() throws {
+    let db = try Database(inMemory: true)
+    let t1 = SessionTemplate(name: "Global")
+    let t2 = SessionTemplate(name: "Project-specific", projectID: "p1")
+    try db.saveTemplate(t1)
+    try db.saveTemplate(t2)
+
+    let forP1 = try db.templates(forProjectID: "p1")
+    #expect(forP1.count == 1)
+    #expect(forP1.first?.name == "Project-specific")
+}
+
 @Test func prCacheRoundTripsNewFields() throws {
     let db = try Database(inMemory: true)
 
