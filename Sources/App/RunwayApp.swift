@@ -517,6 +517,7 @@ struct ContentView: View {
                     Label("Split Down", systemImage: "rectangle.split.1x2")
                 }
                 .help("Split pane down (⌘⇧D)")
+                .accessibilityLabel("Split pane down")
 
                 Button {
                     store.splitVerticalTrigger += 1
@@ -524,6 +525,7 @@ struct ContentView: View {
                     Label("Split Right", systemImage: "rectangle.split.2x1")
                 }
                 .help("Split pane right (⌘D)")
+                .accessibilityLabel("Split pane right")
             }
         }
 

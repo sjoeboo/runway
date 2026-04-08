@@ -6,8 +6,9 @@ import Testing
     #expect(NotificationManager.shouldNotify(event: "PermissionRequest"))
 }
 
-@MainActor @Test func shouldNotifyForStop() {
-    #expect(NotificationManager.shouldNotify(event: "Stop"))
+@MainActor @Test func shouldNotNotifyForStop() {
+    // Stop = turn complete (idle), not session termination — too noisy to notify
+    #expect(!NotificationManager.shouldNotify(event: "Stop"))
 }
 
 @MainActor @Test func shouldNotifyForSessionEnd() {

@@ -19,8 +19,10 @@ public final class NotificationManager {
     }
 
     /// Returns true if this event type should trigger a system notification.
+    /// Note: `Stop` (turn complete, session idle) is intentionally excluded —
+    /// it fires on every Claude turn and would be extremely noisy.
     static func shouldNotify(event: String) -> Bool {
-        event == "PermissionRequest" || event == "Stop" || event == "SessionEnd"
+        event == "PermissionRequest" || event == "SessionEnd"
     }
 
     /// Posts a local notification for a session event.
@@ -39,7 +41,7 @@ public final class NotificationManager {
         case "PermissionRequest":
             content.title = "Permission Required"
             content.body = "\(sessionTitle) is waiting for your approval"
-        case "Stop", "SessionEnd":
+        case "SessionEnd":
             content.title = "Session Finished"
             content.body = "\(sessionTitle) has completed"
         default:
@@ -51,7 +53,11 @@ public final class NotificationManager {
             content: content,
             trigger: nil
         )
-        UNUserNotificationCenter.current().add(request)
+        UNUserNotificationCenter.current().add(request) { error in
+            if let error {
+                print("[Runway] Failed to post notification: \(error)")
+            }
+        }
     }
 
     /// Updates the dock badge with the count of waiting sessions.
