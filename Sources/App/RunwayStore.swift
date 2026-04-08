@@ -361,7 +361,7 @@ public final class RunwayStore {
             resolvedMode = projectMode
         }
 
-        var session = Session(
+        let session = Session(
             title: request.title,
             projectID: request.projectID,
             path: request.path,
@@ -1451,7 +1451,7 @@ public final class RunwayStore {
 
         let resolvedMode = project.permissionMode ?? .default
 
-        var session = Session(
+        let session = Session(
             title: sessionName,
             projectID: projectID,
             path: project.path,
