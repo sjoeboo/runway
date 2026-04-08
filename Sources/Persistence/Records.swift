@@ -64,6 +64,8 @@ struct SessionRecord: Codable, FetchableRecord, MutablePersistableRecord {
     static func encodeTool(_ tool: Tool) -> String {
         switch tool {
         case .claude: "claude"
+        case .gemini: "gemini"
+        case .codex: "codex"
         case .shell: "shell"
         case .custom(let name): name
         }
@@ -72,6 +74,8 @@ struct SessionRecord: Codable, FetchableRecord, MutablePersistableRecord {
     static func decodeTool(_ raw: String) -> Tool {
         switch raw {
         case "claude": .claude
+        case "gemini": .gemini
+        case "codex": .codex
         case "shell": .shell
         default: .custom(raw)
         }

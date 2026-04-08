@@ -15,7 +15,7 @@ import Testing
 }
 
 @Test func builtInProfileCount() {
-    #expect(AgentProfile.builtIn.count == 2)
+    #expect(AgentProfile.builtIn.count == 4)
 }
 
 @Test func defaultProfileForClaude() {

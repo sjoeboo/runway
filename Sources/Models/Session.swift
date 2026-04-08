@@ -110,12 +110,16 @@ public enum SessionStatus: String, Codable, Sendable, CaseIterable {
 
 public enum Tool: Codable, Sendable, Hashable {
     case claude
+    case gemini
+    case codex
     case shell
     case custom(String)
 
     public var displayName: String {
         switch self {
         case .claude: "Claude"
+        case .gemini: "Gemini CLI"
+        case .codex: "Codex"
         case .shell: "Shell"
         case .custom(let name): name
         }
@@ -124,6 +128,8 @@ public enum Tool: Codable, Sendable, Hashable {
     public var command: String {
         switch self {
         case .claude: "claude"
+        case .gemini: "gemini"
+        case .codex: "codex"
         case .shell: ProcessInfo.processInfo.environment["SHELL"] ?? "/bin/zsh"
         case .custom(let name): name
         }
@@ -142,6 +148,8 @@ extension Tool {
         let type = try container.decode(String.self, forKey: .type)
         switch type {
         case "claude": self = .claude
+        case "gemini": self = .gemini
+        case "codex": self = .codex
         case "shell": self = .shell
         default:
             let name = try container.decodeIfPresent(String.self, forKey: .name) ?? type
@@ -154,11 +162,47 @@ extension Tool {
         switch self {
         case .claude:
             try container.encode("claude", forKey: .type)
+        case .gemini:
+            try container.encode("gemini", forKey: .type)
+        case .codex:
+            try container.encode("codex", forKey: .type)
         case .shell:
             try container.encode("shell", forKey: .type)
         case .custom(let name):
             try container.encode("custom", forKey: .type)
             try container.encode(name, forKey: .name)
+        }
+    }
+}
+
+// MARK: - Tool Capabilities
+
+extension Tool {
+    public var supportsPermissionModes: Bool {
+        switch self {
+        case .claude, .gemini, .codex: true
+        default: false
+        }
+    }
+
+    public var supportsInitialPrompt: Bool {
+        switch self {
+        case .claude, .gemini, .codex: true
+        default: false
+        }
+    }
+
+    public var supportsHappy: Bool {
+        switch self {
+        case .claude, .gemini, .codex: true
+        default: false
+        }
+    }
+
+    public var isAgent: Bool {
+        switch self {
+        case .shell: false
+        default: true
         }
     }
 }

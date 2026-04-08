@@ -111,13 +111,45 @@ extension AgentProfile {
         icon: "terminal"
     )
 
+    /// Gemini CLI — placeholder profile; full detection patterns added in Task 4.
+    public static let gemini = AgentProfile(
+        id: "gemini",
+        name: "Gemini CLI",
+        command: "gemini",
+        arguments: [],
+        runningPatterns: [],
+        waitingPatterns: [],
+        idlePatterns: ["❯ ", "> "],
+        lineStartIdlePatterns: [],
+        spinnerChars: [],
+        hookEnabled: false,
+        icon: "sparkle"
+    )
+
+    /// Codex CLI — placeholder profile; full detection patterns added in Task 4.
+    public static let codex = AgentProfile(
+        id: "codex",
+        name: "Codex",
+        command: "codex",
+        arguments: [],
+        runningPatterns: [],
+        waitingPatterns: [],
+        idlePatterns: ["❯ ", "> "],
+        lineStartIdlePatterns: [],
+        spinnerChars: [],
+        hookEnabled: false,
+        icon: "sparkle"
+    )
+
     /// All built-in profiles.
-    public static let builtIn: [AgentProfile] = [.claude, .shell]
+    public static let builtIn: [AgentProfile] = [.claude, .gemini, .codex, .shell]
 
     /// Look up the default built-in profile for a Tool enum value.
     public static func defaultProfile(for tool: Tool) -> AgentProfile {
         switch tool {
         case .claude: return .claude
+        case .gemini: return .gemini
+        case .codex: return .codex
         case .shell: return .shell
         case .custom(let name):
             return AgentProfile(
