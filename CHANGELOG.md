@@ -5,6 +5,14 @@ All notable changes to Runway are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.4.1] — 2026-04-08
+
+### Fixed
+
+- **Notification crash on launch** — Replaced completion-handler-based `UNUserNotificationCenter.add()` with async overload to fix `@MainActor` isolation violation that caused `EXC_BREAKPOINT` on the UserNotifications callback queue
+
+[0.4.1]: https://github.com/sjoeboo/runway/compare/v0.4.0...v0.4.1
+
 ## [0.4.0] — 2026-04-08
 
 ### Added

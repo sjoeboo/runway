@@ -72,8 +72,10 @@ public final class NotificationManager: NSObject, UNUserNotificationCenterDelega
             content: content,
             trigger: nil
         )
-        UNUserNotificationCenter.current().add(request) { error in
-            if let error {
+        Task {
+            do {
+                try await UNUserNotificationCenter.current().add(request)
+            } catch {
                 print("[Runway] Failed to post notification: \(error)")
             }
         }
