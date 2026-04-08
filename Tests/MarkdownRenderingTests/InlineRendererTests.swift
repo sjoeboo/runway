@@ -43,6 +43,8 @@ final class InlineRendererTests: XCTestCase {
         let result = renderInline("Hello *world*")
         let runs = Array(result.runs)
         XCTAssertEqual(runs.count, 2)
+        XCTAssertEqual(String(result.characters[runs[0].range]), "Hello ")
+        XCTAssertNil(runs[0].inlinePresentationIntent)
         XCTAssertEqual(String(result.characters[runs[1].range]), "world")
         XCTAssertTrue(runs[1].inlinePresentationIntent?.contains(.emphasized) ?? false)
     }
@@ -92,9 +94,8 @@ final class InlineRendererTests: XCTestCase {
     // MARK: - Soft Break
 
     func testSoftBreakRendersAsSpace() {
-        // A soft break in markdown (single newline) should render as a space
-        let result = renderInline("line one\nline two")
-        XCTAssertTrue(String(result.characters).contains(" "))
+        let result = renderInline("hello\nworld")
+        XCTAssertEqual(String(result.characters), "hello world")
     }
 
     // MARK: - Mixed Content

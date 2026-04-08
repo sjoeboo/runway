@@ -42,27 +42,30 @@ struct InlineRenderer: MarkupVisitor {
     // MARK: - Emphasis (italic)
 
     mutating func visitEmphasis(_ emphasis: Emphasis) -> AttributedString {
+        let saved = currentIntent
         currentIntent.insert(.emphasized)
         let result = defaultVisit(emphasis)
-        currentIntent.remove(.emphasized)
+        currentIntent = saved
         return result
     }
 
     // MARK: - Strong (bold)
 
     mutating func visitStrong(_ strong: Strong) -> AttributedString {
+        let saved = currentIntent
         currentIntent.insert(.stronglyEmphasized)
         let result = defaultVisit(strong)
-        currentIntent.remove(.stronglyEmphasized)
+        currentIntent = saved
         return result
     }
 
     // MARK: - Strikethrough
 
     mutating func visitStrikethrough(_ strikethrough: Strikethrough) -> AttributedString {
+        let saved = currentIntent
         currentIntent.insert(.strikethrough)
         let result = defaultVisit(strikethrough)
-        currentIntent.remove(.strikethrough)
+        currentIntent = saved
         return result
     }
 
@@ -95,11 +98,12 @@ struct InlineRenderer: MarkupVisitor {
     mutating func visitImage(_ image: Markdown.Image) -> AttributedString {
         // At inline level, render alt text. Block-level handles AsyncImage.
         let altText = image.plainText
-        if altText.isEmpty {
-            return AttributedString("[image]")
-        }
-        var attr = AttributedString(altText)
+        let display = altText.isEmpty ? "[image]" : altText
+        var attr = AttributedString(display)
         attr.foregroundColor = theme.chrome.textDim
+        if !currentIntent.isEmpty {
+            attr.inlinePresentationIntent = currentIntent
+        }
         return attr
     }
 
