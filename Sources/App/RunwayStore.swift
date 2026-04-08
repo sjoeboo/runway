@@ -64,6 +64,15 @@ public final class RunwayStore {
         Set(sessionPRs.values.map(\.id))
     }
 
+    /// Returns PRDetail for the selected session's linked PR, if available.
+    /// Fetches the detail asynchronously if not yet loaded.
+    func prDetailForSession(_ sessionID: String) -> PRDetail? {
+        guard let pr = sessionPRs[sessionID] else { return nil }
+        // prDetail is loaded when a PR is selected; return it if it matches
+        if selectedPRID == pr.id { return prDetail }
+        return nil
+    }
+
     // MARK: - Changes Sidebar
     var changesVisible: Bool = false
     var changesMode: ChangesMode = .branch

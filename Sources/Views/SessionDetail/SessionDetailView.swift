@@ -8,6 +8,7 @@ public struct SessionDetailView: View {
     let session: Session
     let tmuxManager: TmuxSessionManager
     var linkedPR: PullRequest?
+    var prDetail: PRDetail? = nil
     var onSelectPR: ((PullRequest) -> Void)?
     @Binding var showSendBar: Bool
     @Binding var showTerminalSearch: Bool
@@ -28,6 +29,7 @@ public struct SessionDetailView: View {
         session: Session,
         tmuxManager: TmuxSessionManager,
         linkedPR: PullRequest? = nil,
+        prDetail: PRDetail? = nil,
         onSelectPR: ((PullRequest) -> Void)? = nil,
         showSendBar: Binding<Bool>,
         showTerminalSearch: Binding<Bool>,
@@ -45,6 +47,7 @@ public struct SessionDetailView: View {
         self.session = session
         self.tmuxManager = tmuxManager
         self.linkedPR = linkedPR
+        self.prDetail = prDetail
         self.onSelectPR = onSelectPR
         self._showSendBar = showSendBar
         self._showTerminalSearch = showTerminalSearch
@@ -65,6 +68,7 @@ public struct SessionDetailView: View {
             SessionHeaderView(
                 session: session,
                 linkedPR: linkedPR,
+                prDetail: prDetail,
                 onSelectPR: onSelectPR,
                 changesVisible: changesVisible,
                 onToggleChanges: onToggleChanges
