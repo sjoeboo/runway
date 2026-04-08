@@ -9,6 +9,7 @@ public struct SettingsView: View {
     @AppStorage("terminalFontFamily") private var fontFamily: String = "MesloLGS Nerd Font"
     @AppStorage("terminalFontSize") private var fontSize: Double = 13
     @AppStorage("defaultPermissionMode") private var defaultPermissionMode: PermissionMode = .default
+    @AppStorage("notificationsEnabled") private var notificationsEnabled = true
 
     private let updater: SPUUpdater?
 
@@ -220,6 +221,16 @@ public struct SettingsView: View {
                         .font(.caption)
                         .foregroundColor(.orange)
                 }
+            }
+
+            Section("Notifications") {
+                Toggle("Enable notifications", isOn: $notificationsEnabled)
+
+                Text(
+                    "System notifications for permission requests and session completions"
+                )
+                .font(.caption)
+                .foregroundColor(.secondary)
             }
 
             Section("Hooks") {
