@@ -243,7 +243,13 @@ class MouseSelectionMonitor {
                 return event
             }
 
-            // Mouse-down / drag: suppress reporting for native text selection.
+            // Mouse-down: let the click pass through with reporting intact
+            // so tmux can handle pane switching via mouse clicks.
+            if event.type == .leftMouseDown {
+                return event
+            }
+
+            // Mouse-drag: suppress reporting for native text selection.
             if !suppressed {
                 savedReporting = terminal.allowMouseReporting
                 suppressed = true
