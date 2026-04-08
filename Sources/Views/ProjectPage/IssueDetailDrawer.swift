@@ -1,4 +1,5 @@
 import GitHubOperations
+import MarkdownRendering
 import Models
 import SwiftUI
 import Theme
@@ -276,9 +277,7 @@ public struct IssueDetailDrawer: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 12) {
                 if let body = detail?.body, !body.isEmpty {
-                    renderMarkdown(body)
-                        .font(.body)
-                        .foregroundColor(theme.chrome.text)
+                    MarkdownView(source: body, theme: theme)
                         .textSelection(.enabled)
                 } else {
                     Text("No description provided")
@@ -381,9 +380,7 @@ public struct IssueDetailDrawer: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
-                renderMarkdown(comment.body, inlineOnly: true)
-                    .font(.body)
-                    .foregroundColor(theme.chrome.text)
+                MarkdownView(source: comment.body, theme: theme, mode: .inline)
                     .textSelection(.enabled)
             }
             .padding(8)
@@ -502,18 +499,6 @@ public struct IssueDetailDrawer: View {
         }
     }
 
-    // MARK: - Helpers
-
-    private func renderMarkdown(_ source: String, inlineOnly: Bool = false) -> Text {
-        let syntax: AttributedString.MarkdownParsingOptions.InterpretedSyntax =
-            inlineOnly ? .inlineOnlyPreservingWhitespace : .full
-        if let attributed = try? AttributedString(
-            markdown: source, options: .init(interpretedSyntax: syntax)
-        ) {
-            return Text(attributed)
-        }
-        return Text(source)
-    }
 }
 
 // MARK: - Tab Enum
