@@ -91,6 +91,7 @@ public final class RunwayStore {
     let hookInjector: HookInjector
     let tmuxManager: TmuxSessionManager
     let issueManager: IssueManager
+    let notificationManager: NotificationManager
 
     // MARK: - Init
 
@@ -103,6 +104,7 @@ public final class RunwayStore {
         self.hookInjector = HookInjector()
         self.tmuxManager = TmuxSessionManager()
         self.issueManager = IssueManager()
+        self.notificationManager = NotificationManager()
 
         // Open database — surface failure to user since silent nil means all writes are lost
         do {
@@ -127,6 +129,7 @@ public final class RunwayStore {
             lastPRFingerprint = await prManager.prFingerprint(filter: .mine)
             startPRPoll()
             startSessionPRPoll()
+            notificationManager.requestAuthorization()
         }
 
         // Start hook server + inject Claude hooks (sequenced — inject needs the port)
@@ -415,6 +418,8 @@ public final class RunwayStore {
         } catch {
             print("[Runway] Failed to update session status: \(error)")
         }
+        let waitingCount = sessions.filter { $0.status == .waiting }.count
+        notificationManager.updateDockBadge(waitingCount: waitingCount)
     }
 
     public func restartSession(id: String) async {
@@ -704,6 +709,18 @@ public final class RunwayStore {
             updateSessionStatus(id: event.sessionID, status: .waiting)
         case .notification:
             break
+        }
+
+        // Post system notification for high-value events
+        if NotificationManager.shouldNotify(event: event.event.rawValue) {
+            let title =
+                sessions.first(where: { $0.id == event.sessionID })?.title
+                ?? "Session"
+            notificationManager.postSessionNotification(
+                sessionID: event.sessionID,
+                sessionTitle: title,
+                event: event.event.rawValue
+            )
         }
     }
 
