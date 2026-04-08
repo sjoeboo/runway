@@ -5,6 +5,36 @@ All notable changes to Runway are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.3.0] — 2026-04-07
+
+### Added
+
+- **Native notifications** — macOS notifications for permission requests and session completion, with intelligent filtering to avoid noise ([#232](https://github.com/sjoeboo/runway/pull/232))
+- **Issue-linked sessions** — Start sessions directly from GitHub Issues with auto-generated branch names and activity tracking ([#232](https://github.com/sjoeboo/runway/pull/232))
+- **Activity log** — Per-session event timeline with issue badge and activity subtitle in sidebar ([#232](https://github.com/sjoeboo/runway/pull/232))
+- **PR inline comments** — Grouped inline comments with count badge and send-to-session action in PR detail ([#232](https://github.com/sjoeboo/runway/pull/232))
+- **User-installable themes** — Load custom themes from `~/.runway/themes/` JSON files ([#232](https://github.com/sjoeboo/runway/pull/232))
+- **Session templates** — Save and reuse session configurations with template picker in the New Session dialog ([#232](https://github.com/sjoeboo/runway/pull/232))
+- **Deep linking** — `runway://` URL scheme for opening sessions, PRs, and creating new sessions ([#232](https://github.com/sjoeboo/runway/pull/232))
+- **Agent profiles** — Configurable status detection profiles (Claude, Shell built-ins) with profile-based pattern matching ([#232](https://github.com/sjoeboo/runway/pull/232))
+
+### Fixed
+
+- **Changes sidebar expansion** — Files always open expanded; removed unnecessary single-file collapse toggle ([#231](https://github.com/sjoeboo/runway/pull/231))
+- **Picker overflow** — Segmented picker no longer clips "Uncommitted" tab in changes sidebar ([#230](https://github.com/sjoeboo/runway/pull/230))
+- **Sidebar hover shift** — Section headers no longer shift the + button on hover ([#230](https://github.com/sjoeboo/runway/pull/230))
+- **Font consistency** — Standardized section title fonts to `.callout.semibold` across all views ([#230](https://github.com/sjoeboo/runway/pull/230))
+
+### Maintenance
+
+- Added CONTRIBUTING.md with development setup and workflow guide ([#232](https://github.com/sjoeboo/runway/pull/232))
+- Added GitHub issue and PR templates ([#232](https://github.com/sjoeboo/runway/pull/232))
+- Added architecture guide documenting key design decisions ([#232](https://github.com/sjoeboo/runway/pull/232))
+- Added `/release` command for automated release workflow
+- Test suite expanded from 180 to 230 tests
+
+[0.3.0]: https://github.com/sjoeboo/runway/compare/v0.2.0...v0.3.0
+
 ## [0.2.0] — 2026-04-07
 
 ### Added

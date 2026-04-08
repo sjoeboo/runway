@@ -22,7 +22,8 @@
 | **🔍** | **Live status detection** | See at a glance whether each agent is running, waiting, idle, or errored |
 | **📋** | **GitHub PR dashboard** | Review, approve, merge, request changes, toggle automerge, and view CI checks — all without leaving the app |
 | **📌** | **GitHub Issues** | View, create, and manage issues per project |
-| **🎨** | **Theme system** | 6 built-in themes (Tokyo Night, Ayu Mirage, Everforest, Oasis Lagoon) applied to both UI chrome and terminal |
+| **🔔** | **Notifications** | Native macOS notifications for permission requests and session completion |
+| **🎨** | **Theme system** | 6 built-in themes + user-installable custom themes from `~/.runway/themes/` |
 | **📂** | **Project organization** | Group sessions by project with per-project settings for theme, permissions, and branch prefix |
 | **⌨️** | **Keyboard-driven** | 15 shortcuts — `Cmd+K` search, `Cmd+N` new session, `Cmd+D` split pane, `Cmd+3` changes, and more |
 
@@ -79,6 +80,10 @@ Create named sessions tied to projects. Each session launches a terminal running
 - **Permission modes** — choose Default, Accept Edits, or Bypass All per session (with color-coded badges)
 - **Multiple terminal tabs** — add shell tabs alongside your main agent session
 - **Session persistence** — sessions survive app restarts via SQLite + tmux
+- **Session templates** — save common configurations (tool, permissions, prompt) and reuse them from the "From Template" tab in the New Session dialog
+- **Issue-linked sessions** — start sessions directly from GitHub Issues with auto-generated branch names
+- **Activity log** — per-session event timeline with issue badge and activity subtitle in sidebar
+- **Deep linking** — `runway://` URL scheme for opening sessions, PRs, and creating new sessions
 - **Session search** — `Cmd+K` filters the sidebar by session name, branch, or project name
 
 ### Live Status Detection
@@ -89,6 +94,7 @@ Runway knows what your agent is doing. Two detection paths work together:
 |--------|-------------|
 | **HTTP Hooks** | Claude Code sends lifecycle events (session start, permission request, stop) to Runway's hook server |
 | **Buffer Polling** | Every 3 seconds, terminal buffer content is scanned for 90+ patterns — spinners, prompts, permission dialogs, idle indicators |
+| **Agent Profiles** | Configurable detection profiles (Claude, Shell built-ins) with profile-based pattern matching |
 
 Hook injection is automatic — Runway writes to `~/.claude/settings.json` on every launch with the current ephemeral port.
 
@@ -116,6 +122,7 @@ Built-in PR management powered by `gh` CLI:
 - **Visual status**: check results (passed/failed/pending), review decision badges, diff stats (+/-)
 - **Session linking**: PRs are matched to sessions by worktree branch
 - **Send to Session**: navigate to the linked session with the send bar open
+- **Inline comment grouping**: comments grouped by file with count badges and send-to-session action
 - **Conversation timeline**: reviews and comments interleaved chronologically with colored accents for review decisions
 
 ### GitHub Issues
@@ -126,6 +133,7 @@ Per-project issue management:
 - **Issue list** with labels and status
 - **Issue detail view** — full-parity detail drawer matching the PR experience
 - **Create issues** with title, body, and label selection
+- **Start Session** from an issue — creates a session linked to the issue with activity tracking
 - **Open in browser** for full GitHub UI when needed
 
 ### Project Settings
@@ -152,6 +160,8 @@ Six hand-crafted themes with paired light/dark variants:
 
 Themes apply to both the app chrome (sidebar, toolbar, status bar) and the terminal (ANSI colors, cursor, selection). System appearance auto-switching is supported.
 
+**Custom themes**: Drop a JSON theme file into `~/.runway/themes/` and it appears in the theme picker automatically.
+
 ### Keyboard Shortcuts
 
 | Shortcut | Action |
@@ -177,7 +187,7 @@ Pure SwiftUI app built with Swift Package Manager. 11 focused targets:
 ```
 Sources/
 ├── App/                # @main entry, RunwayStore, window setup
-├── Models/             # Session, Project, PullRequest, HookEvent, GitHubIssue
+├── Models/             # Session, Project, PullRequest, HookEvent, GitHubIssue, AgentProfile, SessionEvent, SessionTemplate
 ├── Persistence/        # GRDB/SQLite (WAL mode, ~/.runway/state.db)
 ├── Terminal/           # TerminalProvider protocol, PTY + tmux management
 ├── TerminalView/       # NSViewRepresentable wrapping SwiftTerm, search bar, event monitors
@@ -205,7 +215,7 @@ Sources/
 | Swift Actors | WorktreeManager, PRManager | Thread-safe CLI operations without locks |
 | SidebarActions protocol | ProjectTreeView | Eliminates prop drilling — single protocol replaces 14 callbacks |
 | TerminalProvider protocol | Terminal target | Abstracts backend (SwiftTerm now, libghostty later) |
-| GRDB typed records | Persistence | Type-safe SQLite with migrations (currently v8) |
+| GRDB typed records | Persistence | Type-safe SQLite with migrations (currently v13) |
 | Environment injection | Theme | `@Environment(\.theme)` for consistent theming |
 
 ## Configuration
@@ -215,8 +225,8 @@ Runway stores its state in `~/.runway/`:
 ```
 ~/.runway/
 ├── state.db        # SQLite database (sessions, projects, PR/issue cache)
-├── themes/         # Custom theme files (planned)
-└── logs/           # Application logs (planned)
+├── themes/         # User-installable JSON theme files
+└── logs/           # Application logs
 ```
 
 ### Claude Code Integration
@@ -225,7 +235,7 @@ Runway auto-injects hooks into `~/.claude/settings.json` on every launch, subscr
 
 ## CI & Testing
 
-- **180 tests** across 8 test targets
+- **230 tests** across 8 test targets
 - **GitHub Actions CI** on every PR: build, test, SwiftLint, swift-format
 - **Branch protection** on `master` — CI must pass before merging
 - **Pre-commit hooks** run lint + format checks locally
@@ -234,7 +244,6 @@ Runway auto-injects hooks into `~/.claude/settings.json` on every launch, subscr
 
 - Multi-session split view / open session in new window
 - Menu bar extra for monitoring agent status
-- Session templates (save common configurations)
 - Global activity feed / cross-session dashboard
 - Session-to-session tree (parent/child agent visualization)
 
