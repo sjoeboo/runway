@@ -150,6 +150,10 @@ public final class RunwayStore {
             startPRPoll()
             startSessionPRPoll()
             notificationManager.requestAuthorization()
+            notificationManager.onNotificationTapped = { [weak self] sessionID in
+                self?.selectSession(sessionID)
+                NSApplication.shared.activate()
+            }
         }
 
         // Start hook server + inject Claude hooks (sequenced — inject needs the port)
