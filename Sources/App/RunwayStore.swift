@@ -650,6 +650,30 @@ public final class RunwayStore {
         }
     }
 
+    /// Handles a runway:// deep link URL.
+    func handleDeepLink(_ url: URL) {
+        guard let destination = DeepLinkRouter.parse(url) else {
+            print("[Runway] Unrecognized deep link: \(url)")
+            return
+        }
+
+        switch destination {
+        case .session(let id):
+            selectSession(id)
+            NSApplication.shared.activate()
+
+        case .pr(let number, let repo):
+            if let pr = pullRequests.first(where: { $0.number == number && $0.repo == repo }) {
+                Task { await selectPR(pr) }
+            }
+            NSApplication.shared.activate()
+
+        case .newSession:
+            showNewSessionDialog = true
+            NSApplication.shared.activate()
+        }
+    }
+
     // MARK: - Project Settings
 
     func updateProjectSettings(_ project: Project) {

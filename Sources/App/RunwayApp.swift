@@ -38,6 +38,9 @@ struct RunwayApp: App {
                 .environment(store.themeManager)
                 .theme(store.themeManager.currentTheme)
                 .preferredColorScheme(store.themeManager.currentTheme.appearance == .dark ? .dark : .light)
+                .onOpenURL { url in
+                    store.handleDeepLink(url)
+                }
         }
         .windowStyle(.titleBar)
         .windowToolbarStyle(.unified)
