@@ -73,6 +73,8 @@ public struct NewSessionDialog: View {
     private var selectedTool: Tool {
         switch selectedProfileID {
         case "claude": return .claude
+        case "gemini": return .gemini
+        case "codex": return .codex
         case "shell": return .shell
         default: return .custom(selectedProfileID)
         }
