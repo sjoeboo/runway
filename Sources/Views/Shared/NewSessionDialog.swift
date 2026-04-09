@@ -27,6 +27,7 @@ public struct NewSessionDialog: View {
     // Normal session state
     @State private var title: String = ""
     @State private var selectedProfileID: String = "claude"
+    @State private var useHappy: Bool = false
     @State private var useWorktree: Bool = true
     @State private var branchName: String = ""
     @State private var branchManuallyEdited: Bool = false
@@ -177,6 +178,11 @@ public struct NewSessionDialog: View {
                 branchName = autobranchName(from: title)
             }
         }
+        .onChange(of: selectedProfileID) {
+            if !selectedTool.supportsHappy {
+                useHappy = false
+            }
+        }
 
         // Project picker
         VStack(alignment: .leading, spacing: 4) {
@@ -206,9 +212,19 @@ public struct NewSessionDialog: View {
             .labelsHidden()
         }
 
-        // Permission mode (only for Claude sessions)
-        if selectedTool == .claude {
+        // Permission mode (only for tools that support it)
+        if selectedTool.supportsPermissionModes {
             permissionPicker
+        }
+
+        // Happy toggle (only for tools that support it)
+        if selectedTool.supportsHappy {
+            Toggle("Launch with Happy", isOn: $useHappy)
+            if useHappy {
+                Text("Wraps session with Happy for mobile access")
+                    .font(.caption2)
+                    .foregroundColor(theme.chrome.textDim)
+            }
         }
 
         // Worktree toggle
@@ -227,8 +243,8 @@ public struct NewSessionDialog: View {
                 ), placeholder: "feature/my-feature")
         }
 
-        // Initial prompt (only for Claude sessions)
-        if selectedTool == .claude {
+        // Initial prompt (only for tools that support it)
+        if selectedTool.supportsInitialPrompt {
             promptEditor
         }
     }
@@ -432,8 +448,9 @@ public struct NewSessionDialog: View {
             tool: selectedTool,
             useWorktree: useWorktree,
             branchName: useWorktree ? branchName : nil,
-            permissionMode: selectedTool == .claude ? permissionMode : .default,
-            initialPrompt: (selectedTool == .claude && !initialPrompt.isEmpty) ? initialPrompt : nil
+            permissionMode: selectedTool.supportsPermissionModes ? permissionMode : .default,
+            useHappy: selectedTool.supportsHappy ? useHappy : false,
+            initialPrompt: (selectedTool.supportsInitialPrompt && !initialPrompt.isEmpty) ? initialPrompt : nil
         )
 
         onCreate(request)

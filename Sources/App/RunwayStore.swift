@@ -370,7 +370,8 @@ public final class RunwayStore {
             worktreeBranch: needsWorktree ? request.branchName : nil,
             issueNumber: request.issueNumber,
             parentID: request.parentID,
-            permissionMode: resolvedMode
+            permissionMode: resolvedMode,
+            useHappy: request.useHappy
         )
 
         // Add session to UI immediately so the user sees it right away
@@ -436,9 +437,14 @@ public final class RunwayStore {
         if profile.id == "shell" {
             toolCommand = nil  // shell sessions use tmux's default shell
         } else {
-            var parts = [profile.command]
+            var parts: [String] = []
+            if session.useHappy {
+                parts.append("happy")
+                parts.append(session.tool.command)
+            } else {
+                parts.append(profile.command)
+            }
             parts.append(contentsOf: profile.arguments)
-            // Add permission mode flags for tools that support them
             if session.tool.supportsPermissionModes {
                 parts.append(contentsOf: session.permissionMode.cliFlags(for: session.tool))
             }
@@ -789,7 +795,13 @@ public final class RunwayStore {
 
             if let port = await hookServer.actualPort {
                 Self.persistPort(port)
-                try hookInjector.inject(port: port, force: true)
+                for config in HookInjectionConfig.allBuiltIn {
+                    do {
+                        try hookInjector.inject(port: port, config: config, force: true)
+                    } catch {
+                        print("[Runway] Failed to inject hooks for \(config.agentID): \(error)")
+                    }
+                }
             } else {
                 print("[Runway] Hook server started but no port available")
             }
@@ -844,8 +856,10 @@ public final class RunwayStore {
             updateSessionStatus(id: event.sessionID, status: .waiting)
         case .notification:
             break
-        case .beforeAgent, .afterAgent:
-            break
+        case .beforeAgent:
+            updateSessionStatus(id: event.sessionID, status: .running)
+        case .afterAgent:
+            updateSessionStatus(id: event.sessionID, status: .idle)
         }
 
         // Update sidebar activity text for UserPromptSubmit events
