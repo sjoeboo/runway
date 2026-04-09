@@ -295,6 +295,7 @@ struct ProjectSection: View {
                 isHeaderHovered = hovering
             }
         }
+        .collapsible(false)
         .contextMenu {
             Button {
                 isRenaming = true
