@@ -10,6 +10,8 @@ public struct SessionDetailView: View {
     var linkedPR: PullRequest?
     var prDetail: PRDetail? = nil
     var onSelectPR: ((PullRequest) -> Void)?
+    var parentSession: Session? = nil
+    var onSelectSession: ((String) -> Void)? = nil
     @Binding var showSendBar: Bool
     @Binding var showTerminalSearch: Bool
     @Binding var splitHorizontalTrigger: Int
@@ -31,6 +33,8 @@ public struct SessionDetailView: View {
         linkedPR: PullRequest? = nil,
         prDetail: PRDetail? = nil,
         onSelectPR: ((PullRequest) -> Void)? = nil,
+        parentSession: Session? = nil,
+        onSelectSession: ((String) -> Void)? = nil,
         showSendBar: Binding<Bool>,
         showTerminalSearch: Binding<Bool>,
         splitHorizontalTrigger: Binding<Int> = .constant(0),
@@ -49,6 +53,8 @@ public struct SessionDetailView: View {
         self.linkedPR = linkedPR
         self.prDetail = prDetail
         self.onSelectPR = onSelectPR
+        self.parentSession = parentSession
+        self.onSelectSession = onSelectSession
         self._showSendBar = showSendBar
         self._showTerminalSearch = showTerminalSearch
         self._splitHorizontalTrigger = splitHorizontalTrigger
@@ -69,7 +75,9 @@ public struct SessionDetailView: View {
                 session: session,
                 linkedPR: linkedPR,
                 prDetail: prDetail,
+                parentSession: parentSession,
                 onSelectPR: onSelectPR,
+                onSelectSession: onSelectSession,
                 changesVisible: changesVisible,
                 onToggleChanges: onToggleChanges
             )

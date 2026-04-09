@@ -7,7 +7,9 @@ public struct SessionHeaderView: View {
     let session: Session
     var linkedPR: PullRequest?
     var prDetail: PRDetail? = nil
+    var parentSession: Session? = nil
     var onSelectPR: ((PullRequest) -> Void)?
+    var onSelectSession: ((String) -> Void)? = nil
     var changesVisible: Bool = false
     var onToggleChanges: (() -> Void)? = nil
     @Environment(\.theme) private var theme
@@ -16,14 +18,18 @@ public struct SessionHeaderView: View {
         session: Session,
         linkedPR: PullRequest? = nil,
         prDetail: PRDetail? = nil,
+        parentSession: Session? = nil,
         onSelectPR: ((PullRequest) -> Void)? = nil,
+        onSelectSession: ((String) -> Void)? = nil,
         changesVisible: Bool = false,
         onToggleChanges: (() -> Void)? = nil
     ) {
         self.session = session
         self.linkedPR = linkedPR
         self.prDetail = prDetail
+        self.parentSession = parentSession
         self.onSelectPR = onSelectPR
+        self.onSelectSession = onSelectSession
         self.changesVisible = changesVisible
         self.onToggleChanges = onToggleChanges
     }
@@ -48,13 +54,37 @@ public struct SessionHeaderView: View {
 
                     HStack(spacing: 8) {
                         // Tool + permission mode badge
-                        Text("\(session.tool.displayName.lowercased()) · \(session.permissionMode.badgeLabel)")
+                        Text(toolBadgeText)
                             .font(.caption)
-                            .foregroundColor(session.permissionMode.badgeForeground(chrome: theme.chrome))
+                            .foregroundColor(
+                                session.useHappy ? theme.chrome.cyan : session.permissionMode.badgeForeground(chrome: theme.chrome)
+                            )
                             .padding(.horizontal, 7)
                             .padding(.vertical, 3)
-                            .background(session.permissionMode.badgeBackground(chrome: theme.chrome))
+                            .background(
+                                session.useHappy
+                                    ? theme.chrome.cyan.opacity(0.15) : session.permissionMode.badgeBackground(chrome: theme.chrome)
+                            )
                             .clipShape(Capsule())
+                    }
+                }
+
+                if let parent = parentSession {
+                    HStack(spacing: 4) {
+                        Image(systemName: "arrow.triangle.branch")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        Text("Forked from")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        Button {
+                            onSelectSession?(parent.id)
+                        } label: {
+                            Text("\"\(parent.title)\"")
+                                .font(.caption)
+                                .foregroundStyle(theme.chrome.accent)
+                        }
+                        .buttonStyle(.plain)
                     }
                 }
 
@@ -144,6 +174,17 @@ public struct SessionHeaderView: View {
 
             Divider()
         }
+    }
+
+    // MARK: - Computed Properties
+
+    private var toolBadgeText: String {
+        var parts = [session.tool.displayName.lowercased()]
+        if session.useHappy {
+            parts.append("happy")
+        }
+        parts.append(session.permissionMode.badgeLabel)
+        return parts.joined(separator: " · ")
     }
 
     // MARK: - Status Dot

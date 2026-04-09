@@ -423,6 +423,11 @@ struct ContentView: View {
                     linkedPR: store.sessionPRs[sessionID],
                     prDetail: store.prDetailForSession(sessionID),
                     onSelectPR: { pr in Task { await store.selectPR(pr) } },
+                    parentSession: {
+                        guard let parentID = session.parentID else { return nil }
+                        return store.sessions.first(where: { $0.id == parentID })
+                    }(),
+                    onSelectSession: { id in store.selectSession(id) },
                     showSendBar: Binding(
                         get: { store.showSendBar },
                         set: { store.showSendBar = $0 }
