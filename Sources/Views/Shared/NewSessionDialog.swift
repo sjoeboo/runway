@@ -46,6 +46,7 @@ public struct NewSessionDialog: View {
     let onCreateReview: ((ReviewSessionRequest) async throws -> Void)?
 
     @State private var selectedTemplateID: String?
+    let forkSource: Session?
 
     public init(
         projects: [Project],
@@ -53,6 +54,7 @@ public struct NewSessionDialog: View {
         initialProjectID: String? = nil,
         parentID: String? = nil,
         templates: [SessionTemplate] = [],
+        forkSource: Session? = nil,
         onCreate: @escaping (NewSessionRequest) -> Void,
         onCreateReview: ((ReviewSessionRequest) async throws -> Void)? = nil
     ) {
@@ -61,6 +63,7 @@ public struct NewSessionDialog: View {
         self.initialProjectID = initialProjectID
         self.parentID = parentID
         self.templates = templates
+        self.forkSource = forkSource
         self.onCreate = onCreate
         self.onCreateReview = onCreateReview
         self._selectedProjectID = State(initialValue: initialProjectID)
@@ -158,6 +161,23 @@ public struct NewSessionDialog: View {
         .fixedSize(horizontal: false, vertical: true)
         .onAppear {
             permissionMode = defaultPermissionMode
+            if let source = forkSource {
+                title = "Fork of \(source.title)"
+                switch source.tool {
+                case .claude: selectedProfileID = "claude"
+                case .gemini: selectedProfileID = "gemini"
+                case .codex: selectedProfileID = "codex"
+                case .shell: selectedProfileID = "shell"
+                case .custom(let name): selectedProfileID = name
+                }
+                permissionMode = source.permissionMode
+                useHappy = source.useHappy
+                useWorktree = true
+                if let sourceBranch = source.worktreeBranch {
+                    branchName = "\(sourceBranch)-fork"
+                    branchManuallyEdited = true
+                }
+            }
             titleFocused = true
         }
     }
@@ -452,7 +472,8 @@ public struct NewSessionDialog: View {
             branchName: useWorktree ? branchName : nil,
             permissionMode: selectedTool.supportsPermissionModes ? permissionMode : .default,
             useHappy: selectedTool.supportsHappy ? useHappy : false,
-            initialPrompt: (selectedTool.supportsInitialPrompt && !initialPrompt.isEmpty) ? initialPrompt : nil
+            initialPrompt: (selectedTool.supportsInitialPrompt && !initialPrompt.isEmpty) ? initialPrompt : nil,
+            baseBranch: forkSource?.worktreeBranch
         )
 
         onCreate(request)

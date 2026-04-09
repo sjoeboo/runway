@@ -13,6 +13,7 @@ public struct NewSessionRequest: Sendable {
     public let useHappy: Bool
     public let initialPrompt: String?
     public let issueNumber: Int?
+    public let baseBranch: String?
 
     public init(
         title: String,
@@ -25,7 +26,8 @@ public struct NewSessionRequest: Sendable {
         permissionMode: PermissionMode = .default,
         useHappy: Bool = false,
         initialPrompt: String? = nil,
-        issueNumber: Int? = nil
+        issueNumber: Int? = nil,
+        baseBranch: String? = nil
     ) {
         self.title = title
         self.projectID = projectID
@@ -38,5 +40,6 @@ public struct NewSessionRequest: Sendable {
         self.useHappy = useHappy
         self.initialPrompt = initialPrompt
         self.issueNumber = issueNumber
+        self.baseBranch = baseBranch
     }
 }

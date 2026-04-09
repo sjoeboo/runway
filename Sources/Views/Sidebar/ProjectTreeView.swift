@@ -10,6 +10,7 @@ import Theme
 @MainActor
 public protocol SidebarActions {
     func restartSession(id: String) async
+    func forkSession(id: String)
     func deleteSession(id: String, deleteWorktree: Bool)
     func newSession(projectID: String?, parentID: String?)
     func newProject()
@@ -374,9 +375,16 @@ struct SessionRowView: View {
                         .font(.system(.body, design: .default))
                         .onAppear { editTitle = session.title }
                 } else {
-                    Text(session.title)
-                        .font(.system(.body, design: .default))
-                        .foregroundStyle(.primary)
+                    HStack(spacing: 4) {
+                        Text(session.title)
+                            .font(.system(.body, design: .default))
+                            .foregroundStyle(.primary)
+                        if session.parentID != nil {
+                            Image(systemName: "arrow.triangle.branch")
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
                 }
                 if isProvisioningWorktree {
                     HStack(spacing: 4) {
@@ -466,13 +474,22 @@ struct SessionRowView: View {
             .opacity(isHovered ? 1 : 0)
             .allowsHitTesting(isHovered)
 
-            if !isHovered && session.tool != .claude {
-                Text(session.tool.displayName)
-                    .font(.caption2)
-                    .padding(.horizontal, 4)
-                    .padding(.vertical, 1)
-                    .background(theme.chrome.surface)
-                    .clipShape(RoundedRectangle(cornerRadius: 4))
+            if !isHovered {
+                HStack(spacing: 4) {
+                    if session.useHappy {
+                        Image(systemName: "iphone")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+                    if session.tool != .claude {
+                        Text(session.tool.displayName)
+                            .font(.caption2)
+                            .padding(.horizontal, 4)
+                            .padding(.vertical, 1)
+                            .background(theme.chrome.surface)
+                            .clipShape(RoundedRectangle(cornerRadius: 4))
+                    }
+                }
             }
         }
         .padding(.vertical, 4)
@@ -486,10 +503,12 @@ struct SessionRowView: View {
                 Label("Rename Session", systemImage: "pencil")
             }
 
-            Button {
-                actions.newSession(projectID: session.projectID, parentID: session.id)
-            } label: {
-                Label("Spawn Sub-session", systemImage: "arrow.triangle.branch")
+            if session.worktreeBranch != nil {
+                Button {
+                    actions.forkSession(id: session.id)
+                } label: {
+                    Label("Fork Session", systemImage: "arrow.triangle.branch")
+                }
             }
 
             Divider()

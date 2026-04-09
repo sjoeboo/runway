@@ -40,6 +40,7 @@ public final class RunwayStore {
     var showNewProjectDialog: Bool = false
     var newSessionProjectID: String?
     var newSessionParentID: String?
+    var forkSourceSession: Session?
     var statusMessage: StatusMessage?
     var tmuxAvailable: Bool = false
     var showSendBar: Bool = false
@@ -48,6 +49,8 @@ public final class RunwayStore {
     var splitHorizontalTrigger: Int = 0
     /// Incremented to trigger a vertical split in the active terminal tab.
     var splitVerticalTrigger: Int = 0
+    /// Incremented to force terminal tab reinitialization after restart.
+    var terminalRestartTrigger: Int = 0
     var sidebarSearchQuery: String = ""
     var focusSidebarSearch: Bool = false
     var showReviewPRDialog: Bool = false
@@ -387,18 +390,21 @@ public final class RunwayStore {
         // If worktree needed, create it in the background then start the tmux session
         if needsWorktree, let branchName = request.branchName {
             let project = projects.first(where: { $0.id == request.projectID })
-            let baseBranch = project?.defaultBranch ?? "main"
+            let baseBranch = request.baseBranch ?? project?.defaultBranch ?? "main"
 
             provisioningWorktreeIDs.insert(session.id)
 
             Task {
                 let sessionPath: String
+                let actualBranch: String
                 do {
-                    sessionPath = try await worktreeManager.createWorktree(
+                    let result = try await worktreeManager.createWorktree(
                         repoPath: request.path,
                         branchName: branchName,
                         baseBranch: baseBranch
                     )
+                    sessionPath = result.path
+                    actualBranch = result.branch
                 } catch {
                     print("[Runway] Worktree creation failed: \(error)")
                     provisioningWorktreeIDs.remove(session.id)
@@ -409,8 +415,10 @@ public final class RunwayStore {
 
                 if let idx = sessions.firstIndex(where: { $0.id == session.id }) {
                     sessions[idx].path = sessionPath
+                    sessions[idx].worktreeBranch = actualBranch
                 }
                 try? database?.updateSessionPath(id: session.id, path: sessionPath)
+                try? database?.updateSessionBranch(id: session.id, branch: actualBranch)
 
                 provisioningWorktreeIDs.remove(session.id)
 
@@ -423,6 +431,31 @@ public final class RunwayStore {
         }
     }
 
+    /// Builds the CLI command string for an agent session.
+    /// Returns nil for shell sessions (tmux uses its default shell).
+    private func buildAgentCommand(
+        session: Session,
+        profile: AgentProfile,
+        resume: Bool = false
+    ) -> String? {
+        guard profile.id != "shell" else { return nil }
+        var parts: [String] = []
+        if session.useHappy {
+            parts.append("happy")
+            parts.append(session.tool.command)
+        } else {
+            parts.append(profile.command)
+        }
+        parts.append(contentsOf: profile.arguments)
+        if resume {
+            parts.append(contentsOf: profile.resumeArguments)
+        }
+        if session.tool.supportsPermissionModes {
+            parts.append(contentsOf: session.permissionMode.cliFlags(for: session.tool))
+        }
+        return parts.joined(separator: " ")
+    }
+
     /// Creates the tmux session and updates the session status to .running.
     private func startTmuxSession(for session: Session, path: String, initialPrompt: String? = nil) async {
         guard tmuxAvailable else {
@@ -433,23 +466,7 @@ public final class RunwayStore {
 
         let tmuxName = "runway-\(session.id)"
         let profile = profileForSession(session)
-        let toolCommand: String?
-        if profile.id == "shell" {
-            toolCommand = nil  // shell sessions use tmux's default shell
-        } else {
-            var parts: [String] = []
-            if session.useHappy {
-                parts.append("happy")
-                parts.append(session.tool.command)
-            } else {
-                parts.append(profile.command)
-            }
-            parts.append(contentsOf: profile.arguments)
-            if session.tool.supportsPermissionModes {
-                parts.append(contentsOf: session.permissionMode.cliFlags(for: session.tool))
-            }
-            toolCommand = parts.joined(separator: " ")
-        }
+        let toolCommand = buildAgentCommand(session: session, profile: profile, resume: false)
 
         do {
             try await tmuxManager.createSession(
@@ -496,8 +513,10 @@ public final class RunwayStore {
     }
 
     public func restartSession(id: String) async {
-        guard let idx = sessions.firstIndex(where: { $0.id == id }) else { return }
-        let session = sessions[idx]
+        guard let session = sessions.first(where: { $0.id == id }) else { return }
+
+        // Transition to .starting so TerminalTabView clears its tabs
+        updateSessionStatus(id: id, status: .starting)
 
         // Kill existing tmux sessions (main + shell tabs)
         let tmuxName = "runway-\(id)"
@@ -515,17 +534,7 @@ public final class RunwayStore {
         // Recreate tmux session
         if tmuxAvailable {
             let profile = profileForSession(session)
-            let toolCommand: String?
-            if profile.id == "shell" {
-                toolCommand = nil  // shell sessions use tmux's default shell
-            } else {
-                var parts = [profile.command]
-                parts.append(contentsOf: profile.arguments)
-                if session.tool.supportsPermissionModes {
-                    parts.append(contentsOf: session.permissionMode.cliFlags(for: session.tool))
-                }
-                toolCommand = parts.joined(separator: " ")
-            }
+            let toolCommand = buildAgentCommand(session: session, profile: profile, resume: true)
 
             do {
                 try await tmuxManager.createSession(
@@ -537,14 +546,13 @@ public final class RunwayStore {
                         "RUNWAY_TITLE": session.title,
                     ]
                 )
-                sessions[idx].status = .running
+                updateSessionStatus(id: id, status: .running)
+                terminalRestartTrigger += 1
             } catch {
                 print("[Runway] Failed to restart tmux session: \(error)")
-                sessions[idx].status = .error
+                updateSessionStatus(id: id, status: .error)
             }
         }
-
-        try? database?.updateSessionStatus(id: id, status: sessions[idx].status)
     }
 
     public func deleteSession(id: String, deleteWorktree: Bool = false) {
@@ -1548,6 +1556,16 @@ extension RunwayStore: SidebarActions {
     public func newSession(projectID: String?, parentID: String? = nil) {
         newSessionProjectID = projectID
         newSessionParentID = parentID
+        showNewSessionDialog = true
+    }
+
+    public func forkSession(id: String) {
+        guard let session = sessions.first(where: { $0.id == id }),
+            session.worktreeBranch != nil
+        else { return }
+        forkSourceSession = session
+        newSessionProjectID = session.projectID
+        newSessionParentID = session.id
         showNewSessionDialog = true
     }
 

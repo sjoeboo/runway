@@ -141,7 +141,14 @@ struct ContentView: View {
             .sheet(
                 isPresented: Binding(
                     get: { store.showNewSessionDialog },
-                    set: { store.showNewSessionDialog = $0 }
+                    set: {
+                        store.showNewSessionDialog = $0
+                        if !$0 {
+                            store.newSessionProjectID = nil
+                            store.newSessionParentID = nil
+                            store.forkSourceSession = nil
+                        }
+                    }
                 )
             ) {
                 NewSessionDialog(
@@ -150,10 +157,12 @@ struct ContentView: View {
                     initialProjectID: store.newSessionProjectID,
                     parentID: store.newSessionParentID,
                     templates: store.availableTemplates(forProjectID: store.newSessionProjectID),
+                    forkSource: store.forkSourceSession,
                     onCreate: { request in
                         Task { await store.handleNewSessionRequest(request) }
                         store.newSessionProjectID = nil
                         store.newSessionParentID = nil
+                        store.forkSourceSession = nil
                     },
                     onCreateReview: { request in
                         try await store.handleReviewSessionRequest(request)
@@ -414,6 +423,11 @@ struct ContentView: View {
                     linkedPR: store.sessionPRs[sessionID],
                     prDetail: store.prDetailForSession(sessionID),
                     onSelectPR: { pr in Task { await store.selectPR(pr) } },
+                    parentSession: {
+                        guard let parentID = session.parentID else { return nil }
+                        return store.sessions.first(where: { $0.id == parentID })
+                    }(),
+                    onSelectSession: { id in store.selectSession(id) },
                     showSendBar: Binding(
                         get: { store.showSendBar },
                         set: { store.showSendBar = $0 }
@@ -429,6 +443,10 @@ struct ContentView: View {
                     splitVerticalTrigger: Binding(
                         get: { store.splitVerticalTrigger },
                         set: { store.splitVerticalTrigger = $0 }
+                    ),
+                    terminalRestartTrigger: Binding(
+                        get: { store.terminalRestartTrigger },
+                        set: { store.terminalRestartTrigger = $0 }
                     ),
                     changesVisible: Binding(
                         get: { store.changesVisible },

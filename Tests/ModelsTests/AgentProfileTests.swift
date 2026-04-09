@@ -110,3 +110,67 @@ import Testing
     #expect(profile.runningPatterns == ["Applying edit"])
     #expect(!profile.hookEnabled)
 }
+
+@Test func claudeProfileHasResumeArguments() {
+    #expect(AgentProfile.claude.resumeArguments == ["--continue"])
+}
+
+@Test func geminiProfileHasResumeArguments() {
+    #expect(AgentProfile.gemini.resumeArguments == ["--resume"])
+}
+
+@Test func codexProfileHasResumeArguments() {
+    #expect(AgentProfile.codex.resumeArguments == ["--continue"])
+}
+
+@Test func shellProfileHasEmptyResumeArguments() {
+    #expect(AgentProfile.shell.resumeArguments.isEmpty)
+}
+
+@Test func customProfileHasEmptyResumeArguments() {
+    let profile = AgentProfile.defaultProfile(for: .custom("aider"))
+    #expect(profile.resumeArguments.isEmpty)
+}
+
+@Test func agentProfileJSONDecodingWithResumeArguments() throws {
+    let json = """
+        {
+            "id": "cursor",
+            "name": "Cursor",
+            "command": "cursor",
+            "arguments": [],
+            "resumeArguments": ["--resume-last"],
+            "runningPatterns": [],
+            "waitingPatterns": [],
+            "idlePatterns": ["$"],
+            "lineStartIdlePatterns": [],
+            "spinnerChars": [],
+            "hookEnabled": false,
+            "icon": "terminal.fill"
+        }
+        """
+    let data = try #require(json.data(using: .utf8))
+    let profile = try JSONDecoder().decode(AgentProfile.self, from: data)
+    #expect(profile.resumeArguments == ["--resume-last"])
+}
+
+@Test func agentProfileJSONDecodingWithoutResumeArguments() throws {
+    let json = """
+        {
+            "id": "aider",
+            "name": "Aider",
+            "command": "aider",
+            "arguments": ["--watch"],
+            "runningPatterns": ["Applying edit"],
+            "waitingPatterns": ["Add these files?"],
+            "idlePatterns": ["aider>"],
+            "lineStartIdlePatterns": [],
+            "spinnerChars": [],
+            "hookEnabled": false,
+            "icon": "terminal.fill"
+        }
+        """
+    let data = try #require(json.data(using: .utf8))
+    let profile = try JSONDecoder().decode(AgentProfile.self, from: data)
+    #expect(profile.resumeArguments.isEmpty)
+}

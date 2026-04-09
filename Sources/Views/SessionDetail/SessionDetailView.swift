@@ -10,10 +10,13 @@ public struct SessionDetailView: View {
     var linkedPR: PullRequest?
     var prDetail: PRDetail? = nil
     var onSelectPR: ((PullRequest) -> Void)?
+    var parentSession: Session? = nil
+    var onSelectSession: ((String) -> Void)? = nil
     @Binding var showSendBar: Bool
     @Binding var showTerminalSearch: Bool
     @Binding var splitHorizontalTrigger: Int
     @Binding var splitVerticalTrigger: Int
+    @Binding var terminalRestartTrigger: Int
     @Binding var changesVisible: Bool
     @Binding var changesMode: ChangesMode
     let changes: [FileChange]
@@ -31,10 +34,13 @@ public struct SessionDetailView: View {
         linkedPR: PullRequest? = nil,
         prDetail: PRDetail? = nil,
         onSelectPR: ((PullRequest) -> Void)? = nil,
+        parentSession: Session? = nil,
+        onSelectSession: ((String) -> Void)? = nil,
         showSendBar: Binding<Bool>,
         showTerminalSearch: Binding<Bool>,
         splitHorizontalTrigger: Binding<Int> = .constant(0),
         splitVerticalTrigger: Binding<Int> = .constant(0),
+        terminalRestartTrigger: Binding<Int> = .constant(0),
         changesVisible: Binding<Bool>,
         changesMode: Binding<ChangesMode>,
         changes: [FileChange] = [],
@@ -49,10 +55,13 @@ public struct SessionDetailView: View {
         self.linkedPR = linkedPR
         self.prDetail = prDetail
         self.onSelectPR = onSelectPR
+        self.parentSession = parentSession
+        self.onSelectSession = onSelectSession
         self._showSendBar = showSendBar
         self._showTerminalSearch = showTerminalSearch
         self._splitHorizontalTrigger = splitHorizontalTrigger
         self._splitVerticalTrigger = splitVerticalTrigger
+        self._terminalRestartTrigger = terminalRestartTrigger
         self._changesVisible = changesVisible
         self._changesMode = changesMode
         self.changes = changes
@@ -69,7 +78,9 @@ public struct SessionDetailView: View {
                 session: session,
                 linkedPR: linkedPR,
                 prDetail: prDetail,
+                parentSession: parentSession,
                 onSelectPR: onSelectPR,
+                onSelectSession: onSelectSession,
                 changesVisible: changesVisible,
                 onToggleChanges: onToggleChanges
             )
@@ -129,8 +140,10 @@ public struct SessionDetailView: View {
                 tmuxManager: tmuxManager,
                 showSearch: $showTerminalSearch,
                 splitHorizontalTrigger: $splitHorizontalTrigger,
-                splitVerticalTrigger: $splitVerticalTrigger
+                splitVerticalTrigger: $splitVerticalTrigger,
+                terminalRestartTrigger: $terminalRestartTrigger
             )
+            .id("terminal-\(session.id)-\(terminalRestartTrigger)")
         }
     }
 }
