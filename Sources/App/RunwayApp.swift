@@ -141,7 +141,14 @@ struct ContentView: View {
             .sheet(
                 isPresented: Binding(
                     get: { store.showNewSessionDialog },
-                    set: { store.showNewSessionDialog = $0 }
+                    set: {
+                        store.showNewSessionDialog = $0
+                        if !$0 {
+                            store.newSessionProjectID = nil
+                            store.newSessionParentID = nil
+                            store.forkSourceSession = nil
+                        }
+                    }
                 )
             ) {
                 NewSessionDialog(
