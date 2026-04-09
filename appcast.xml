@@ -3,13 +3,13 @@
     <channel>
         <title>Runway</title>
         <item>
-            <title>0.4.1</title>
-            <pubDate>Wed, 08 Apr 2026 14:17:46 +0000</pubDate>
+            <title>0.5.0</title>
+            <pubDate>Thu, 09 Apr 2026 01:45:43 +0000</pubDate>
             <link>https://github.com/sjoeboo/runway/releases</link>
-            <sparkle:version>158</sparkle:version>
-            <sparkle:shortVersionString>0.4.1</sparkle:shortVersionString>
+            <sparkle:version>164</sparkle:version>
+            <sparkle:shortVersionString>0.5.0</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
-            <enclosure url="https://github.com/sjoeboo/runway/releases/download/v0.4.1/Runway-0.4.1-universal.app.zip" length="15290755" type="application/octet-stream" sparkle:edSignature="lLvGkLYffSSmurHe7BKhSJH1qKAjg5GmQevgWUn5nuINYC+6EqqDGiHn3BB2vd0Aw0oRamVUwSjN9x4pNbwQAA=="/>
+            <enclosure url="https://github.com/sjoeboo/runway/releases/download/v0.5.0/Runway-0.5.0-universal.app.zip" length="15330138" type="application/octet-stream" sparkle:edSignature="+khjshcVroGYdBZeyzsPDsX8jRXc5KamwBRmqpdOp6MD7Wkr2u9Rr4SrqSId7cMo9Nvbq7wHSLElAaVpmfzHCA=="/>
         </item>
     </channel>
 </rss>
