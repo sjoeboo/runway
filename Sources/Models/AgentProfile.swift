@@ -17,6 +17,8 @@ public struct AgentProfile: Identifiable, Codable, Sendable {
     public let lineStartIdlePatterns: [String]
     /// Single characters used as spinner indicators (e.g., braille dots).
     public let spinnerChars: [String]
+    /// CLI arguments to pass when resuming a previous conversation.
+    public let resumeArguments: [String]
     /// Whether this agent supports Runway's HTTP hook protocol.
     public let hookEnabled: Bool
     /// SF Symbol name for the agent's icon.
@@ -32,6 +34,7 @@ public struct AgentProfile: Identifiable, Codable, Sendable {
         idlePatterns: [String] = [],
         lineStartIdlePatterns: [String] = [],
         spinnerChars: [String] = [],
+        resumeArguments: [String] = [],
         hookEnabled: Bool = false,
         icon: String = "terminal.fill"
     ) {
@@ -44,8 +47,31 @@ public struct AgentProfile: Identifiable, Codable, Sendable {
         self.idlePatterns = idlePatterns
         self.lineStartIdlePatterns = lineStartIdlePatterns
         self.spinnerChars = spinnerChars
+        self.resumeArguments = resumeArguments
         self.hookEnabled = hookEnabled
         self.icon = icon
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case id, name, command, arguments, runningPatterns, waitingPatterns
+        case idlePatterns, lineStartIdlePatterns, spinnerChars, resumeArguments
+        case hookEnabled, icon
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(String.self, forKey: .id)
+        name = try container.decode(String.self, forKey: .name)
+        command = try container.decode(String.self, forKey: .command)
+        arguments = try container.decodeIfPresent([String].self, forKey: .arguments) ?? []
+        runningPatterns = try container.decodeIfPresent([String].self, forKey: .runningPatterns) ?? []
+        waitingPatterns = try container.decodeIfPresent([String].self, forKey: .waitingPatterns) ?? []
+        idlePatterns = try container.decodeIfPresent([String].self, forKey: .idlePatterns) ?? []
+        lineStartIdlePatterns = try container.decodeIfPresent([String].self, forKey: .lineStartIdlePatterns) ?? []
+        spinnerChars = try container.decodeIfPresent([String].self, forKey: .spinnerChars) ?? []
+        resumeArguments = try container.decodeIfPresent([String].self, forKey: .resumeArguments) ?? []
+        hookEnabled = try container.decodeIfPresent(Bool.self, forKey: .hookEnabled) ?? false
+        icon = try container.decodeIfPresent(String.self, forKey: .icon) ?? "terminal.fill"
     }
 }
 
@@ -92,6 +118,7 @@ extension AgentProfile {
         ],
         lineStartIdlePatterns: ["> ", "$ "],
         spinnerChars: ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"],
+        resumeArguments: ["--continue"],
         hookEnabled: true,
         icon: "sparkle"
     )
@@ -130,6 +157,7 @@ extension AgentProfile {
         idlePatterns: ["Type your message"],
         lineStartIdlePatterns: ["> "],
         spinnerChars: ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"],
+        resumeArguments: ["--resume"],
         hookEnabled: true,
         icon: "diamond.fill"
     )
@@ -152,6 +180,7 @@ extension AgentProfile {
         idlePatterns: ["Ask Codex to do anything"],
         lineStartIdlePatterns: [],
         spinnerChars: [],
+        resumeArguments: ["--continue"],
         hookEnabled: true,
         icon: "cpu"
     )
