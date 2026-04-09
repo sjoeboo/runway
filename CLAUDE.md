@@ -37,7 +37,7 @@ Pure SwiftUI app with modular SPM targets:
 |--------|---------|
 | `App` | SwiftUI entry point, window management, RunwayStore |
 | `Models` | Session, Project, PullRequest, HookEvent, GitHubIssue, AgentProfile, SessionEvent, SessionTemplate |
-| `Persistence` | GRDB/SQLite with migrations (v1–v13) |
+| `Persistence` | GRDB/SQLite with migrations (v1–v14) |
 | `Terminal` | TerminalProvider protocol, PTY + tmux session management |
 | `TerminalView` | NSViewRepresentable wrapping SwiftTerm, TerminalSearchBar, event monitors, session cache |
 | `GitOperations` | Actor-based git CLI worktree operations |
@@ -75,7 +75,7 @@ Dual-path: HTTP hooks (ephemeral port, force-injected on every launch into `~/.c
 
 ## Testing
 
-230 tests across 8 targets: ModelsTests, PersistenceTests, StatusDetectionTests, GitOperationsTests, ThemeTests, GitHubOperationsTests, TerminalTests, ViewsTests.
+266 tests across 8 targets: ModelsTests, PersistenceTests, StatusDetectionTests, GitOperationsTests, ThemeTests, GitHubOperationsTests, TerminalTests, ViewsTests.
 
 ## Keyboard Shortcuts
 

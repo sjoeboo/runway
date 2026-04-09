@@ -5,6 +5,25 @@ All notable changes to Runway are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.5.0] — 2026-04-08
+
+### Added
+
+- **Multi-agent support** — first-class Gemini CLI and Codex support alongside Claude Code, with agent-specific permission modes, data-driven hook injection, and optional Happy wrapper for mobile/remote access ([#241](https://github.com/sjoeboo/runway/pull/241))
+
+### Fixed
+
+- **Terminal scrollback replay** — eliminated full scrollback buffer replay when switching sessions or tabs ([#239](https://github.com/sjoeboo/runway/pull/239))
+- **Dock badge and notifications not clearing** — dock badge count and pending notifications now clear properly when a session leaves the waiting state ([#238](https://github.com/sjoeboo/runway/pull/238))
+- **Split panes opening in wrong directory** — split panes now open in the project directory instead of `/`, and click-to-focus works between tmux panes ([#237](https://github.com/sjoeboo/runway/pull/237))
+
+### Maintenance
+
+- Resolved all compiler warnings across the codebase ([#240](https://github.com/sjoeboo/runway/pull/240))
+- Test suite expanded from 230 to 266 tests
+
+[0.5.0]: https://github.com/sjoeboo/runway/compare/v0.4.1...v0.5.0
+
 ## [0.4.1] — 2026-04-08
 
 ### Fixed

@@ -67,7 +67,7 @@ make precommit      # fix, then verify everything passes
 
 ### Session Management
 
-Create named sessions tied to projects. Each session launches a terminal running your chosen tool (Claude Code, shell, or custom command) in an isolated git worktree.
+Create named sessions tied to projects. Each session launches a terminal running your chosen agent (Claude Code, Gemini CLI, Codex, shell, or custom command) in an isolated git worktree.
 
 - **Auto-branch naming** — session name suggests a branch using the project's configured prefix (default: `feature/`)
 - **Per-project branch prefixes** — configure `feature/`, `fix/`, `yourname/`, or any prefix in Project Settings
@@ -84,6 +84,7 @@ Create named sessions tied to projects. Each session launches a terminal running
 - **Issue-linked sessions** — start sessions directly from GitHub Issues with auto-generated branch names
 - **Activity log** — per-session event timeline with issue badge and activity subtitle in sidebar
 - **Deep linking** — `runway://` URL scheme for opening sessions, PRs, and creating new sessions
+- **Multi-agent support** — first-class support for Claude Code, Gemini CLI, and Codex with agent-specific permission modes, hook injection, and optional Happy wrapper for mobile/remote access
 - **Session search** — `Cmd+K` filters the sidebar by session name, branch, or project name
 
 ### Live Status Detection
@@ -94,7 +95,7 @@ Runway knows what your agent is doing. Two detection paths work together:
 |--------|-------------|
 | **HTTP Hooks** | Claude Code sends lifecycle events (session start, permission request, stop) to Runway's hook server |
 | **Buffer Polling** | Every 3 seconds, terminal buffer content is scanned for 90+ patterns — spinners, prompts, permission dialogs, idle indicators |
-| **Agent Profiles** | Configurable detection profiles (Claude, Shell built-ins) with profile-based pattern matching |
+| **Agent Profiles** | Configurable detection profiles (Claude, Gemini CLI, Codex, Shell) with profile-based pattern matching |
 
 Hook injection is automatic — Runway writes to `~/.claude/settings.json` on every launch with the current ephemeral port.
 
@@ -236,7 +237,7 @@ Runway auto-injects hooks into `~/.claude/settings.json` on every launch, subscr
 
 ## CI & Testing
 
-- **230 tests** across 8 test targets
+- **266 tests** across 8 test targets
 - **GitHub Actions CI** on every PR: build, test, SwiftLint, swift-format
 - **Branch protection** on `master` — CI must pass before merging
 - **Pre-commit hooks** run lint + format checks locally
