@@ -95,7 +95,8 @@ public final class NotificationManager: NSObject, UNUserNotificationCenterDelega
     func clearDeliveredNotifications(forSessionID sessionID: String) {
         guard isBundled else { return }
         let center = UNUserNotificationCenter.current()
-        center.getDeliveredNotifications { notifications in
+        Task {
+            let notifications = await center.deliveredNotifications()
             let matching =
                 notifications
                 .filter { $0.request.content.userInfo["sessionID"] as? String == sessionID }

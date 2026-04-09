@@ -213,89 +213,60 @@ struct ProjectSection: View {
     }
 
     var body: some View {
-        Section {
-            if isExpanded {
-                ForEach(rootSessions) { session in
-                    SessionRowView(
-                        session: session,
-                        linkedPR: sessionPRs[session.id],
-                        isProvisioningWorktree: provisioningWorktreeIDs.contains(session.id),
-                        actions: actions
-                    )
-                    .tag(session.id)
-
-                    // Child sessions indented under parent
-                    ForEach(children(of: session.id)) { child in
-                        SessionRowView(
-                            session: child,
-                            linkedPR: sessionPRs[child.id],
-                            isProvisioningWorktree: provisioningWorktreeIDs.contains(child.id),
-                            actions: actions
-                        )
-                        .padding(.leading, 20)
-                        .tag(child.id)
+        // Project header as a plain list row — avoids Section's hover disclosure arrow
+        HStack(spacing: 4) {
+            Image(systemName: "chevron.right")
+                .font(.caption)
+                .foregroundColor(theme.chrome.textDim)
+                .rotationEffect(.degrees(isExpanded ? 90 : 0))
+                .animation(.easeInOut(duration: 0.15), value: isExpanded)
+                .frame(width: 16)
+                .onTapGesture {
+                    withAnimation(.easeInOut(duration: 0.15)) {
+                        isExpanded.toggle()
                     }
                 }
-                .onMove { fromOffsets, toOffset in
-                    actions.reorderSessions(in: project.id, fromOffsets: fromOffsets, toOffset: toOffset)
-                }
-            }
-        } header: {
-            HStack(spacing: 4) {
-                Image(systemName: "chevron.right")
-                    .font(.caption)
-                    .foregroundColor(theme.chrome.textDim)
-                    .rotationEffect(.degrees(isExpanded ? 90 : 0))
-                    .animation(.easeInOut(duration: 0.15), value: isExpanded)
-                    .frame(width: 16)
+
+            if isRenaming {
+                TextField("Project name", text: $editName)
+                    .onSubmit {
+                        if !editName.isEmpty {
+                            actions.renameProject(id: project.id, name: editName)
+                        }
+                        isRenaming = false
+                    }
+                    .textFieldStyle(.plain)
+                    .font(.system(.callout, weight: .semibold))
+                    .onAppear { editName = project.name }
+            } else {
+                Text(project.name)
+                    .font(.system(.callout, weight: .semibold))
+                    .foregroundColor(theme.chrome.text)
+                    .accessibilityLabel("Project: \(project.name)")
+                    .accessibilityHint("Tap to open project settings")
                     .onTapGesture {
-                        withAnimation(.easeInOut(duration: 0.15)) {
-                            isExpanded.toggle()
-                        }
+                        actions.selectProject(project.id)
                     }
-
-                if isRenaming {
-                    TextField("Project name", text: $editName)
-                        .onSubmit {
-                            if !editName.isEmpty {
-                                actions.renameProject(id: project.id, name: editName)
-                            }
-                            isRenaming = false
-                        }
-                        .textFieldStyle(.plain)
-                        .font(.system(.callout, weight: .semibold))
-                        .onAppear { editName = project.name }
-                } else {
-                    Text(project.name)
-                        .font(.system(.callout, weight: .semibold))
-                        .foregroundColor(theme.chrome.text)
-                        .accessibilityLabel("Project: \(project.name)")
-                        .accessibilityHint("Tap to open project settings")
-                        .onTapGesture {
-                            actions.selectProject(project.id)
-                        }
-                }
-                Spacer()
-
-                if !isRenaming {
-                    Button {
-                        actions.newSession(projectID: project.id, parentID: nil)
-                    } label: {
-                        Image(systemName: "plus")
-                            .font(.callout)
-                            .foregroundColor(isHeaderHovered ? theme.chrome.text : theme.chrome.textDim)
-                            .frame(width: 26, height: 26)
-                            .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-                    .help("New session in \(project.name)")
-                }
             }
-            .onHover { hovering in
-                isHeaderHovered = hovering
+            Spacer()
+
+            if !isRenaming {
+                Button {
+                    actions.newSession(projectID: project.id, parentID: nil)
+                } label: {
+                    Image(systemName: "plus")
+                        .font(.callout)
+                        .foregroundColor(isHeaderHovered ? theme.chrome.text : theme.chrome.textDim)
+                        .frame(width: 26, height: 26)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .help("New session in \(project.name)")
             }
         }
-        .collapsible(false)
+        .onHover { hovering in
+            isHeaderHovered = hovering
+        }
         .contextMenu {
             Button {
                 isRenaming = true
@@ -341,6 +312,34 @@ struct ProjectSection: View {
             Button("Cancel", role: .cancel) {}
         } message: {
             Text("This will remove the project and all its sessions from Runway. Worktrees on disk will not be deleted.")
+        }
+
+        // Session rows (flat list items, not inside a Section)
+        if isExpanded {
+            ForEach(rootSessions) { session in
+                SessionRowView(
+                    session: session,
+                    linkedPR: sessionPRs[session.id],
+                    isProvisioningWorktree: provisioningWorktreeIDs.contains(session.id),
+                    actions: actions
+                )
+                .tag(session.id)
+
+                // Child sessions indented under parent
+                ForEach(children(of: session.id)) { child in
+                    SessionRowView(
+                        session: child,
+                        linkedPR: sessionPRs[child.id],
+                        isProvisioningWorktree: provisioningWorktreeIDs.contains(child.id),
+                        actions: actions
+                    )
+                    .padding(.leading, 20)
+                    .tag(child.id)
+                }
+            }
+            .onMove { fromOffsets, toOffset in
+                actions.reorderSessions(in: project.id, fromOffsets: fromOffsets, toOffset: toOffset)
+            }
         }
     }
 }
