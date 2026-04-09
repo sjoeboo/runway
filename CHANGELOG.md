@@ -5,6 +5,14 @@ All notable changes to Runway are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.5.1] — 2026-04-08
+
+### Fixed
+
+- **Duplicate disclosure arrows in sidebar** — suppressed redundant disclosure arrow on project sections that already have a custom chevron ([#242](https://github.com/sjoeboo/runway/pull/242))
+
+[0.5.1]: https://github.com/sjoeboo/runway/compare/v0.5.0...v0.5.1
+
 ## [0.5.0] — 2026-04-08
 
 ### Added
