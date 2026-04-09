@@ -23,7 +23,7 @@
 | **📋** | **GitHub PR dashboard** | Review, approve, merge, request changes, toggle automerge, and view CI checks — all without leaving the app |
 | **📌** | **GitHub Issues** | View, create, and manage issues per project |
 | **🔔** | **Notifications** | Native macOS notifications for permission requests and session completion, with enable/disable toggle in Settings |
-| **🎨** | **Theme system** | 6 built-in themes + user-installable custom themes from `~/.runway/themes/` |
+| **🎨** | **Theme system** | 18 built-in themes + user-installable custom themes from `~/.runway/themes/` |
 | **📂** | **Project organization** | Group sessions by project with per-project settings for theme, permissions, and branch prefix |
 | **⌨️** | **Keyboard-driven** | 15 shortcuts — `Cmd+K` search, `Cmd+N` new session, `Cmd+D` split pane, `Cmd+3` changes, and more |
 
@@ -85,6 +85,8 @@ Create named sessions tied to projects. Each session launches a terminal running
 - **Activity log** — per-session event timeline with issue badge and activity subtitle in sidebar
 - **Deep linking** — `runway://` URL scheme for opening sessions, PRs, and creating new sessions
 - **Multi-agent support** — first-class support for Claude Code, Gemini CLI, and Codex with agent-specific permission modes, hook injection, and optional Happy wrapper for mobile/remote access
+- **Session restart/resume** — restart stopped sessions from the sidebar context menu, resuming from where they left off
+- **Fork session** — create a new session forked from an existing one, inheriting configuration and branch
 - **Session search** — `Cmd+K` filters the sidebar by session name, branch, or project name
 
 ### Live Status Detection
@@ -149,18 +151,23 @@ Per-project configuration from the sidebar context menu:
 
 ### Theme System
 
-Six hand-crafted themes with paired light/dark variants:
+18 hand-crafted themes with paired light/dark variants:
 
 | Theme | Style |
 |-------|-------|
 | Tokyo Night Storm | Dark, purple/blue |
 | Ayu Mirage | Dark, warm amber |
-| Everforest Dark | Dark, nature green |
-| Everforest Light | Light, nature green |
-| Oasis Lagoon Dark | Dark, deep navy |
-| Oasis Lagoon Light | Light, ocean blue |
+| Catppuccin Mocha / Latte | Dark pastel / Light pastel |
+| Dracula / Alucard | Dark purple / Light purple |
+| Everforest Dark / Light | Nature green |
+| Gruvbox Dark / Light | Warm retro |
+| Kanagawa | Dark, wave blue |
+| Nord | Dark, arctic blue |
+| Oasis Lagoon Dark / Light | Ocean blue |
+| Rosé Pine / Dawn | Dark muted / Light rosé |
+| Solarized Dark / Light | Precision color |
 
-Themes apply to both the app chrome (sidebar, toolbar, status bar) and the terminal (ANSI colors, cursor, selection). System appearance auto-switching is supported.
+Themes apply to both the app chrome (sidebar, toolbar, status bar) and the terminal (ANSI colors, cursor, selection). System appearance auto-switching is supported with 7 paired theme sets.
 
 **Custom themes**: Drop a JSON theme file into `~/.runway/themes/` and it appears in the theme picker automatically.
 
@@ -217,7 +224,7 @@ Sources/
 | Swift Actors | WorktreeManager, PRManager | Thread-safe CLI operations without locks |
 | SidebarActions protocol | ProjectTreeView | Eliminates prop drilling — single protocol replaces 14 callbacks |
 | TerminalProvider protocol | Terminal target | Abstracts backend (SwiftTerm now, libghostty later) |
-| GRDB typed records | Persistence | Type-safe SQLite with migrations (currently v13) |
+| GRDB typed records | Persistence | Type-safe SQLite with migrations (currently v14) |
 | Environment injection | Theme | `@Environment(\.theme)` for consistent theming |
 
 ## Configuration
@@ -237,7 +244,7 @@ Runway auto-injects hooks into `~/.claude/settings.json` on every launch, subscr
 
 ## CI & Testing
 
-- **266 tests** across 8 test targets
+- **273 tests** across 8 test targets
 - **GitHub Actions CI** on every PR: build, test, SwiftLint, swift-format
 - **Branch protection** on `master` — CI must pass before merging
 - **Pre-commit hooks** run lint + format checks locally

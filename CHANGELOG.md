@@ -5,6 +5,27 @@ All notable changes to Runway are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.6.0] — 2026-04-09
+
+### Added
+
+- **Session restart/resume** — restart stopped sessions from the sidebar context menu, resuming from where they left off ([#245](https://github.com/sjoeboo/runway/pull/245))
+- **Fork session** — create a new session forked from an existing one, inheriting its configuration and branch as a starting point ([#245](https://github.com/sjoeboo/runway/pull/245))
+- **Happy wrapper indicators** — visual indicators (cyan permission badge, "happy" subtitle) when a session is launched with Happy for mobile/remote access ([#245](https://github.com/sjoeboo/runway/pull/245))
+- **12 new built-in themes** — Catppuccin Mocha/Latte, Dracula/Alucard, Gruvbox Dark/Light, Kanagawa, Nord, Rosé Pine/Dawn, Solarized Dark/Light, all with paired light/dark auto-switching ([#244](https://github.com/sjoeboo/runway/pull/244))
+
+### Fixed
+
+- **43 bugs from pre-1.0.0 bug hunt** — comprehensive quality pass across 27 files covering UI glitches, state management edge cases, and correctness issues ([#246](https://github.com/sjoeboo/runway/pull/246)–[#292](https://github.com/sjoeboo/runway/pull/292), [#293](https://github.com/sjoeboo/runway/pull/293))
+- **Crash in notification cleanup** — fixed a crash during notification center cleanup and sidebar disclosure arrow regression ([#243](https://github.com/sjoeboo/runway/pull/243))
+
+### Maintenance
+
+- Test suite expanded from 266 to 273 tests
+- Database migration v14 adds Happy wrapper support
+
+[0.6.0]: https://github.com/sjoeboo/runway/compare/v0.5.2...v0.6.0
+
 ## [0.5.1] — 2026-04-08
 
 ### Fixed
