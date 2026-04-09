@@ -10,6 +10,7 @@ struct ResizableDivider: View {
 
     @State private var isDragging = false
     @State private var dragStart: Double = 0
+    @State private var cursorPushed = false
     @Environment(\.theme) private var theme
 
     var body: some View {
@@ -18,10 +19,12 @@ struct ResizableDivider: View {
             .frame(width: isDragging ? 3 : 1)
             .contentShape(Rectangle().inset(by: -3))
             .onHover { hovering in
-                if hovering {
+                if hovering, !cursorPushed {
                     NSCursor.resizeLeftRight.push()
-                } else {
+                    cursorPushed = true
+                } else if !hovering, cursorPushed {
                     NSCursor.pop()
+                    cursorPushed = false
                 }
             }
             .gesture(

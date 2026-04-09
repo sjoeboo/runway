@@ -42,12 +42,12 @@ final class CheckForUpdatesViewModel: ObservableObject {
 
 /// A button that triggers a manual update check. Suitable for menus and settings.
 struct CheckForUpdatesView: View {
-    @ObservedObject private var viewModel: CheckForUpdatesViewModel
+    @StateObject private var viewModel: CheckForUpdatesViewModel
     private let updater: SPUUpdater
 
     init(updater: SPUUpdater) {
         self.updater = updater
-        self.viewModel = CheckForUpdatesViewModel(updater: updater)
+        self._viewModel = StateObject(wrappedValue: CheckForUpdatesViewModel(updater: updater))
     }
 
     var body: some View {

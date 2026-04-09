@@ -46,7 +46,18 @@ public enum ShellRunner {
             applyFallbackPath(current)
             return
         }
-        process.waitUntilExit()
+
+        // Timeout after 3 seconds — complex shell configs (nvm, rbenv, pyenv)
+        // can take a long time and this blocks the main thread at launch.
+        let deadline = DispatchTime.now() + .seconds(3)
+        let semaphore = DispatchSemaphore(value: 0)
+        process.terminationHandler = { _ in semaphore.signal() }
+        if semaphore.wait(timeout: deadline) == .timedOut {
+            process.terminate()
+            print("[Runway] Login shell timed out after 3s, applying fallback PATH")
+            applyFallbackPath(current)
+            return
+        }
 
         let data = pipe.fileHandleForReading.readDataToEndOfFile()
         let resolved = String(data: data, encoding: .utf8) ?? ""
@@ -98,8 +109,6 @@ public enum ShellRunner {
         process.standardOutput = stdoutPipe
         process.standardError = stderrPipe
 
-        try process.run()
-
         // Drain both pipes concurrently to prevent pipe buffer deadlocks.
         // If a child writes >64KB to stdout or stderr, it blocks until the
         // pipe is drained. Reading only after termination creates a deadlock
@@ -112,9 +121,18 @@ public enum ShellRunner {
         }.value
 
         // Use terminationHandler + continuation to avoid blocking the cooperative thread pool.
+        // IMPORTANT: Set terminationHandler BEFORE process.run() to prevent a race where
+        // the process exits before the handler is assigned, leaving the continuation
+        // permanently unresolved and deadlocking the calling actor.
         let terminationStatus: Int32 = try await withCheckedThrowingContinuation { continuation in
             process.terminationHandler = { proc in
                 continuation.resume(returning: proc.terminationStatus)
+            }
+            do {
+                try process.run()
+            } catch {
+                process.terminationHandler = nil
+                continuation.resume(throwing: error)
             }
         }
 

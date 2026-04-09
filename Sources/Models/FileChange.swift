@@ -109,9 +109,9 @@ public func buildFileTree(_ changes: [FileChange], prefix: String = "") -> [File
         let adds = children.reduce(0) { $0 + $1.additions }
         let dels = children.reduce(0) { $0 + $1.deletions }
 
-        if subtree.count == 1, case .directory(let childName, _, let grandchildren, _, _) = subtree[0] {
+        if subtree.count == 1, case .directory(let childName, let childFullPath, let grandchildren, _, _) = subtree[0] {
             nodes.append(
-                .directory(name: "\(dir)/\(childName)", fullPath: newPrefix, children: grandchildren, additions: adds, deletions: dels))
+                .directory(name: "\(dir)/\(childName)", fullPath: childFullPath, children: grandchildren, additions: adds, deletions: dels))
         } else {
             nodes.append(.directory(name: "\(dir)/", fullPath: newPrefix, children: subtree, additions: adds, deletions: dels))
         }

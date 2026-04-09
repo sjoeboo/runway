@@ -183,7 +183,7 @@ public struct NewIssueSheet: View {
                     .keyboardShortcut(.cancelAction)
                 Spacer()
                 Button("Create Issue") {
-                    onCreate(title, issueBody, Array(selectedLabels))
+                    onCreate(title.trimmingCharacters(in: .whitespacesAndNewlines), issueBody, Array(selectedLabels))
                     dismiss()
                 }
                 .keyboardShortcut(.defaultAction)

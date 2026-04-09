@@ -242,7 +242,7 @@ public struct TerminalTabView: View {
     private func initializeTabs() {
         guard tabs.isEmpty else { return }
 
-        let mainTabID = "\(session.id)_main_\(terminalRestartTrigger)"
+        let mainTabID = "\(session.id)_main"
         let tmuxName = "runway-\(session.id)"
 
         // Build the command with permission flags for tools that support them

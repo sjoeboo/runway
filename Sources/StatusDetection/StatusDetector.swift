@@ -101,6 +101,9 @@ public struct StatusDetector: Sendable {
                     state = .inCSI
                 } else if char == "]" {
                     state = .inOSC
+                } else if char == "\\" {
+                    // String Terminator (ESC \) — terminates OSC/DCS/etc.
+                    state = .normal
                 } else if char.isLetter {
                     // Two-character escape (e.g., ESC M) — done
                     state = .normal
@@ -109,8 +112,10 @@ public struct StatusDetector: Sendable {
                     state = .inCSI
                 }
             case .inCSI:
-                // CSI terminates on a letter (final byte 0x40-0x7E)
-                if char.isLetter || char == "m" || char == "H" || char == "J" || char == "K" || char == "~" {
+                // CSI final bytes are 0x40-0x7E per ECMA-48
+                if let scalar = char.unicodeScalars.first,
+                    scalar.value >= 0x40, scalar.value <= 0x7E
+                {
                     state = .normal
                 }
             case .inOSC:

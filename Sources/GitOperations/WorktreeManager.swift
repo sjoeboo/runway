@@ -126,7 +126,10 @@ public actor WorktreeManager {
         if deleteBranch {
             // Extract branch name from worktree path
             let branchName = URL(fileURLWithPath: worktreePath).lastPathComponent
-            _ = try? await runGit(in: repoPath, args: ["branch", "-D", branchName])
+            // Use -d (safe delete) instead of -D (force) to protect unmerged work.
+            // If the branch has unmerged commits, git will refuse and the branch
+            // is preserved — the user can recover their work later.
+            _ = try? await runGit(in: repoPath, args: ["branch", "-d", branchName])
         }
     }
 

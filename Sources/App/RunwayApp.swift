@@ -92,6 +92,8 @@ struct RunwayApp: App {
         Settings {
             SettingsView(updater: updaterController.updater)
                 .environment(store.themeManager)
+                .theme(store.themeManager.currentTheme)
+                .preferredColorScheme(store.themeManager.currentTheme.appearance == .dark ? .dark : .light)
         }
 
         MenuBarExtra {
@@ -407,6 +409,7 @@ struct ContentView: View {
                     onReviewPR: { pr in store.reviewPR(pr) },
                     onEnableAutoMergePR: { pr, strategy in Task { await store.enableAutoMerge(pr, strategy: strategy) } },
                     onDisableAutoMergePR: { pr in Task { await store.disableAutoMerge(pr) } },
+                    onDeselectPR: { Task { await store.selectPR(nil, navigate: false) } },
                     onUpdateProject: { store.updateProjectSettings($0) },
                     onDetectRepo: { await store.detectGHRepo(for: project) },
                     onFetchLabels: { Task { await store.fetchLabels(forProject: projectID) } },

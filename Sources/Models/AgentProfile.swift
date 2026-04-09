@@ -107,7 +107,9 @@ extension AgentProfile {
             "(y/N)",
             "Allow?",
             "Try again",
-            "What would you like",
+            "What would you like to work",
+            "What would you like to change",
+            "What would you like me to",
             "Do you want to",
         ],
         idlePatterns: [

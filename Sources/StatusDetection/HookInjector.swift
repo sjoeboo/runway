@@ -295,12 +295,17 @@ public struct HookInjector: Sendable {
     private func withSettingsLock<T>(path: String, body: () throws -> T) throws -> T {
         let lockPath = path + ".lock"
         let lockFD = open(lockPath, O_CREAT | O_WRONLY, 0o644)
-        guard lockFD >= 0 else { return try body() }
+        guard lockFD >= 0 else {
+            print("[Runway] Warning: could not create lock file at \(lockPath), proceeding without lock")
+            return try body()
+        }
         defer {
             flock(lockFD, LOCK_UN)
             close(lockFD)
         }
-        flock(lockFD, LOCK_EX)
+        if flock(lockFD, LOCK_EX) != 0 {
+            print("[Runway] Warning: flock failed on \(lockPath) (errno \(errno)), proceeding without lock")
+        }
         return try body()
     }
 

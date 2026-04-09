@@ -19,6 +19,7 @@ public struct ProjectPRsTab: View {
     var onReviewPR: ((PullRequest) -> Void)?
     var onEnableAutoMerge: ((PullRequest, MergeStrategy) -> Void)?
     var onDisableAutoMerge: ((PullRequest) -> Void)?
+    var onDeselectPR: (() -> Void)?
 
     @AppStorage("hideDrafts") private var hideDrafts: Bool = false
     @AppStorage("projectPRListWidth") private var projectPRListWidth: Double = 320
@@ -38,7 +39,8 @@ public struct ProjectPRsTab: View {
         onUpdateBranch: ((PullRequest, Bool) -> Void)? = nil,
         onReviewPR: ((PullRequest) -> Void)? = nil,
         onEnableAutoMerge: ((PullRequest, MergeStrategy) -> Void)? = nil,
-        onDisableAutoMerge: ((PullRequest) -> Void)? = nil
+        onDisableAutoMerge: ((PullRequest) -> Void)? = nil,
+        onDeselectPR: (() -> Void)? = nil
     ) {
         self.pullRequests = pullRequests
         self.onSelectPR = onSelectPR
@@ -54,6 +56,7 @@ public struct ProjectPRsTab: View {
         self.onReviewPR = onReviewPR
         self.onEnableAutoMerge = onEnableAutoMerge
         self.onDisableAutoMerge = onDisableAutoMerge
+        self.onDeselectPR = onDeselectPR
     }
 
     private var selectedPR: PullRequest? {
@@ -112,7 +115,7 @@ public struct ProjectPRsTab: View {
                     PRDetailDrawer(
                         pr: pr,
                         detail: detail,
-                        onClose: { onSelectPR(pr) },
+                        onClose: { onDeselectPR?() },
                         onApprove: { onApprove?(pr) },
                         onComment: { body in onComment?(pr, body) },
                         onRequestChanges: { body in onRequestChanges?(pr, body) },

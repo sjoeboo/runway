@@ -172,7 +172,9 @@ public struct CheckRun: Identifiable, Codable, Sendable {
     public var detailsURL: String?
 
     public init(name: String, status: CheckStatus, detailsURL: String? = nil) {
-        self.id = name
+        // Use name + status for uniqueness — CI matrix builds produce multiple
+        // runs with the same name but different statuses
+        self.id = "\(name)-\(status.rawValue)"
         self.name = name
         self.status = status
         self.detailsURL = detailsURL

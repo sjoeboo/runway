@@ -44,6 +44,7 @@ public struct ProjectPageView: View {
     var onReviewPR: ((PullRequest) -> Void)?
     var onEnableAutoMergePR: ((PullRequest, MergeStrategy) -> Void)?
     var onDisableAutoMergePR: ((PullRequest) -> Void)?
+    var onDeselectPR: (() -> Void)?
     let onUpdateProject: (Project) -> Void
     let onDetectRepo: () async -> (repo: String, host: String?)?
     let onFetchLabels: () -> Void
@@ -88,6 +89,7 @@ public struct ProjectPageView: View {
         onReviewPR: ((PullRequest) -> Void)? = nil,
         onEnableAutoMergePR: ((PullRequest, MergeStrategy) -> Void)? = nil,
         onDisableAutoMergePR: ((PullRequest) -> Void)? = nil,
+        onDeselectPR: (() -> Void)? = nil,
         onUpdateProject: @escaping (Project) -> Void,
         onDetectRepo: @escaping () async -> (repo: String, host: String?)?,
         onFetchLabels: @escaping () -> Void,
@@ -126,6 +128,7 @@ public struct ProjectPageView: View {
         self.onReviewPR = onReviewPR
         self.onEnableAutoMergePR = onEnableAutoMergePR
         self.onDisableAutoMergePR = onDisableAutoMergePR
+        self.onDeselectPR = onDeselectPR
         self.onUpdateProject = onUpdateProject
         self.onDetectRepo = onDetectRepo
         self.onFetchLabels = onFetchLabels
@@ -239,7 +242,8 @@ public struct ProjectPageView: View {
                     onUpdateBranch: onUpdateBranchPR,
                     onReviewPR: onReviewPR,
                     onEnableAutoMerge: onEnableAutoMergePR,
-                    onDisableAutoMerge: onDisableAutoMergePR
+                    onDisableAutoMerge: onDisableAutoMergePR,
+                    onDeselectPR: onDeselectPR
                 )
             }
         }
@@ -255,7 +259,8 @@ public struct ProjectPageView: View {
             )
         }
         .onChange(of: project) { _, newProject in
-            if editableProject.id == newProject.id {
+            // Don't overwrite user's unsaved edits while the settings sheet is open
+            if !showSettings, editableProject.id == newProject.id {
                 editableProject = newProject
             }
         }

@@ -54,10 +54,10 @@ public struct TerminalSearchBar: View {
                     .font(.caption)
                     .focused($isFocused)
                     .onSubmit { performSearch(forward: true) }
-                    .onChange(of: searchText) { _, newValue in
-                        if newValue.isEmpty {
-                            searchState = .idle
-                        }
+                    .onChange(of: searchText) { _, _ in
+                        // Reset search state on any text change so find buttons
+                        // re-enable after editing a "not found" search term
+                        searchState = .idle
                     }
 
                 // Match feedback label
@@ -102,6 +102,11 @@ public struct TerminalSearchBar: View {
             .padding(.horizontal, 8)
             .padding(.top, 4)
             .onAppear { isFocused = true }
+            .onDisappear {
+                // Clear search highlights when the bar disappears — covers both
+                // the dismiss() path and the Cmd+F toggle path which bypasses dismiss()
+                onDismiss()
+            }
             .onExitCommand { dismiss() }
         }
     }

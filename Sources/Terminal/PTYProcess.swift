@@ -127,8 +127,17 @@ public final class PTYProcess: @unchecked Sendable {
             if bytesRead > 0 {
                 let data = Data(buffer[..<bytesRead])
                 outputHandler(data)
-            } else if bytesRead <= 0 {
+            } else if bytesRead == 0 {
+                // True EOF — slave side closed
                 self?.handleExit()
+            } else {
+                // bytesRead < 0 — check errno
+                // EAGAIN/EWOULDBLOCK: spurious wakeup on non-blocking FD, ignore
+                // EINTR: interrupted by signal, ignore
+                // Anything else: real error, tear down
+                if errno != EAGAIN && errno != EWOULDBLOCK && errno != EINTR {
+                    self?.handleExit()
+                }
             }
         }
 
@@ -149,6 +158,12 @@ public final class PTYProcess: @unchecked Sendable {
 
         self.readSource.resume()
         self.processSource.resume()
+    }
+
+    deinit {
+        // Cancel dispatch sources before deallocation — deallocating a resumed,
+        // non-cancelled DispatchSource is undefined behavior and will crash.
+        handleExit()
     }
 
     /// Write data to the PTY master (sends to child's stdin).

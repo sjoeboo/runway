@@ -302,7 +302,7 @@ public struct PRDashboardView: View {
                 .frame(maxWidth: .infinity)
             }
         }
-        .onAppear { onRefresh() }
+        .task { onRefresh() }
     }
 
     // MARK: - Tab Button
