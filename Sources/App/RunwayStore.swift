@@ -423,6 +423,31 @@ public final class RunwayStore {
         }
     }
 
+    /// Builds the CLI command string for an agent session.
+    /// Returns nil for shell sessions (tmux uses its default shell).
+    private func buildAgentCommand(
+        session: Session,
+        profile: AgentProfile,
+        resume: Bool = false
+    ) -> String? {
+        guard profile.id != "shell" else { return nil }
+        var parts: [String] = []
+        if session.useHappy {
+            parts.append("happy")
+            parts.append(session.tool.command)
+        } else {
+            parts.append(profile.command)
+        }
+        parts.append(contentsOf: profile.arguments)
+        if resume {
+            parts.append(contentsOf: profile.resumeArguments)
+        }
+        if session.tool.supportsPermissionModes {
+            parts.append(contentsOf: session.permissionMode.cliFlags(for: session.tool))
+        }
+        return parts.joined(separator: " ")
+    }
+
     /// Creates the tmux session and updates the session status to .running.
     private func startTmuxSession(for session: Session, path: String, initialPrompt: String? = nil) async {
         guard tmuxAvailable else {
@@ -433,23 +458,7 @@ public final class RunwayStore {
 
         let tmuxName = "runway-\(session.id)"
         let profile = profileForSession(session)
-        let toolCommand: String?
-        if profile.id == "shell" {
-            toolCommand = nil  // shell sessions use tmux's default shell
-        } else {
-            var parts: [String] = []
-            if session.useHappy {
-                parts.append("happy")
-                parts.append(session.tool.command)
-            } else {
-                parts.append(profile.command)
-            }
-            parts.append(contentsOf: profile.arguments)
-            if session.tool.supportsPermissionModes {
-                parts.append(contentsOf: session.permissionMode.cliFlags(for: session.tool))
-            }
-            toolCommand = parts.joined(separator: " ")
-        }
+        let toolCommand = buildAgentCommand(session: session, profile: profile, resume: false)
 
         do {
             try await tmuxManager.createSession(
@@ -515,17 +524,7 @@ public final class RunwayStore {
         // Recreate tmux session
         if tmuxAvailable {
             let profile = profileForSession(session)
-            let toolCommand: String?
-            if profile.id == "shell" {
-                toolCommand = nil  // shell sessions use tmux's default shell
-            } else {
-                var parts = [profile.command]
-                parts.append(contentsOf: profile.arguments)
-                if session.tool.supportsPermissionModes {
-                    parts.append(contentsOf: session.permissionMode.cliFlags(for: session.tool))
-                }
-                toolCommand = parts.joined(separator: " ")
-            }
+            let toolCommand = buildAgentCommand(session: session, profile: profile, resume: true)
 
             do {
                 try await tmuxManager.createSession(
