@@ -140,3 +140,13 @@ import Testing
     #expect(PermissionMode.acceptEdits.cliFlags(for: .shell) == [])
     #expect(PermissionMode.bypassAll.cliFlags(for: .shell) == [])
 }
+
+@Test func sessionUseHappyDefaultsFalse() {
+    let session = Session(title: "test", path: "/tmp")
+    #expect(session.useHappy == false)
+}
+
+@Test func sessionUseHappyPreserved() {
+    let session = Session(title: "test", path: "/tmp", useHappy: true)
+    #expect(session.useHappy == true)
+}
