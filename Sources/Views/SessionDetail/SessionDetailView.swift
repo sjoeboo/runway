@@ -143,6 +143,7 @@ public struct SessionDetailView: View {
                 splitVerticalTrigger: $splitVerticalTrigger,
                 terminalRestartTrigger: $terminalRestartTrigger
             )
+            .id("terminal-\(session.id)-\(terminalRestartTrigger)")
         }
     }
 }
