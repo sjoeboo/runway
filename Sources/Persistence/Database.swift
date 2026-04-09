@@ -384,7 +384,7 @@ public final class Database: Sendable {
 
     public func updateProject(_ project: Project) throws {
         try dbQueue.write { db in
-            var record = ProjectRecord(project)
+            let record = ProjectRecord(project)
             try record.update(db)
         }
     }
