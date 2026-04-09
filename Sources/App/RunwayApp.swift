@@ -150,10 +150,12 @@ struct ContentView: View {
                     initialProjectID: store.newSessionProjectID,
                     parentID: store.newSessionParentID,
                     templates: store.availableTemplates(forProjectID: store.newSessionProjectID),
+                    forkSource: store.forkSourceSession,
                     onCreate: { request in
                         Task { await store.handleNewSessionRequest(request) }
                         store.newSessionProjectID = nil
                         store.newSessionParentID = nil
+                        store.forkSourceSession = nil
                     },
                     onCreateReview: { request in
                         try await store.handleReviewSessionRequest(request)
