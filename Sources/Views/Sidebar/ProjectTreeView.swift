@@ -493,6 +493,14 @@ struct SessionRowView: View {
                 Label("Spawn Sub-session", systemImage: "arrow.triangle.branch")
             }
 
+            if session.worktreeBranch != nil {
+                Button {
+                    actions.forkSession(id: session.id)
+                } label: {
+                    Label("Fork Session", systemImage: "arrow.triangle.branch")
+                }
+            }
+
             Divider()
 
             Button {
