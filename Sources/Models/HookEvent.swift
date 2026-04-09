@@ -55,4 +55,7 @@ public enum HookEventType: String, Codable, Sendable {
     case userPromptSubmit = "UserPromptSubmit"
     case permissionRequest = "PermissionRequest"
     case notification = "Notification"
+    // Gemini CLI events
+    case beforeAgent = "BeforeAgent"
+    case afterAgent = "AfterAgent"
 }

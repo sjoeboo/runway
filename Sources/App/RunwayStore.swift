@@ -844,6 +844,8 @@ public final class RunwayStore {
             updateSessionStatus(id: event.sessionID, status: .waiting)
         case .notification:
             break
+        case .beforeAgent, .afterAgent:
+            break
         }
 
         // Update sidebar activity text for UserPromptSubmit events
