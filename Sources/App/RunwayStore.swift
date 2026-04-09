@@ -509,6 +509,10 @@ public final class RunwayStore {
         guard let idx = sessions.firstIndex(where: { $0.id == id }) else { return }
         let session = sessions[idx]
 
+        // Transition to .starting so TerminalTabView clears its tabs
+        sessions[idx].status = .starting
+        try? database?.updateSessionStatus(id: id, status: .starting)
+
         // Kill existing tmux sessions (main + shell tabs)
         let tmuxName = "runway-\(id)"
         if tmuxAvailable {
