@@ -49,6 +49,8 @@ public final class RunwayStore {
     var splitHorizontalTrigger: Int = 0
     /// Incremented to trigger a vertical split in the active terminal tab.
     var splitVerticalTrigger: Int = 0
+    /// Incremented to force terminal tab reinitialization after restart.
+    var terminalRestartTrigger: Int = 0
     var sidebarSearchQuery: String = ""
     var focusSidebarSearch: Bool = false
     var showReviewPRDialog: Bool = false
@@ -545,6 +547,7 @@ public final class RunwayStore {
                     ]
                 )
                 updateSessionStatus(id: id, status: .running)
+                terminalRestartTrigger += 1
             } catch {
                 print("[Runway] Failed to restart tmux session: \(error)")
                 updateSessionStatus(id: id, status: .error)

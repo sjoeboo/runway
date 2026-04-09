@@ -16,6 +16,7 @@ public struct SessionDetailView: View {
     @Binding var showTerminalSearch: Bool
     @Binding var splitHorizontalTrigger: Int
     @Binding var splitVerticalTrigger: Int
+    @Binding var terminalRestartTrigger: Int
     @Binding var changesVisible: Bool
     @Binding var changesMode: ChangesMode
     let changes: [FileChange]
@@ -39,6 +40,7 @@ public struct SessionDetailView: View {
         showTerminalSearch: Binding<Bool>,
         splitHorizontalTrigger: Binding<Int> = .constant(0),
         splitVerticalTrigger: Binding<Int> = .constant(0),
+        terminalRestartTrigger: Binding<Int> = .constant(0),
         changesVisible: Binding<Bool>,
         changesMode: Binding<ChangesMode>,
         changes: [FileChange] = [],
@@ -59,6 +61,7 @@ public struct SessionDetailView: View {
         self._showTerminalSearch = showTerminalSearch
         self._splitHorizontalTrigger = splitHorizontalTrigger
         self._splitVerticalTrigger = splitVerticalTrigger
+        self._terminalRestartTrigger = terminalRestartTrigger
         self._changesVisible = changesVisible
         self._changesMode = changesMode
         self.changes = changes
@@ -137,7 +140,8 @@ public struct SessionDetailView: View {
                 tmuxManager: tmuxManager,
                 showSearch: $showTerminalSearch,
                 splitHorizontalTrigger: $splitHorizontalTrigger,
-                splitVerticalTrigger: $splitVerticalTrigger
+                splitVerticalTrigger: $splitVerticalTrigger,
+                terminalRestartTrigger: $terminalRestartTrigger
             )
         }
     }

@@ -27,6 +27,7 @@ public struct TerminalTabView: View {
     @Binding var showSearch: Bool
     @Binding var splitHorizontalTrigger: Int
     @Binding var splitVerticalTrigger: Int
+    @Binding var terminalRestartTrigger: Int
     @State private var tabs: [TerminalTab] = []
     @State private var selectedTabID: String?
     @State private var shellCounter: Int = 0
@@ -39,13 +40,15 @@ public struct TerminalTabView: View {
         tmuxManager: TmuxSessionManager,
         showSearch: Binding<Bool>,
         splitHorizontalTrigger: Binding<Int> = .constant(0),
-        splitVerticalTrigger: Binding<Int> = .constant(0)
+        splitVerticalTrigger: Binding<Int> = .constant(0),
+        terminalRestartTrigger: Binding<Int> = .constant(0)
     ) {
         self.session = session
         self.tmuxManager = tmuxManager
         self._showSearch = showSearch
         self._splitHorizontalTrigger = splitHorizontalTrigger
         self._splitVerticalTrigger = splitVerticalTrigger
+        self._terminalRestartTrigger = terminalRestartTrigger
     }
 
     public var body: some View {
@@ -116,6 +119,13 @@ public struct TerminalTabView: View {
         }
         .onChange(of: splitHorizontalTrigger) { _, _ in splitDown() }
         .onChange(of: splitVerticalTrigger) { _, _ in splitRight() }
+        .onChange(of: terminalRestartTrigger) { _, _ in
+            // Force reinitialize tabs after restart — the status onChange may not
+            // fire if SwiftUI coalesces .running → .starting → .running into no-op.
+            tabs = []
+            selectedTabID = nil
+            initializeTabsIfReady()
+        }
         .onChange(of: session.status) { _, newStatus in
             // Wait for the tmux session to be created before attaching.
             // TerminalPane calls `tmux attach-session` immediately, so we

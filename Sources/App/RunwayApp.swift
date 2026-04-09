@@ -444,6 +444,10 @@ struct ContentView: View {
                         get: { store.splitVerticalTrigger },
                         set: { store.splitVerticalTrigger = $0 }
                     ),
+                    terminalRestartTrigger: Binding(
+                        get: { store.terminalRestartTrigger },
+                        set: { store.terminalRestartTrigger = $0 }
+                    ),
                     changesVisible: Binding(
                         get: { store.changesVisible },
                         set: { store.changesVisible = $0 }
