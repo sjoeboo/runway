@@ -26,8 +26,14 @@ public actor WorktreeManager {
             (try? await runGit(in: repoPath, args: ["remote"])).map { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty } ?? false
 
         if hasRemote {
-            _ = try? await runGit(in: repoPath, args: ["fetch", "origin", baseBranch])
-            try await runGit(in: repoPath, args: ["worktree", "add", "-b", sanitized, worktreePath, "origin/\(baseBranch)"])
+            let fetched = (try? await runGit(in: repoPath, args: ["fetch", "origin", baseBranch])) != nil
+            if fetched {
+                // Branch from the remote-tracking version
+                try await runGit(in: repoPath, args: ["worktree", "add", "-b", sanitized, worktreePath, "origin/\(baseBranch)"])
+            } else {
+                // baseBranch doesn't exist on origin (e.g., forking from a local worktree branch)
+                try await runGit(in: repoPath, args: ["worktree", "add", "-b", sanitized, worktreePath, baseBranch])
+            }
         } else {
             // No remote — branch from local base branch
             try await runGit(in: repoPath, args: ["worktree", "add", "-b", sanitized, worktreePath, baseBranch])
