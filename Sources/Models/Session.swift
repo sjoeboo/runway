@@ -76,11 +76,16 @@ public enum PermissionMode: String, Codable, Sendable, CaseIterable {
         }
     }
 
-    public var cliFlags: [String] {
-        switch self {
-        case .default: []
-        case .acceptEdits: ["--accept-edits"]
-        case .bypassAll: ["--dangerously-skip-permissions"]
+    public func cliFlags(for tool: Tool) -> [String] {
+        switch (self, tool) {
+        case (.default, _): []
+        case (.acceptEdits, .claude): ["--accept-edits"]
+        case (.acceptEdits, .gemini): ["--yolo"]
+        case (.acceptEdits, .codex): ["--full-auto"]
+        case (.bypassAll, .claude): ["--dangerously-skip-permissions"]
+        case (.bypassAll, .gemini): ["--yolo"]
+        case (.bypassAll, .codex): ["--yolo"]
+        default: []
         }
     }
 }

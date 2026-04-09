@@ -117,3 +117,26 @@ import Testing
         #expect(decoded == tool)
     }
 }
+
+@Test func permissionModeCliFlagsForClaude() {
+    #expect(PermissionMode.default.cliFlags(for: .claude) == [])
+    #expect(PermissionMode.acceptEdits.cliFlags(for: .claude) == ["--accept-edits"])
+    #expect(PermissionMode.bypassAll.cliFlags(for: .claude) == ["--dangerously-skip-permissions"])
+}
+
+@Test func permissionModeCliFlagsForGemini() {
+    #expect(PermissionMode.default.cliFlags(for: .gemini) == [])
+    #expect(PermissionMode.acceptEdits.cliFlags(for: .gemini) == ["--yolo"])
+    #expect(PermissionMode.bypassAll.cliFlags(for: .gemini) == ["--yolo"])
+}
+
+@Test func permissionModeCliFlagsForCodex() {
+    #expect(PermissionMode.default.cliFlags(for: .codex) == [])
+    #expect(PermissionMode.acceptEdits.cliFlags(for: .codex) == ["--full-auto"])
+    #expect(PermissionMode.bypassAll.cliFlags(for: .codex) == ["--yolo"])
+}
+
+@Test func permissionModeCliFlagsForShell() {
+    #expect(PermissionMode.acceptEdits.cliFlags(for: .shell) == [])
+    #expect(PermissionMode.bypassAll.cliFlags(for: .shell) == [])
+}

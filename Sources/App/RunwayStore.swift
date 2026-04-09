@@ -438,9 +438,9 @@ public final class RunwayStore {
         } else {
             var parts = [profile.command]
             parts.append(contentsOf: profile.arguments)
-            // For Claude, add permission mode flags
-            if session.tool == .claude {
-                parts.append(contentsOf: session.permissionMode.cliFlags)
+            // Add permission mode flags for tools that support them
+            if session.tool.supportsPermissionModes {
+                parts.append(contentsOf: session.permissionMode.cliFlags(for: session.tool))
             }
             toolCommand = parts.joined(separator: " ")
         }
@@ -515,8 +515,8 @@ public final class RunwayStore {
             } else {
                 var parts = [profile.command]
                 parts.append(contentsOf: profile.arguments)
-                if session.tool == .claude {
-                    parts.append(contentsOf: session.permissionMode.cliFlags)
+                if session.tool.supportsPermissionModes {
+                    parts.append(contentsOf: session.permissionMode.cliFlags(for: session.tool))
                 }
                 toolCommand = parts.joined(separator: " ")
             }

@@ -93,9 +93,9 @@ import Testing
 }
 
 @Test func permissionModeCLIFlags() {
-    #expect(PermissionMode.default.cliFlags.isEmpty)
-    #expect(PermissionMode.acceptEdits.cliFlags == ["--accept-edits"])
-    #expect(PermissionMode.bypassAll.cliFlags == ["--dangerously-skip-permissions"])
+    #expect(PermissionMode.default.cliFlags(for: .claude).isEmpty)
+    #expect(PermissionMode.acceptEdits.cliFlags(for: .claude) == ["--accept-edits"])
+    #expect(PermissionMode.bypassAll.cliFlags(for: .claude) == ["--dangerously-skip-permissions"])
 }
 
 @Test func permissionModeCaseIterable() {
