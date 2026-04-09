@@ -40,6 +40,7 @@ public final class RunwayStore {
     var showNewProjectDialog: Bool = false
     var newSessionProjectID: String?
     var newSessionParentID: String?
+    var forkSourceSession: Session?
     var statusMessage: StatusMessage?
     var tmuxAvailable: Bool = false
     var showSendBar: Bool = false
@@ -1547,6 +1548,16 @@ extension RunwayStore: SidebarActions {
     public func newSession(projectID: String?, parentID: String? = nil) {
         newSessionProjectID = projectID
         newSessionParentID = parentID
+        showNewSessionDialog = true
+    }
+
+    public func forkSession(id: String) {
+        guard let session = sessions.first(where: { $0.id == id }),
+            session.worktreeBranch != nil
+        else { return }
+        forkSourceSession = session
+        newSessionProjectID = session.projectID
+        newSessionParentID = session.id
         showNewSessionDialog = true
     }
 

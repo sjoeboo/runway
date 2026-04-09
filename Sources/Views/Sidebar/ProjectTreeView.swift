@@ -10,6 +10,7 @@ import Theme
 @MainActor
 public protocol SidebarActions {
     func restartSession(id: String) async
+    func forkSession(id: String)
     func deleteSession(id: String, deleteWorktree: Bool)
     func newSession(projectID: String?, parentID: String?)
     func newProject()
