@@ -375,9 +375,16 @@ struct SessionRowView: View {
                         .font(.system(.body, design: .default))
                         .onAppear { editTitle = session.title }
                 } else {
-                    Text(session.title)
-                        .font(.system(.body, design: .default))
-                        .foregroundStyle(.primary)
+                    HStack(spacing: 4) {
+                        Text(session.title)
+                            .font(.system(.body, design: .default))
+                            .foregroundStyle(.primary)
+                        if session.parentID != nil {
+                            Image(systemName: "arrow.triangle.branch")
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
                 }
                 if isProvisioningWorktree {
                     HStack(spacing: 4) {
@@ -467,13 +474,22 @@ struct SessionRowView: View {
             .opacity(isHovered ? 1 : 0)
             .allowsHitTesting(isHovered)
 
-            if !isHovered && session.tool != .claude {
-                Text(session.tool.displayName)
-                    .font(.caption2)
-                    .padding(.horizontal, 4)
-                    .padding(.vertical, 1)
-                    .background(theme.chrome.surface)
-                    .clipShape(RoundedRectangle(cornerRadius: 4))
+            if !isHovered {
+                HStack(spacing: 4) {
+                    if session.useHappy {
+                        Image(systemName: "iphone")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+                    if session.tool != .claude {
+                        Text(session.tool.displayName)
+                            .font(.caption2)
+                            .padding(.horizontal, 4)
+                            .padding(.vertical, 1)
+                            .background(theme.chrome.surface)
+                            .clipShape(RoundedRectangle(cornerRadius: 4))
+                    }
+                }
             }
         }
         .padding(.vertical, 4)
