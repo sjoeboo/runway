@@ -111,7 +111,7 @@ private func withTempGitRepo(_ body: (String) async throws -> Void) async throws
             withIntermediateDirectories: true
         )
 
-        let worktreePath = try await manager.createWorktree(
+        let (worktreePath, _) = try await manager.createWorktree(
             repoPath: repoPath,
             branchName: "test-feature",
             baseBranch: currentBranch
@@ -139,7 +139,7 @@ private func withTempGitRepo(_ body: (String) async throws -> Void) async throws
             withIntermediateDirectories: true
         )
 
-        let worktreePath = try await manager.createWorktree(
+        let (worktreePath, _) = try await manager.createWorktree(
             repoPath: repoPath,
             branchName: "to-remove",
             baseBranch: currentBranch
@@ -222,7 +222,7 @@ private func withTempGitRepo(_ body: (String) async throws -> Void) async throws
             withIntermediateDirectories: true
         )
 
-        let worktreePath = try await manager.createWorktree(
+        let (worktreePath, _) = try await manager.createWorktree(
             repoPath: repoPath,
             branchName: "stale-wt",
             baseBranch: currentBranch

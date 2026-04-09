@@ -394,12 +394,15 @@ public final class RunwayStore {
 
             Task {
                 let sessionPath: String
+                let actualBranch: String
                 do {
-                    sessionPath = try await worktreeManager.createWorktree(
+                    let result = try await worktreeManager.createWorktree(
                         repoPath: request.path,
                         branchName: branchName,
                         baseBranch: baseBranch
                     )
+                    sessionPath = result.path
+                    actualBranch = result.branch
                 } catch {
                     print("[Runway] Worktree creation failed: \(error)")
                     provisioningWorktreeIDs.remove(session.id)
@@ -410,8 +413,10 @@ public final class RunwayStore {
 
                 if let idx = sessions.firstIndex(where: { $0.id == session.id }) {
                     sessions[idx].path = sessionPath
+                    sessions[idx].worktreeBranch = actualBranch
                 }
                 try? database?.updateSessionPath(id: session.id, path: sessionPath)
+                try? database?.updateSessionBranch(id: session.id, branch: actualBranch)
 
                 provisioningWorktreeIDs.remove(session.id)
 
@@ -506,12 +511,10 @@ public final class RunwayStore {
     }
 
     public func restartSession(id: String) async {
-        guard let idx = sessions.firstIndex(where: { $0.id == id }) else { return }
-        let session = sessions[idx]
+        guard let session = sessions.first(where: { $0.id == id }) else { return }
 
         // Transition to .starting so TerminalTabView clears its tabs
-        sessions[idx].status = .starting
-        try? database?.updateSessionStatus(id: id, status: .starting)
+        updateSessionStatus(id: id, status: .starting)
 
         // Kill existing tmux sessions (main + shell tabs)
         let tmuxName = "runway-\(id)"
@@ -541,14 +544,12 @@ public final class RunwayStore {
                         "RUNWAY_TITLE": session.title,
                     ]
                 )
-                sessions[idx].status = .running
+                updateSessionStatus(id: id, status: .running)
             } catch {
                 print("[Runway] Failed to restart tmux session: \(error)")
-                sessions[idx].status = .error
+                updateSessionStatus(id: id, status: .error)
             }
         }
-
-        try? database?.updateSessionStatus(id: id, status: sessions[idx].status)
     }
 
     public func deleteSession(id: String, deleteWorktree: Bool = false) {

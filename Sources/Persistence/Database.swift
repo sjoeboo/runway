@@ -296,6 +296,15 @@ public final class Database: Sendable {
         }
     }
 
+    public func updateSessionBranch(id: String, branch: String) throws {
+        try dbQueue.write { db in
+            try db.execute(
+                sql: "UPDATE sessions SET worktreeBranch = ?, lastAccessedAt = ? WHERE id = ?",
+                arguments: [branch, Date(), id]
+            )
+        }
+    }
+
     public func updateSessionSortOrder(id: String, sortOrder: Int) throws {
         try dbQueue.write { db in
             try db.execute(

@@ -503,12 +503,6 @@ struct SessionRowView: View {
                 Label("Rename Session", systemImage: "pencil")
             }
 
-            Button {
-                actions.newSession(projectID: session.projectID, parentID: session.id)
-            } label: {
-                Label("Spawn Sub-session", systemImage: "arrow.triangle.branch")
-            }
-
             if session.worktreeBranch != nil {
                 Button {
                     actions.forkSession(id: session.id)

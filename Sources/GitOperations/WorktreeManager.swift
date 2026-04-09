@@ -13,11 +13,12 @@ public actor WorktreeManager {
     ///   - branchName: Name for the new branch (will be sanitized)
     ///   - baseBranch: Branch to base the worktree on (default: "main")
     /// - Returns: Path to the created worktree directory
+    /// Returns `(path, actualBranchName)` — the branch name may differ from input due to sanitization.
     public func createWorktree(
         repoPath: String,
         branchName: String,
         baseBranch: String = "main"
-    ) async throws -> String {
+    ) async throws -> (path: String, branch: String) {
         let sanitized = sanitizeBranchName(branchName)
         let worktreePath = "\(repoPath)/.worktrees/\(sanitized)"
 
@@ -25,21 +26,27 @@ public actor WorktreeManager {
         let hasRemote =
             (try? await runGit(in: repoPath, args: ["remote"])).map { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty } ?? false
 
+        // Also sanitize baseBranch in case it came from a stored worktreeBranch
+        // that wasn't sanitized (pre-existing sessions)
+        let sanitizedBase = sanitizeBranchName(baseBranch)
+
         if hasRemote {
+            // Try fetching the original baseBranch name from origin first
             let fetched = (try? await runGit(in: repoPath, args: ["fetch", "origin", baseBranch])) != nil
             if fetched {
-                // Branch from the remote-tracking version
                 try await runGit(in: repoPath, args: ["worktree", "add", "-b", sanitized, worktreePath, "origin/\(baseBranch)"])
             } else {
-                // baseBranch doesn't exist on origin (e.g., forking from a local worktree branch)
-                try await runGit(in: repoPath, args: ["worktree", "add", "-b", sanitized, worktreePath, baseBranch])
+                // baseBranch doesn't exist on origin — try local (sanitized form first, then raw)
+                let localRef = try? await runGit(in: repoPath, args: ["rev-parse", "--verify", sanitizedBase])
+                let refToUse = localRef != nil ? sanitizedBase : baseBranch
+                try await runGit(in: repoPath, args: ["worktree", "add", "-b", sanitized, worktreePath, refToUse])
             }
         } else {
             // No remote — branch from local base branch
             try await runGit(in: repoPath, args: ["worktree", "add", "-b", sanitized, worktreePath, baseBranch])
         }
 
-        return worktreePath
+        return (path: worktreePath, branch: sanitized)
     }
 
     /// Create a worktree for an existing branch (e.g., a PR's remote branch).
