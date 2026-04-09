@@ -19,6 +19,7 @@ struct SessionRecord: Codable, FetchableRecord, MutablePersistableRecord {
     var parentID: String?
     var command: String?
     var permissionMode: String
+    var useHappy: Bool
     var sortOrder: Int
     var createdAt: Date
     var lastAccessedAt: Date
@@ -36,6 +37,7 @@ struct SessionRecord: Codable, FetchableRecord, MutablePersistableRecord {
         self.parentID = session.parentID
         self.command = session.command
         self.permissionMode = session.permissionMode.rawValue
+        self.useHappy = session.useHappy
         self.sortOrder = session.sortOrder
         self.createdAt = session.createdAt
         self.lastAccessedAt = session.lastAccessedAt
@@ -55,6 +57,7 @@ struct SessionRecord: Codable, FetchableRecord, MutablePersistableRecord {
             parentID: parentID,
             command: command,
             permissionMode: PermissionMode(rawValue: permissionMode) ?? .default,
+            useHappy: useHappy,
             sortOrder: sortOrder,
             createdAt: createdAt,
             lastAccessedAt: lastAccessedAt
