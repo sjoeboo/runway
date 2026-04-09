@@ -98,3 +98,100 @@ import Testing
     // Should not throw when settings don't exist
     try injector.remove(configDir: tmpDir)
 }
+
+@Test func hookInjectorInjectWithConfig() throws {
+    let tmpDir = FileManager.default.temporaryDirectory.appendingPathComponent("runway-test-\(UUID().uuidString)").path
+    defer { try? FileManager.default.removeItem(atPath: tmpDir) }
+
+    let config = HookInjectionConfig(
+        agentID: "test-agent",
+        configDir: tmpDir,
+        settingsFile: "settings.json",
+        events: [("SessionStart", nil), ("Stop", nil)]
+    )
+
+    let injector = HookInjector()
+    let installed = try injector.inject(port: 47437, config: config)
+    #expect(installed == true)
+
+    let settingsPath = "\(tmpDir)/settings.json"
+    let data = try Data(contentsOf: URL(fileURLWithPath: settingsPath))
+    let json = try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
+    let hooks = try #require(json["hooks"] as? [String: Any])
+    #expect(hooks["SessionStart"] != nil)
+    #expect(hooks["Stop"] != nil)
+}
+
+@Test func hookInjectorRemoveWithConfig() throws {
+    let tmpDir = FileManager.default.temporaryDirectory.appendingPathComponent("runway-test-\(UUID().uuidString)").path
+    defer { try? FileManager.default.removeItem(atPath: tmpDir) }
+
+    let config = HookInjectionConfig(
+        agentID: "test-agent",
+        configDir: tmpDir,
+        settingsFile: "settings.json",
+        events: [("SessionStart", nil)]
+    )
+
+    let injector = HookInjector()
+    try injector.inject(port: 47437, config: config)
+    #expect(injector.isInstalled(config: config) == true)
+
+    try injector.remove(config: config)
+    #expect(injector.isInstalled(config: config) == false)
+}
+
+@Test func hookInjectorGeminiConfig() throws {
+    let tmpDir = FileManager.default.temporaryDirectory.appendingPathComponent("runway-test-\(UUID().uuidString)").path
+    defer { try? FileManager.default.removeItem(atPath: tmpDir) }
+
+    let config = HookInjectionConfig(
+        agentID: "gemini",
+        configDir: tmpDir,
+        settingsFile: "settings.json",
+        events: [
+            ("SessionStart", nil),
+            ("SessionEnd", nil),
+            ("BeforeAgent", nil),
+            ("AfterAgent", nil),
+            ("Notification", nil),
+        ]
+    )
+
+    let injector = HookInjector()
+    try injector.inject(port: 47437, config: config)
+
+    let data = try Data(contentsOf: URL(fileURLWithPath: "\(tmpDir)/settings.json"))
+    let json = try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
+    let hooks = try #require(json["hooks"] as? [String: Any])
+    #expect(hooks["BeforeAgent"] != nil)
+    #expect(hooks["AfterAgent"] != nil)
+}
+
+@Test func hookInjectorCodexPreStepCreatesTOML() throws {
+    let tmpDir = FileManager.default.temporaryDirectory.appendingPathComponent("runway-test-\(UUID().uuidString)").path
+    defer { try? FileManager.default.removeItem(atPath: tmpDir) }
+
+    let config = HookInjectionConfig(
+        agentID: "codex",
+        configDir: tmpDir,
+        settingsFile: "hooks.json",
+        events: [("SessionStart", nil)],
+        preSteps: [
+            .ensureTOMLFlag(file: "config.toml", section: "features", key: "codex_hooks", value: "true")
+        ]
+    )
+
+    let injector = HookInjector()
+    try injector.inject(port: 47437, config: config)
+
+    // Verify TOML file was created with the feature flag
+    let tomlPath = "\(tmpDir)/config.toml"
+    let tomlContent = try String(contentsOfFile: tomlPath, encoding: .utf8)
+    #expect(tomlContent.contains("[features]"))
+    #expect(tomlContent.contains("codex_hooks = true"))
+
+    // Verify hooks.json was created
+    let hooksPath = "\(tmpDir)/hooks.json"
+    #expect(FileManager.default.fileExists(atPath: hooksPath))
+}

@@ -232,14 +232,12 @@ public struct TerminalTabView: View {
         let mainTabID = "\(session.id)_main"
         let tmuxName = "runway-\(session.id)"
 
-        // For Claude sessions, build the command with permission flags
-        let command: String
+        // Build the command with permission flags for tools that support them
+        let command: String = session.tool.command
         let arguments: [String]
-        if session.tool == .claude {
-            command = session.tool.command
-            arguments = session.permissionMode.cliFlags
+        if session.tool.supportsPermissionModes {
+            arguments = session.permissionMode.cliFlags(for: session.tool)
         } else {
-            command = session.tool.command
             arguments = []
         }
 

@@ -111,13 +111,60 @@ extension AgentProfile {
         icon: "terminal"
     )
 
+    /// Gemini CLI — Google's AI coding agent with hook support.
+    public static let gemini = AgentProfile(
+        id: "gemini",
+        name: "Gemini CLI",
+        command: "gemini",
+        arguments: [],
+        runningPatterns: ["Working..."],
+        waitingPatterns: [
+            "Action Required",
+            "Apply this change?",
+            "Allow execution of",
+            "Allow once",
+            "Allow for this session",
+            "Do you want to proceed?",
+            "Answer Questions",
+        ],
+        idlePatterns: ["Type your message"],
+        lineStartIdlePatterns: ["> "],
+        spinnerChars: ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"],
+        hookEnabled: true,
+        icon: "diamond.fill"
+    )
+
+    /// Codex — OpenAI's AI coding agent. Uses --no-alt-screen for buffer detection.
+    public static let codex = AgentProfile(
+        id: "codex",
+        name: "Codex",
+        command: "codex",
+        arguments: ["--no-alt-screen"],
+        runningPatterns: ["Working", "Esc to interrupt"],
+        waitingPatterns: [
+            "Would you like to run",
+            "Would you like to make",
+            "Would you like to grant",
+            "Yes, proceed",
+            "needs your approval",
+            "Implement this plan?",
+        ],
+        idlePatterns: ["Ask Codex to do anything"],
+        lineStartIdlePatterns: [],
+        spinnerChars: [],
+        hookEnabled: true,
+        icon: "cpu"
+    )
+
     /// All built-in profiles.
-    public static let builtIn: [AgentProfile] = [.claude, .shell]
+    public static let builtIn: [AgentProfile] = [.claude, .gemini, .codex, .shell]
 
     /// Look up the default built-in profile for a Tool enum value.
     public static func defaultProfile(for tool: Tool) -> AgentProfile {
         switch tool {
         case .claude: return .claude
+        case .gemini: return .gemini
+        case .codex: return .codex
         case .shell: return .shell
         case .custom(let name):
             return AgentProfile(

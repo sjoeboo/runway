@@ -14,6 +14,7 @@ public struct Session: Identifiable, Codable, Sendable {
     public var parentID: String?
     public var command: String?
     public var permissionMode: PermissionMode
+    public var useHappy: Bool
     public var sortOrder: Int
     public var createdAt: Date
     public var lastAccessedAt: Date
@@ -34,6 +35,7 @@ public struct Session: Identifiable, Codable, Sendable {
         parentID: String? = nil,
         command: String? = nil,
         permissionMode: PermissionMode = .default,
+        useHappy: Bool = false,
         sortOrder: Int = 0,
         createdAt: Date = Date(),
         lastAccessedAt: Date = Date()
@@ -50,6 +52,7 @@ public struct Session: Identifiable, Codable, Sendable {
         self.parentID = parentID
         self.command = command
         self.permissionMode = permissionMode
+        self.useHappy = useHappy
         self.sortOrder = sortOrder
         self.createdAt = createdAt
         self.lastAccessedAt = lastAccessedAt
@@ -76,11 +79,16 @@ public enum PermissionMode: String, Codable, Sendable, CaseIterable {
         }
     }
 
-    public var cliFlags: [String] {
-        switch self {
-        case .default: []
-        case .acceptEdits: ["--accept-edits"]
-        case .bypassAll: ["--dangerously-skip-permissions"]
+    public func cliFlags(for tool: Tool) -> [String] {
+        switch (self, tool) {
+        case (.default, _): []
+        case (.acceptEdits, .claude): ["--accept-edits"]
+        case (.acceptEdits, .gemini): ["--yolo"]
+        case (.acceptEdits, .codex): ["--full-auto"]
+        case (.bypassAll, .claude): ["--dangerously-skip-permissions"]
+        case (.bypassAll, .gemini): ["--yolo"]
+        case (.bypassAll, .codex): ["--yolo"]
+        default: []
         }
     }
 }
@@ -110,12 +118,16 @@ public enum SessionStatus: String, Codable, Sendable, CaseIterable {
 
 public enum Tool: Codable, Sendable, Hashable {
     case claude
+    case gemini
+    case codex
     case shell
     case custom(String)
 
     public var displayName: String {
         switch self {
         case .claude: "Claude"
+        case .gemini: "Gemini CLI"
+        case .codex: "Codex"
         case .shell: "Shell"
         case .custom(let name): name
         }
@@ -124,6 +136,8 @@ public enum Tool: Codable, Sendable, Hashable {
     public var command: String {
         switch self {
         case .claude: "claude"
+        case .gemini: "gemini"
+        case .codex: "codex"
         case .shell: ProcessInfo.processInfo.environment["SHELL"] ?? "/bin/zsh"
         case .custom(let name): name
         }
@@ -142,6 +156,8 @@ extension Tool {
         let type = try container.decode(String.self, forKey: .type)
         switch type {
         case "claude": self = .claude
+        case "gemini": self = .gemini
+        case "codex": self = .codex
         case "shell": self = .shell
         default:
             let name = try container.decodeIfPresent(String.self, forKey: .name) ?? type
@@ -154,11 +170,47 @@ extension Tool {
         switch self {
         case .claude:
             try container.encode("claude", forKey: .type)
+        case .gemini:
+            try container.encode("gemini", forKey: .type)
+        case .codex:
+            try container.encode("codex", forKey: .type)
         case .shell:
             try container.encode("shell", forKey: .type)
         case .custom(let name):
             try container.encode("custom", forKey: .type)
             try container.encode(name, forKey: .name)
+        }
+    }
+}
+
+// MARK: - Tool Capabilities
+
+extension Tool {
+    public var supportsPermissionModes: Bool {
+        switch self {
+        case .claude, .gemini, .codex: true
+        default: false
+        }
+    }
+
+    public var supportsInitialPrompt: Bool {
+        switch self {
+        case .claude, .gemini, .codex: true
+        default: false
+        }
+    }
+
+    public var supportsHappy: Bool {
+        switch self {
+        case .claude, .gemini, .codex: true
+        default: false
+        }
+    }
+
+    public var isAgent: Bool {
+        switch self {
+        case .shell: false
+        default: true
         }
     }
 }

@@ -1,3 +1,4 @@
+import Foundation
 import Testing
 
 @testable import Models
@@ -66,4 +67,86 @@ import Testing
 @Test func sessionIssueNumberSet() {
     let session = Session(title: "Fix #42", path: "/tmp", issueNumber: 42)
     #expect(session.issueNumber == 42)
+}
+
+@Test func geminiToolProperties() {
+    #expect(Tool.gemini.displayName == "Gemini CLI")
+    #expect(Tool.gemini.command == "gemini")
+}
+
+@Test func codexToolProperties() {
+    #expect(Tool.codex.displayName == "Codex")
+    #expect(Tool.codex.command == "codex")
+}
+
+@Test func toolSupportsPermissionModes() {
+    #expect(Tool.claude.supportsPermissionModes == true)
+    #expect(Tool.gemini.supportsPermissionModes == true)
+    #expect(Tool.codex.supportsPermissionModes == true)
+    #expect(Tool.shell.supportsPermissionModes == false)
+    #expect(Tool.custom("aider").supportsPermissionModes == false)
+}
+
+@Test func toolSupportsHappy() {
+    #expect(Tool.claude.supportsHappy == true)
+    #expect(Tool.gemini.supportsHappy == true)
+    #expect(Tool.codex.supportsHappy == true)
+    #expect(Tool.shell.supportsHappy == false)
+}
+
+@Test func toolSupportsInitialPrompt() {
+    #expect(Tool.claude.supportsInitialPrompt == true)
+    #expect(Tool.gemini.supportsInitialPrompt == true)
+    #expect(Tool.codex.supportsInitialPrompt == true)
+    #expect(Tool.shell.supportsInitialPrompt == false)
+}
+
+@Test func toolIsAgent() {
+    #expect(Tool.claude.isAgent == true)
+    #expect(Tool.gemini.isAgent == true)
+    #expect(Tool.codex.isAgent == true)
+    #expect(Tool.shell.isAgent == false)
+    #expect(Tool.custom("aider").isAgent == true)
+}
+
+@Test func toolCodableRoundTrip() throws {
+    let tools: [Tool] = [.claude, .gemini, .codex, .shell, .custom("aider")]
+    for tool in tools {
+        let data = try JSONEncoder().encode(tool)
+        let decoded = try JSONDecoder().decode(Tool.self, from: data)
+        #expect(decoded == tool)
+    }
+}
+
+@Test func permissionModeCliFlagsForClaude() {
+    #expect(PermissionMode.default.cliFlags(for: .claude) == [])
+    #expect(PermissionMode.acceptEdits.cliFlags(for: .claude) == ["--accept-edits"])
+    #expect(PermissionMode.bypassAll.cliFlags(for: .claude) == ["--dangerously-skip-permissions"])
+}
+
+@Test func permissionModeCliFlagsForGemini() {
+    #expect(PermissionMode.default.cliFlags(for: .gemini) == [])
+    #expect(PermissionMode.acceptEdits.cliFlags(for: .gemini) == ["--yolo"])
+    #expect(PermissionMode.bypassAll.cliFlags(for: .gemini) == ["--yolo"])
+}
+
+@Test func permissionModeCliFlagsForCodex() {
+    #expect(PermissionMode.default.cliFlags(for: .codex) == [])
+    #expect(PermissionMode.acceptEdits.cliFlags(for: .codex) == ["--full-auto"])
+    #expect(PermissionMode.bypassAll.cliFlags(for: .codex) == ["--yolo"])
+}
+
+@Test func permissionModeCliFlagsForShell() {
+    #expect(PermissionMode.acceptEdits.cliFlags(for: .shell) == [])
+    #expect(PermissionMode.bypassAll.cliFlags(for: .shell) == [])
+}
+
+@Test func sessionUseHappyDefaultsFalse() {
+    let session = Session(title: "test", path: "/tmp")
+    #expect(session.useHappy == false)
+}
+
+@Test func sessionUseHappyPreserved() {
+    let session = Session(title: "test", path: "/tmp", useHappy: true)
+    #expect(session.useHappy == true)
 }

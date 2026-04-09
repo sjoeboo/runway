@@ -15,7 +15,7 @@ import Testing
 }
 
 @Test func builtInProfileCount() {
-    #expect(AgentProfile.builtIn.count == 2)
+    #expect(AgentProfile.builtIn.count == 4)
 }
 
 @Test func defaultProfileForClaude() {
@@ -45,6 +45,45 @@ import Testing
     #expect(!profile.idlePatterns.isEmpty)
     #expect(!profile.lineStartIdlePatterns.isEmpty)
     #expect(!profile.spinnerChars.isEmpty)
+}
+
+@Test func geminiProfileProperties() {
+    let profile = AgentProfile.gemini
+    #expect(profile.id == "gemini")
+    #expect(profile.name == "Gemini CLI")
+    #expect(profile.command == "gemini")
+    #expect(profile.hookEnabled == true)
+    #expect(profile.icon == "diamond.fill")
+    #expect(!profile.runningPatterns.isEmpty)
+    #expect(!profile.waitingPatterns.isEmpty)
+    #expect(!profile.idlePatterns.isEmpty)
+    #expect(!profile.spinnerChars.isEmpty)
+}
+
+@Test func codexProfileProperties() {
+    let profile = AgentProfile.codex
+    #expect(profile.id == "codex")
+    #expect(profile.name == "Codex")
+    #expect(profile.command == "codex")
+    #expect(profile.hookEnabled == true)
+    #expect(profile.icon == "cpu")
+    #expect(profile.arguments == ["--no-alt-screen"])
+    #expect(!profile.runningPatterns.isEmpty)
+    #expect(!profile.waitingPatterns.isEmpty)
+    #expect(!profile.idlePatterns.isEmpty)
+}
+
+@Test func defaultProfileForGemini() {
+    let profile = AgentProfile.defaultProfile(for: .gemini)
+    #expect(profile.id == "gemini")
+    #expect(profile.hookEnabled == true)
+}
+
+@Test func defaultProfileForCodex() {
+    let profile = AgentProfile.defaultProfile(for: .codex)
+    #expect(profile.id == "codex")
+    #expect(profile.hookEnabled == true)
+    #expect(profile.arguments == ["--no-alt-screen"])
 }
 
 @Test func agentProfileJSONDecoding() throws {

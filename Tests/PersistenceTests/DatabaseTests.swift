@@ -194,6 +194,42 @@ import Testing
     #expect(forP1.first?.name == "Project-specific")
 }
 
+@Test func sessionUseHappyPersistence() throws {
+    let db = try Database(inMemory: true)
+    let session = Session(title: "happy-test", path: "/tmp", useHappy: true)
+    try db.saveSession(session)
+
+    let fetched = try db.session(id: session.id)
+    #expect(fetched?.useHappy == true)
+}
+
+@Test func sessionUseHappyDefaultsFalse() throws {
+    let db = try Database(inMemory: true)
+    let session = Session(title: "normal", path: "/tmp")
+    try db.saveSession(session)
+
+    let fetched = try db.session(id: session.id)
+    #expect(fetched?.useHappy == false)
+}
+
+@Test func sessionToolGeminiPersistence() throws {
+    let db = try Database(inMemory: true)
+    let session = Session(title: "gemini-test", path: "/tmp", tool: .gemini)
+    try db.saveSession(session)
+
+    let fetched = try db.session(id: session.id)
+    #expect(fetched?.tool == .gemini)
+}
+
+@Test func sessionToolCodexPersistence() throws {
+    let db = try Database(inMemory: true)
+    let session = Session(title: "codex-test", path: "/tmp", tool: .codex)
+    try db.saveSession(session)
+
+    let fetched = try db.session(id: session.id)
+    #expect(fetched?.tool == .codex)
+}
+
 @Test func prCacheRoundTripsNewFields() throws {
     let db = try Database(inMemory: true)
 

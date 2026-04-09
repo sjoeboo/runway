@@ -67,6 +67,24 @@ import Testing
     #expect(event.notificationType == "permission_prompt")
 }
 
+@Test func geminiBeforeAgentEventDecodes() throws {
+    let json = """
+        {"session_id": "s1", "hook_event_name": "BeforeAgent"}
+        """
+    let data = try #require(json.data(using: .utf8))
+    let event = try JSONDecoder().decode(HookEvent.self, from: data)
+    #expect(event.event == .beforeAgent)
+}
+
+@Test func geminiAfterAgentEventDecodes() throws {
+    let json = """
+        {"session_id": "s1", "hook_event_name": "AfterAgent"}
+        """
+    let data = try #require(json.data(using: .utf8))
+    let event = try JSONDecoder().decode(HookEvent.self, from: data)
+    #expect(event.event == .afterAgent)
+}
+
 // MARK: - HookEventType
 
 @Test func hookEventTypeRawValues() {
@@ -76,6 +94,8 @@ import Testing
     #expect(HookEventType.userPromptSubmit.rawValue == "UserPromptSubmit")
     #expect(HookEventType.permissionRequest.rawValue == "PermissionRequest")
     #expect(HookEventType.notification.rawValue == "Notification")
+    #expect(HookEventType.beforeAgent.rawValue == "BeforeAgent")
+    #expect(HookEventType.afterAgent.rawValue == "AfterAgent")
 }
 
 // MARK: - PermissionMode
@@ -93,9 +113,9 @@ import Testing
 }
 
 @Test func permissionModeCLIFlags() {
-    #expect(PermissionMode.default.cliFlags.isEmpty)
-    #expect(PermissionMode.acceptEdits.cliFlags == ["--accept-edits"])
-    #expect(PermissionMode.bypassAll.cliFlags == ["--dangerously-skip-permissions"])
+    #expect(PermissionMode.default.cliFlags(for: .claude).isEmpty)
+    #expect(PermissionMode.acceptEdits.cliFlags(for: .claude) == ["--accept-edits"])
+    #expect(PermissionMode.bypassAll.cliFlags(for: .claude) == ["--dangerously-skip-permissions"])
 }
 
 @Test func permissionModeCaseIterable() {

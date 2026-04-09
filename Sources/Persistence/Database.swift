@@ -235,6 +235,12 @@ public final class Database: Sendable {
             }
         }
 
+        migrator.registerMigration("v14_session_use_happy") { db in
+            try db.alter(table: "sessions") { t in
+                t.add(column: "useHappy", .boolean).notNull().defaults(to: false)
+            }
+        }
+
         try migrator.migrate(dbQueue)
     }
 

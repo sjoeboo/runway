@@ -10,6 +10,7 @@ public struct NewSessionRequest: Sendable {
     public let useWorktree: Bool
     public let branchName: String?
     public let permissionMode: PermissionMode
+    public let useHappy: Bool
     public let initialPrompt: String?
     public let issueNumber: Int?
 
@@ -22,6 +23,7 @@ public struct NewSessionRequest: Sendable {
         useWorktree: Bool,
         branchName: String?,
         permissionMode: PermissionMode = .default,
+        useHappy: Bool = false,
         initialPrompt: String? = nil,
         issueNumber: Int? = nil
     ) {
@@ -33,6 +35,7 @@ public struct NewSessionRequest: Sendable {
         self.useWorktree = useWorktree
         self.branchName = branchName
         self.permissionMode = permissionMode
+        self.useHappy = useHappy
         self.initialPrompt = initialPrompt
         self.issueNumber = issueNumber
     }
