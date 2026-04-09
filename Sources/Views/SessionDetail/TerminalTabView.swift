@@ -132,15 +132,11 @@ public struct TerminalTabView: View {
             // must not initialize tabs until the tmux session actually exists.
             // Only .running, .idle, and .waiting indicate a live tmux session —
             // .error and .stopped mean creation failed or the session is gone.
-            if newStatus.tmuxSessionExpected {
-                if tabs.isEmpty {
-                    initializeTabs()
-                }
-            } else {
-                // Session went non-live (e.g., restarting) — clear tabs so they
-                // reinitialize when the session comes back.
-                tabs = []
-                selectedTabID = nil
+            // Note: tabs are NOT cleared on non-live status — restart uses .id()
+            // to force full view recreation, and stale hook events from a killed
+            // session could otherwise destroy the freshly created terminal.
+            if tabs.isEmpty, newStatus.tmuxSessionExpected {
+                initializeTabs()
             }
         }
     }
