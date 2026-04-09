@@ -387,7 +387,7 @@ public final class RunwayStore {
         // If worktree needed, create it in the background then start the tmux session
         if needsWorktree, let branchName = request.branchName {
             let project = projects.first(where: { $0.id == request.projectID })
-            let baseBranch = project?.defaultBranch ?? "main"
+            let baseBranch = request.baseBranch ?? project?.defaultBranch ?? "main"
 
             provisioningWorktreeIDs.insert(session.id)
 
