@@ -68,6 +68,9 @@ public actor HookServer {
                 case .failed(let error):
                     listener?.stateUpdateHandler = nil  // prevent double-resume
                     continuation.resume(throwing: error)
+                case .cancelled:
+                    listener?.stateUpdateHandler = nil  // prevent double-resume
+                    continuation.resume(throwing: HookServerError.cancelled)
                 default:
                     break
                 }
@@ -100,6 +103,11 @@ public actor HookServer {
     /// Calls processRequest once the full payload is received.
     nonisolated private func accumulateRequest(connection: NWConnection, buffer: Data) {
         connection.receive(minimumIncompleteLength: 1, maximumLength: 65536) { [weak self] data, _, _, error in
+            guard let self else {
+                // Server was deallocated — clean up the connection to prevent FD leak
+                connection.cancel()
+                return
+            }
             guard let data, error == nil else {
                 connection.cancel()
                 return
@@ -130,17 +138,26 @@ public actor HookServer {
                 let receivedBody = accumulated.count - bodyStart
                 if receivedBody >= contentLength {
                     // Full request received
-                    Task { await self?.processRequest(data: accumulated, connection: connection) }
+                    Task { await self.processRequest(data: accumulated, connection: connection) }
                     return
                 }
             }
 
             // Need more data — keep reading
-            self?.accumulateRequest(connection: connection, buffer: accumulated)
+            self.accumulateRequest(connection: connection, buffer: accumulated)
         }
     }
 
     private func processRequest(data: Data, connection: NWConnection) {
+        // Send 200 OK response immediately — don't block the agent waiting for
+        // handler dispatch, which may await MainActor and exceed the hook timeout.
+        let response = "HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n"
+        connection.send(
+            content: response.data(using: .utf8),
+            completion: .contentProcessed { _ in
+                connection.cancel()
+            })
+
         // Parse HTTP request body (skip headers, find blank line)
         if let bodyRange = findHTTPBody(in: data),
             var event = try? JSONDecoder().decode(HookEvent.self, from: data[bodyRange])
@@ -155,14 +172,6 @@ public actor HookServer {
                 handler(event)
             }
         }
-
-        // Send 200 OK response
-        let response = "HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n"
-        connection.send(
-            content: response.data(using: .utf8),
-            completion: .contentProcessed { _ in
-                connection.cancel()
-            })
     }
 
     private func extractHeader(named name: String, from data: Data) -> String? {
@@ -192,11 +201,14 @@ public actor HookServer {
 
 public enum HookServerError: Error, LocalizedError {
     case invalidPort(UInt16)
+    case cancelled
 
     public var errorDescription: String? {
         switch self {
         case .invalidPort(let port):
             "Invalid port number: \(port)"
+        case .cancelled:
+            "Hook server listener was cancelled before it could start"
         }
     }
 }

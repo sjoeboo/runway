@@ -214,7 +214,10 @@ public struct PRDetailDrawer: View {
                             .frame(minHeight: 100)
                             .border(Color.secondary.opacity(0.3))
                         HStack {
-                            Button("Cancel") { activeSheet = nil }
+                            Button("Cancel") {
+                                requestChangesText = ""
+                                activeSheet = nil
+                            }
                             Spacer()
                             Button("Submit") {
                                 onRequestChanges(requestChangesText)
@@ -236,7 +239,10 @@ public struct PRDetailDrawer: View {
                             .frame(minHeight: 100)
                             .border(Color.secondary.opacity(0.3))
                         HStack {
-                            Button("Cancel") { activeSheet = nil }
+                            Button("Cancel") {
+                                sheetCommentText = ""
+                                activeSheet = nil
+                            }
                             Spacer()
                             Button("Comment") {
                                 onComment(sheetCommentText)
@@ -390,6 +396,7 @@ public struct PRDetailDrawer: View {
                     .padding(.top, 8)
                 }
                 .buttonStyle(.plain)
+                .keyboardShortcut(KeyEquivalent(Character("\(index + 1)")), modifiers: .control)
             }
             Spacer()
         }
@@ -620,7 +627,7 @@ public struct PRDetailDrawer: View {
 
         var date: Date {
             switch self {
-            case .review(let review): review.submittedAt ?? .distantPast
+            case .review(let review): review.submittedAt ?? Date()
             case .comment(let comment): comment.createdAt
             }
         }
@@ -665,7 +672,9 @@ public struct PRDetailDrawer: View {
                         all += reviews.map { .review($0) }
                     }
                     if let comments = detail?.comments {
-                        all += comments.map { .comment($0) }
+                        // Exclude inline comments (those with a file path) — they're
+                        // already shown in the grouped "Inline Comments" section above
+                        all += comments.filter { $0.path == nil }.map { .comment($0) }
                     }
                     return all.sorted { $0.date < $1.date }
                 }()

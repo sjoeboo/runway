@@ -31,6 +31,7 @@ public final class RunwayStore {
     var isLoadingPRs: Bool = false
     private var prPollTask: Task<Void, Never>?
     private var sessionPRPollTask: Task<Void, Never>?
+    private var enrichPRsTask: Task<Void, Never>?
     private var lastPRFingerprint: PRFingerprint?
     /// Per-session PR fetch timestamps — mirrors Hangar's sessionFetched map with 60s TTL.
     private var sessionPRFetchedAt: [String: Date] = [:]
@@ -167,6 +168,17 @@ public final class RunwayStore {
 
         // Start buffer-based status detection for sessions without hook events
         startBufferDetection()
+
+        // Remove injected hooks on app termination so agents don't block on a dead port
+        NotificationCenter.default.addObserver(
+            forName: NSApplication.willTerminateNotification,
+            object: nil,
+            queue: .main
+        ) { [hookInjector] _ in
+            for config in HookInjectionConfig.allBuiltIn {
+                try? hookInjector.remove(config: config)
+            }
+        }
     }
 
     // MARK: - State Loading
@@ -244,8 +256,10 @@ public final class RunwayStore {
             print("[Runway] Failed to load state: \(error)")
         }
 
-        // Reload cached PRs after reconciliation (init already schedules fetchPRs)
-        loadCachedPRs()
+        // Note: loadCachedPRs() is NOT called here — init already called it for
+        // instant display, and fetchPRs() (also scheduled from init) replaces the
+        // cached data with fresh data. A second loadCachedPRs() would overwrite
+        // the fresh fetch results with stale cache.
     }
 
     /// Remove worktrees that exist on disk but have no matching session in the database.
@@ -353,6 +367,9 @@ public final class RunwayStore {
     // MARK: - New Session Request (from dialog)
 
     func handleNewSessionRequest(_ request: NewSessionRequest) async {
+        if database == nil {
+            statusMessage = .error("Database unavailable — sessions will not persist across restarts")
+        }
         let needsWorktree = request.useWorktree && !(request.branchName ?? "").isEmpty
 
         // Resolve permission mode: request > project override > default
@@ -982,7 +999,9 @@ public final class RunwayStore {
                 return existing
             }
 
-            Task { await enrichPRs() }
+            // Cancel any in-flight enrichment to prevent stale results overwriting fresh data
+            enrichPRsTask?.cancel()
+            enrichPRsTask = Task { await enrichPRs() }
         } catch {
             print("[Runway] Failed to fetch PRs: \(error)")
             statusMessage = .error("PR fetch failed: \(error.localizedDescription)")
@@ -1407,6 +1426,7 @@ public final class RunwayStore {
         guard let project = projectForIssue(issue) else { return }
         do {
             try await issueManager.addComment(repo: issue.repo, number: issue.number, host: project.ghHost, body: body)
+            statusMessage = .success("Commented on #\(issue.number)")
             issueDetail = try? await issueManager.fetchDetail(repo: issue.repo, number: issue.number, host: project.ghHost)
         } catch {
             statusMessage = .error("Comment failed: \(error.localizedDescription)")
@@ -1501,15 +1521,18 @@ public final class RunwayStore {
         provisioningWorktreeIDs.insert(session.id)
 
         Task {
-            var sessionPath = project.path
+            let sessionPath: String
             do {
                 sessionPath = try await worktreeManager.checkoutWorktree(
                     repoPath: project.path,
                     branch: pr.headBranch
                 )
             } catch {
-                print("[Runway] Worktree checkout failed, using project path: \(error)")
-                statusMessage = .error("Worktree failed: \(error.localizedDescription)")
+                print("[Runway] Worktree checkout failed for PR review: \(error)")
+                provisioningWorktreeIDs.remove(session.id)
+                updateSessionStatus(id: session.id, status: .error)
+                statusMessage = .error("Worktree failed — PR review cannot start without branch isolation: \(error.localizedDescription)")
+                return
             }
 
             // Update session path
@@ -1655,8 +1678,10 @@ struct StatusMessage: Equatable {
     enum Kind: Equatable { case success, info, error }
     let text: String
     let kind: Kind
+    /// Unique ID ensures `.task(id:)` restarts for identical consecutive messages
+    let id: UUID
 
-    static func success(_ text: String) -> StatusMessage { .init(text: text, kind: .success) }
-    static func info(_ text: String) -> StatusMessage { .init(text: text, kind: .info) }
-    static func error(_ text: String) -> StatusMessage { .init(text: text, kind: .error) }
+    static func success(_ text: String) -> StatusMessage { .init(text: text, kind: .success, id: UUID()) }
+    static func info(_ text: String) -> StatusMessage { .init(text: text, kind: .info, id: UUID()) }
+    static func error(_ text: String) -> StatusMessage { .init(text: text, kind: .error, id: UUID()) }
 }

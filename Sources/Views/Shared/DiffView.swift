@@ -12,7 +12,9 @@ public struct DiffView: View {
 
     public init(files: [DiffFile]) {
         self.files = files
-        self._expandedFiles = State(initialValue: Set())
+        // Auto-expand all files for small diffs, none for large ones
+        let initial = files.count <= 8 ? Set(files.map(\.path)) : Set<String>()
+        self._expandedFiles = State(initialValue: initial)
     }
 
     /// Initialize from a raw unified diff string.
@@ -227,6 +229,13 @@ public struct DiffFile: Identifiable, Sendable {
                 currentLines.append(
                     DiffLine(index: lineIndex, type: .context, content: String(rawLine.dropFirst()), oldLineNo: oldLine, newLineNo: newLine)
                 )
+                lineIndex += 1
+                oldLine += 1
+                newLine += 1
+            } else if rawLine.isEmpty, currentPath != nil {
+                // Empty line without leading space — blank context line
+                currentLines.append(
+                    DiffLine(index: lineIndex, type: .context, content: "", oldLineNo: oldLine, newLineNo: newLine))
                 lineIndex += 1
                 oldLine += 1
                 newLine += 1

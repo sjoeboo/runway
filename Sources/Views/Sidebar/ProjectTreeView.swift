@@ -216,17 +216,20 @@ struct ProjectSection: View {
     var body: some View {
         // Project header as a plain list row — avoids Section's hover disclosure arrow
         HStack(spacing: 4) {
-            Image(systemName: "chevron.right")
-                .font(.caption)
-                .foregroundColor(theme.chrome.textDim)
-                .rotationEffect(.degrees(isExpanded ? 90 : 0))
-                .animation(.easeInOut(duration: 0.15), value: isExpanded)
-                .frame(width: 16)
-                .onTapGesture {
-                    withAnimation(.easeInOut(duration: 0.15)) {
-                        isExpanded.toggle()
-                    }
+            Button {
+                withAnimation(.easeInOut(duration: 0.15)) {
+                    isExpanded.toggle()
                 }
+            } label: {
+                Image(systemName: "chevron.right")
+                    .font(.caption)
+                    .foregroundColor(theme.chrome.textDim)
+                    .rotationEffect(.degrees(isExpanded ? 90 : 0))
+                    .animation(.easeInOut(duration: 0.15), value: isExpanded)
+                    .frame(width: 16)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(isExpanded ? "Collapse project" : "Expand project")
 
             if isRenaming {
                 TextField("Project name", text: $editName)
@@ -472,7 +475,7 @@ struct SessionRowView: View {
                 .help("Delete session")
             }
             .opacity(isHovered ? 1 : 0)
-            .allowsHitTesting(isHovered)
+            .accessibilityElement(children: .contain)
 
             if !isHovered {
                 HStack(spacing: 4) {

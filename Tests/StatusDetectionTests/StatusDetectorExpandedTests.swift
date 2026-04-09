@@ -70,10 +70,9 @@ import Testing
 @Test func detectClaudeIdlePromptVariants() {
     let detector = StatusDetector()
 
-    // Note: "What would you like to do" is NOT tested here because it contains
-    // the waiting pattern "What would you like" which takes priority.
     let patterns = [
         "How can I help",
+        "What would you like to do",
         "Enter your prompt",
         "$ ",
     ]
@@ -84,12 +83,16 @@ import Testing
     }
 }
 
-@Test func detectWaitingTakesPriorityOverIdle() {
+@Test func detectWaitingWithSpecificPatterns() {
     let detector = StatusDetector()
-    // "What would you like to do" contains "What would you like" (waiting pattern)
-    // Waiting patterns are checked before idle, so this should be .waiting
-    let result = detector.detect(content: "What would you like to do", tool: .claude)
-    #expect(result == .waiting)
+    // "What would you like to do" is idle (not waiting) — the waiting patterns
+    // are now more specific to avoid matching the idle prompt.
+    let idleResult = detector.detect(content: "What would you like to do", tool: .claude)
+    #expect(idleResult == .idle)
+
+    // Specific waiting patterns should still detect as waiting
+    let waitingResult = detector.detect(content: "What would you like me to do?", tool: .claude)
+    #expect(waitingResult == .waiting)
 }
 
 @Test func detectClaudeNoMatch() {

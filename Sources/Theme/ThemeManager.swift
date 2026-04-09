@@ -59,11 +59,13 @@ public final class ThemeManager {
             if selectedThemeID == pair.dark && targetAppearance == .light {
                 if let light = allThemes.first(where: { $0.id == pair.light }) {
                     currentTheme = light
+                    selectedThemeID = light.id
                     return
                 }
             } else if selectedThemeID == pair.light && targetAppearance == .dark {
                 if let dark = allThemes.first(where: { $0.id == pair.dark }) {
                     currentTheme = dark
+                    selectedThemeID = dark.id
                     return
                 }
             }

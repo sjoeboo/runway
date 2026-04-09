@@ -34,6 +34,9 @@ public struct SettingsView: View {
                 .tabItem { Label("General", systemImage: "gear") }
         }
         .frame(minWidth: 500, minHeight: 360)
+        .onAppear {
+            if cachedFonts == nil { cachedFonts = groupedFonts() }
+        }
     }
 
     // MARK: - Appearance
@@ -117,8 +120,10 @@ public struct SettingsView: View {
 
     // MARK: - Font
 
+    @State private var cachedFonts: (nerd: [String], mono: [String], other: [String])?
+
     private var fontSettings: some View {
-        let fonts = groupedFonts()
+        let fonts = cachedFonts ?? groupedFonts()
         return Form {
             Section("Terminal Font") {
                 Picker("Font Family", selection: $fontFamily) {
