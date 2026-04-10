@@ -26,11 +26,6 @@ public struct PRDashboardView: View {
     @AppStorage("prListWidth") private var prListWidth: Double = 380
     @AppStorage("hideDrafts") private var hideDrafts: Bool = false
     @AppStorage("showSessionPRsOnly") private var showSessionPRsOnly: Bool = false
-    @AppStorage("prGroupNeedsAttentionExpanded") private var needsAttentionExpanded: Bool = true
-    @AppStorage("prGroupInProgressExpanded") private var inProgressExpanded: Bool = true
-    @AppStorage("prGroupReadyExpanded") private var readyExpanded: Bool = true
-    @AppStorage("prGroupWaitingForReviewExpanded") private var waitingForReviewExpanded: Bool = true
-    @AppStorage("prGroupDraftsExpanded") private var draftsExpanded: Bool = false
     @AppStorage("prSortField") private var sortFieldRaw: String = PRSortField.age.rawValue
     @AppStorage("prSortOrder") private var sortOrderRaw: String = PRSortOrder.descending.rawValue
     @AppStorage("prFilterRepo") private var filterRepo: String = ""
@@ -179,61 +174,12 @@ public struct PRDashboardView: View {
         return prs.count
     }
 
-    // MARK: - Grouping
+    // MARK: - Sorted PRs
 
-    private func groupedPRs() -> [(group: PRGroup, prs: [PullRequest])] {
-        var byGroup: [PRGroup: [PullRequest]] = [:]
-        for pr in filteredPRs {
-            let g = prGroup(for: pr)
-            byGroup[g, default: []].append(pr)
-        }
-        let currentSortField = sortField
-        let currentSortOrder = sortOrder
-        return PRGroup.allCases.compactMap { g in
-            guard var prs = byGroup[g], !prs.isEmpty else { return nil }
-            prs = sortPRs(prs, by: currentSortField, order: currentSortOrder)
-            return (g, prs)
-        }
-    }
-
-    private func isGroupExpanded(_ group: PRGroup) -> Bool {
-        switch group {
-        case .needsAttention: return needsAttentionExpanded
-        case .inProgress: return inProgressExpanded
-        case .ready: return readyExpanded
-        case .waitingForReview: return waitingForReviewExpanded
-        case .drafts: return draftsExpanded
-        }
-    }
-
-    private func toggleGroupExpanded(_ group: PRGroup) {
-        switch group {
-        case .needsAttention: needsAttentionExpanded.toggle()
-        case .inProgress: inProgressExpanded.toggle()
-        case .ready: readyExpanded.toggle()
-        case .waitingForReview: waitingForReviewExpanded.toggle()
-        case .drafts: draftsExpanded.toggle()
-        }
-    }
-
-    private func groupColor(_ group: PRGroup) -> Color {
-        switch group {
-        case .needsAttention: return theme.chrome.red
-        case .inProgress: return theme.chrome.yellow
-        case .ready: return theme.chrome.green
-        case .waitingForReview: return theme.chrome.accent
-        case .drafts: return theme.chrome.textDim
-        }
-    }
-
-    private func groupIcon(_ group: PRGroup) -> String {
-        switch group {
-        case .needsAttention: return "exclamationmark.circle"
-        case .inProgress: return "clock"
-        case .ready: return "checkmark.circle"
-        case .waitingForReview: return "eye"
-        case .drafts: return "circle.dashed"
-        }
+    private var sortedPRs: [PullRequest] {
+        var prs = filteredPRs
+        if hideDrafts { prs = prs.filter { !$0.isDraft } }
+        return sortPRs(prs, by: sortField, order: sortOrder)
     }
 
     // MARK: - Body
@@ -328,10 +274,9 @@ public struct PRDashboardView: View {
 
     // MARK: - PR List Content
 
-    /// The filter bar, column headers, and scrollable PR list as one cohesive unit.
+    /// The filter bar, column headers, and scrollable PR list.
     @ViewBuilder
     private var prListContent: some View {
-        // Filter bar — always visible, fixed above scroll
         PRFilterBar(
             filter: Binding(
                 get: { filterState },
@@ -340,8 +285,6 @@ public struct PRDashboardView: View {
             pullRequests: filteredPRs
         )
         Divider()
-
-        // Column headers — fixed above scroll
         PRColumnHeader(
             sortField: Binding(
                 get: { sortField },
@@ -358,8 +301,8 @@ public struct PRDashboardView: View {
         )
         Divider()
 
-        // Scrollable PR content
-        if filteredPRs.isEmpty && !isLoading {
+        let prs = sortedPRs
+        if prs.isEmpty && !isLoading {
             VStack(spacing: 8) {
                 Image(systemName: "pull.request")
                     .font(.largeTitle)
@@ -378,49 +321,27 @@ public struct PRDashboardView: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else {
-            let visibleGroups = groupedPRs().filter { !($0.group == .drafts && hideDrafts) }
-            if visibleGroups.isEmpty {
-                VStack(spacing: 8) {
-                    Image(systemName: "pull.request")
-                        .font(.largeTitle)
-                        .foregroundStyle(.secondary)
-                    Text("No pull requests")
-                        .foregroundStyle(.secondary)
-                    Button("Refresh") { onRefresh() }
-                        .controlSize(.small)
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else {
-                ScrollView {
-                    LazyVStack(alignment: .leading, spacing: 0) {
-                        ForEach(visibleGroups, id: \.group) { entry in
-                            groupHeader(entry.group, count: entry.prs.count)
-                                .background(theme.chrome.background)
-                            if isGroupExpanded(entry.group) {
-                                ForEach(entry.prs) { pr in
-                                    PRRowView(
-                                        pr: pr,
-                                        columnWidths: columnWidths,
-                                        onReview: onReviewPR.map { callback in
-                                            { callback(pr) }
-                                        }
-                                    )
-                                    .background(
-                                        selectedPRID == pr.id
-                                            ? theme.chrome.accent.opacity(0.15)
-                                            : Color.clear
-                                    )
-                                    .onTapGesture {
-                                        onSelectPR(selectedPRID == pr.id ? nil : pr)
-                                    }
-                                }
-                            }
-                        }
+            List(
+                selection: Binding(
+                    get: { selectedPRID },
+                    set: { id in
+                        let pr = prs.first(where: { $0.id == id })
+                        onSelectPR(pr)
                     }
-                    .frame(maxWidth: .infinity)
+                )
+            ) {
+                ForEach(prs) { pr in
+                    PRRowView(
+                        pr: pr,
+                        columnWidths: columnWidths,
+                        onReview: onReviewPR.map { callback in { callback(pr) } }
+                    )
+                    .tag(pr.id)
+                    .listRowInsets(EdgeInsets())
                 }
-                .frame(maxHeight: .infinity, alignment: .top)
             }
+            .listStyle(.plain)
+            .scrollContentBackground(.hidden)
         }
     }
 
@@ -442,31 +363,6 @@ public struct PRDashboardView: View {
         .accessibilityAddTraits(selectedTab == tab ? .isSelected : [])
     }
 
-    // MARK: - Group Header
-
-    private func groupHeader(_ group: PRGroup, count: Int) -> some View {
-        Button(action: { toggleGroupExpanded(group) }) {
-            HStack(spacing: 6) {
-                Image(systemName: groupIcon(group))
-                    .font(.callout)
-                    .foregroundColor(groupColor(group))
-                Text(group.rawValue)
-                    .font(.callout)
-                    .fontWeight(.semibold)
-                    .foregroundStyle(.secondary)
-                Text("(\(count))")
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-                Spacer()
-                Image(systemName: isGroupExpanded(group) ? "chevron.down" : "chevron.right")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-            .padding(.horizontal, 12)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-    }
 }
 
 // MARK: - Grouping
