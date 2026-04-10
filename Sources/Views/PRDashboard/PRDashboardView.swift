@@ -329,11 +329,37 @@ public struct PRDashboardView: View {
     // MARK: - PR List Content
 
     /// The filter bar, column headers, and scrollable PR list as one cohesive unit.
-    /// Filter bar and column headers are pinned above the scroll content via safeAreaInset.
     @ViewBuilder
     private var prListContent: some View {
+        // Filter bar — always visible, fixed above scroll
+        PRFilterBar(
+            filter: Binding(
+                get: { filterState },
+                set: { filterState = $0 }
+            ),
+            pullRequests: filteredPRs
+        )
+        Divider()
+
+        // Column headers — fixed above scroll
+        PRColumnHeader(
+            sortField: Binding(
+                get: { sortField },
+                set: { sortField = $0 }
+            ),
+            sortOrder: Binding(
+                get: { sortOrder },
+                set: { sortOrder = $0 }
+            ),
+            columnWidths: Binding(
+                get: { columnWidths },
+                set: { columnWidths = $0 }
+            )
+        )
+        Divider()
+
+        // Scrollable PR content
         if filteredPRs.isEmpty && !isLoading {
-            Spacer()
             VStack(spacing: 8) {
                 Image(systemName: "pull.request")
                     .font(.largeTitle)
@@ -350,11 +376,10 @@ public struct PRDashboardView: View {
                         .controlSize(.small)
                 }
             }
-            Spacer()
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else {
             let visibleGroups = groupedPRs().filter { !($0.group == .drafts && hideDrafts) }
             if visibleGroups.isEmpty {
-                Spacer()
                 VStack(spacing: 8) {
                     Image(systemName: "pull.request")
                         .font(.largeTitle)
@@ -364,7 +389,7 @@ public struct PRDashboardView: View {
                     Button("Refresh") { onRefresh() }
                         .controlSize(.small)
                 }
-                Spacer()
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 ScrollView {
                     LazyVStack(spacing: 0) {
@@ -392,34 +417,6 @@ public struct PRDashboardView: View {
                             }
                         }
                     }
-                }
-                .safeAreaInset(edge: .top, spacing: 0) {
-                    VStack(spacing: 0) {
-                        PRFilterBar(
-                            filter: Binding(
-                                get: { filterState },
-                                set: { filterState = $0 }
-                            ),
-                            pullRequests: filteredPRs
-                        )
-                        Divider()
-                        PRColumnHeader(
-                            sortField: Binding(
-                                get: { sortField },
-                                set: { sortField = $0 }
-                            ),
-                            sortOrder: Binding(
-                                get: { sortOrder },
-                                set: { sortOrder = $0 }
-                            ),
-                            columnWidths: Binding(
-                                get: { columnWidths },
-                                set: { columnWidths = $0 }
-                            )
-                        )
-                        Divider()
-                    }
-                    .background(theme.chrome.background)
                 }
             }
         }
