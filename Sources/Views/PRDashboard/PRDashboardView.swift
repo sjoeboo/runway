@@ -31,7 +31,46 @@ public struct PRDashboardView: View {
     @AppStorage("prGroupReadyExpanded") private var readyExpanded: Bool = true
     @AppStorage("prGroupWaitingForReviewExpanded") private var waitingForReviewExpanded: Bool = true
     @AppStorage("prGroupDraftsExpanded") private var draftsExpanded: Bool = false
+    @AppStorage("prSortField") private var sortFieldRaw: String = PRSortField.age.rawValue
+    @AppStorage("prSortOrder") private var sortOrderRaw: String = PRSortOrder.descending.rawValue
+    @AppStorage("prFilterRepo") private var filterRepo: String = ""
+    @AppStorage("prFilterAuthor") private var filterAuthor: String = ""
+    @AppStorage("prFilterAge") private var filterAgeRaw: String = PRAgeBucket.any.rawValue
+    @AppStorage("prFilterChecks") private var filterChecksRaw: String = ""
+    @AppStorage("prFilterReview") private var filterReviewRaw: String = ""
+    @AppStorage("prFilterMerge") private var filterMergeRaw: String = ""
     @Environment(\.theme) private var theme
+
+    private var sortField: PRSortField {
+        get { PRSortField(rawValue: sortFieldRaw) ?? .age }
+        nonmutating set { sortFieldRaw = newValue.rawValue }
+    }
+
+    private var sortOrder: PRSortOrder {
+        get { PRSortOrder(rawValue: sortOrderRaw) ?? .descending }
+        nonmutating set { sortOrderRaw = newValue.rawValue }
+    }
+
+    private var filterState: PRFilterState {
+        get {
+            var state = PRFilterState()
+            state.repo = filterRepo.isEmpty ? nil : filterRepo
+            state.author = filterAuthor.isEmpty ? nil : filterAuthor
+            state.ageBucket = PRAgeBucket(rawValue: filterAgeRaw) ?? .any
+            state.checks = CheckStatus(rawValue: filterChecksRaw)
+            state.review = filterReviewRaw.isEmpty ? nil : ReviewDecision(rawValue: filterReviewRaw)
+            state.mergeFilter = filterMergeRaw.isEmpty ? nil : PRMergeFilter(rawValue: filterMergeRaw)
+            return state
+        }
+        nonmutating set {
+            filterRepo = newValue.repo ?? ""
+            filterAuthor = newValue.author ?? ""
+            filterAgeRaw = newValue.ageBucket.rawValue
+            filterChecksRaw = newValue.checks?.rawValue ?? ""
+            filterReviewRaw = newValue.review?.rawValue ?? ""
+            filterMergeRaw = newValue.mergeFilter?.rawValue ?? ""
+        }
+    }
 
     public init(
         pullRequests: [PullRequest] = [],
@@ -99,12 +138,21 @@ public struct PRDashboardView: View {
     }
 
     private var filteredPRs: [PullRequest] {
-        applyFilters(to: pullRequests, tab: selectedTab)
+        var result = applyFilters(to: pullRequests, tab: selectedTab)
+        let currentFilter = filterState
+        if currentFilter.isActive {
+            result = result.filter { currentFilter.matches($0) }
+        }
+        return result
     }
 
     private func tabCount(_ tab: PRTab) -> Int {
         var prs = applyFilters(to: pullRequests, tab: tab)
         if hideDrafts { prs = prs.filter { !$0.isDraft } }
+        let currentFilter = filterState
+        if currentFilter.isActive {
+            prs = prs.filter { currentFilter.matches($0) }
+        }
         return prs.count
     }
 
@@ -116,8 +164,11 @@ public struct PRDashboardView: View {
             let g = prGroup(for: pr)
             byGroup[g, default: []].append(pr)
         }
+        let currentSortField = sortField
+        let currentSortOrder = sortOrder
         return PRGroup.allCases.compactMap { g in
-            guard let prs = byGroup[g], !prs.isEmpty else { return nil }
+            guard var prs = byGroup[g], !prs.isEmpty else { return nil }
+            prs = sortPRs(prs, by: currentSortField, order: currentSortOrder)
             return (g, prs)
         }
     }
@@ -215,6 +266,31 @@ public struct PRDashboardView: View {
 
                 Divider()
 
+                // Filter bar
+                PRFilterBar(
+                    filter: Binding(
+                        get: { filterState },
+                        set: { filterState = $0 }
+                    ),
+                    pullRequests: filteredPRs
+                )
+
+                Divider()
+
+                // Column headers
+                PRColumnHeader(
+                    sortField: Binding(
+                        get: { sortField },
+                        set: { sortField = $0 }
+                    ),
+                    sortOrder: Binding(
+                        get: { sortOrder },
+                        set: { sortOrder = $0 }
+                    )
+                )
+
+                Divider()
+
                 // PR list
                 if filteredPRs.isEmpty && !isLoading {
                     Spacer()
@@ -222,10 +298,17 @@ public struct PRDashboardView: View {
                         Image(systemName: "pull.request")
                             .font(.largeTitle)
                             .foregroundStyle(.secondary)
-                        Text("No pull requests")
-                            .foregroundStyle(.secondary)
-                        Button("Refresh") { onRefresh() }
-                            .controlSize(.small)
+                        if filterState.isActive {
+                            Text("No PRs match current filters")
+                                .foregroundStyle(.secondary)
+                            Button("Clear Filters") { filterState = PRFilterState() }
+                                .controlSize(.small)
+                        } else {
+                            Text("No pull requests")
+                                .foregroundStyle(.secondary)
+                            Button("Refresh") { onRefresh() }
+                                .controlSize(.small)
+                        }
                     }
                     Spacer()
                 } else {
