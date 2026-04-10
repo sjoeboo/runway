@@ -504,7 +504,8 @@ struct ContentView: View {
                 },
                 onReviewPR: { pr in store.reviewPR(pr) },
                 onEnableAutoMerge: { pr, strategy in Task { await store.enableAutoMerge(pr, strategy: strategy) } },
-                onDisableAutoMerge: { pr in Task { await store.disableAutoMerge(pr) } }
+                onDisableAutoMerge: { pr in Task { await store.disableAutoMerge(pr) } },
+                onClosePR: { pr in Task { await store.closePR(pr) } }
             )
         }
     }
