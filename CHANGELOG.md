@@ -5,6 +5,14 @@ All notable changes to Runway are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.7.1] — 2026-04-10
+
+### Added
+
+- **Close PR button** — close pull requests directly from the PR dashboard without leaving the app ([#297](https://github.com/sjoeboo/runway/pull/297))
+
+[0.7.1]: https://github.com/sjoeboo/runway/compare/v0.7.0...v0.7.1
+
 ## [0.7.0] — 2026-04-10
 
 ### Added

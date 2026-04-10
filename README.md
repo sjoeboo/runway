@@ -123,7 +123,7 @@ Built-in PR management powered by `gh` CLI:
 - **Native Table view** — macOS-native table layout with resizable columns
 - **PR grouping** by status with merge-state badges
 - **Detail drawer** with Overview, Diff, and Conversation tabs (`Ctrl+1/2/3`)
-- **Actions**: approve, request changes, comment, merge (squash/merge/rebase), toggle draft, toggle automerge
+- **Actions**: approve, request changes, comment, merge (squash/merge/rebase), close, toggle draft, toggle automerge
 - **CI checks tab** — view GitHub Actions / CI check results per PR
 - **Visual status**: check results (passed/failed/pending), review decision badges, diff stats (+/-)
 - **Session linking**: PRs are matched to sessions by worktree branch
