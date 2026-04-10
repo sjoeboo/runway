@@ -121,6 +121,66 @@ public struct PRFilterState: Sendable {
     }
 }
 
+// MARK: - Column Widths
+
+/// Resizable column widths for the PR list grid.
+/// Title is always flexible (fills remaining space), so it's not stored here.
+public struct PRColumnWidths: Sendable {
+    public var repo: CGFloat
+    public var author: CGFloat
+    public var age: CGFloat
+    public var checks: CGFloat
+    public var review: CGFloat
+    public var merge: CGFloat
+
+    public static let defaults = PRColumnWidths(
+        repo: 100, author: 70, age: 50, checks: 55, review: 55, merge: 65
+    )
+
+    public static let minimums = PRColumnWidths(
+        repo: 50, author: 40, age: 35, checks: 40, review: 40, merge: 45
+    )
+
+    public static let maximums = PRColumnWidths(
+        repo: 200, author: 150, age: 80, checks: 100, review: 100, merge: 120
+    )
+
+    public init(
+        repo: CGFloat = 100, author: CGFloat = 70, age: CGFloat = 50,
+        checks: CGFloat = 55, review: CGFloat = 55, merge: CGFloat = 65
+    ) {
+        self.repo = repo
+        self.author = author
+        self.age = age
+        self.checks = checks
+        self.review = review
+        self.merge = merge
+    }
+
+    /// Width for a given sort field (title excluded — it's flexible).
+    public func width(for field: PRSortField) -> CGFloat {
+        switch field {
+        case .title: 0  // not used — title is flexible
+        case .repo: repo
+        case .author: author
+        case .age: age
+        case .checks: checks
+        case .review: review
+        case .mergeStatus: merge
+        }
+    }
+
+    /// Minimum width for a given sort field.
+    public static func min(for field: PRSortField) -> CGFloat {
+        Self.minimums.width(for: field)
+    }
+
+    /// Maximum width for a given sort field.
+    public static func max(for field: PRSortField) -> CGFloat {
+        Self.maximums.width(for: field)
+    }
+}
+
 // MARK: - Sorting
 
 /// Sort an array of PRs by the given field and order.

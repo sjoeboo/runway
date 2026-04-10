@@ -39,6 +39,12 @@ public struct PRDashboardView: View {
     @AppStorage("prFilterChecks") private var filterChecksRaw: String = ""
     @AppStorage("prFilterReview") private var filterReviewRaw: String = ""
     @AppStorage("prFilterMerge") private var filterMergeRaw: String = ""
+    @AppStorage("prColRepo") private var colRepo: Double = Double(PRColumnWidths.defaults.repo)
+    @AppStorage("prColAuthor") private var colAuthor: Double = Double(PRColumnWidths.defaults.author)
+    @AppStorage("prColAge") private var colAge: Double = Double(PRColumnWidths.defaults.age)
+    @AppStorage("prColChecks") private var colChecks: Double = Double(PRColumnWidths.defaults.checks)
+    @AppStorage("prColReview") private var colReview: Double = Double(PRColumnWidths.defaults.review)
+    @AppStorage("prColMerge") private var colMerge: Double = Double(PRColumnWidths.defaults.merge)
     @Environment(\.theme) private var theme
 
     private var sortField: PRSortField {
@@ -69,6 +75,23 @@ public struct PRDashboardView: View {
             filterChecksRaw = newValue.checks?.rawValue ?? ""
             filterReviewRaw = newValue.review?.rawValue ?? ""
             filterMergeRaw = newValue.mergeFilter?.rawValue ?? ""
+        }
+    }
+
+    private var columnWidths: PRColumnWidths {
+        get {
+            PRColumnWidths(
+                repo: CGFloat(colRepo), author: CGFloat(colAuthor), age: CGFloat(colAge),
+                checks: CGFloat(colChecks), review: CGFloat(colReview), merge: CGFloat(colMerge)
+            )
+        }
+        nonmutating set {
+            colRepo = Double(newValue.repo)
+            colAuthor = Double(newValue.author)
+            colAge = Double(newValue.age)
+            colChecks = Double(newValue.checks)
+            colReview = Double(newValue.review)
+            colMerge = Double(newValue.merge)
         }
     }
 
@@ -286,6 +309,10 @@ public struct PRDashboardView: View {
                     sortOrder: Binding(
                         get: { sortOrder },
                         set: { sortOrder = $0 }
+                    ),
+                    columnWidths: Binding(
+                        get: { columnWidths },
+                        set: { columnWidths = $0 }
                     )
                 )
 
@@ -341,6 +368,7 @@ public struct PRDashboardView: View {
                                         ForEach(entry.prs) { pr in
                                             PRRowView(
                                                 pr: pr,
+                                                columnWidths: columnWidths,
                                                 onReview: onReviewPR.map { callback in { callback(pr) } }
                                             )
                                             .tag(pr.id)
@@ -487,6 +515,7 @@ public enum PRTab: String, CaseIterable, Sendable {
 
 struct PRRowView: View {
     let pr: PullRequest
+    let columnWidths: PRColumnWidths
     var onReview: (() -> Void)?
     @Environment(\.theme) private var theme
 
@@ -510,32 +539,32 @@ struct PRRowView: View {
                 .font(.caption)
                 .foregroundColor(theme.chrome.cyan)
                 .lineLimit(1)
-                .frame(width: 100, alignment: .leading)
+                .frame(width: columnWidths.repo, alignment: .leading)
 
             // Author column
             Text(pr.author)
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
-                .frame(width: 70, alignment: .leading)
+                .frame(width: columnWidths.author, alignment: .leading)
 
             // Age column
             Text(pr.ageText)
                 .font(.caption)
                 .foregroundStyle(.secondary)
-                .frame(width: 50, alignment: .leading)
+                .frame(width: columnWidths.age, alignment: .leading)
 
             // Checks column
             CheckSummaryBadge(checks: pr.checks)
-                .frame(width: 55, alignment: .leading)
+                .frame(width: columnWidths.checks, alignment: .leading)
 
             // Review column
             ReviewDecisionBadge(decision: pr.reviewDecision)
-                .frame(width: 55, alignment: .leading)
+                .frame(width: columnWidths.review, alignment: .leading)
 
             // Merge column
             MergeStatusBadge(mergeable: pr.mergeable, mergeStateStatus: pr.mergeStateStatus)
-                .frame(width: 65, alignment: .leading)
+                .frame(width: columnWidths.merge, alignment: .leading)
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 4)
