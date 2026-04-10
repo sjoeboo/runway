@@ -186,17 +186,131 @@ public struct PRDashboardView: View {
 
     public var body: some View {
         HStack(spacing: 0) {
-            // Left: PR list — single List containing everything
-            List(
-                selection: Binding(
-                    get: { selectedPRID },
-                    set: { id in
-                        let pr = sortedPRs.first(where: { $0.id == id })
-                        onSelectPR(pr)
+            // Left: PR table
+            prTable
+                .frame(minWidth: 300)
+                .frame(maxWidth: selectedPR == nil ? .infinity : CGFloat(prListWidth))
+
+            // Right: PR detail drawer
+            if let pr = selectedPR {
+                ResizableDivider(width: $prListWidth)
+                PRDetailDrawer(
+                    pr: pr,
+                    detail: detail,
+                    onClose: { onSelectPR(nil) },
+                    onApprove: { onApprove(pr) },
+                    onComment: { body in onComment(pr, body) },
+                    onRequestChanges: { body in onRequestChanges?(pr, body) },
+                    onMerge: { strategy in onMerge?(pr, strategy) },
+                    onToggleDraft: { onToggleDraft?(pr) },
+                    onUpdateBranch: onUpdateBranch.map { callback in
+                        { rebase in callback(pr, rebase) }
+                    },
+                    onSendToSession: onSendToSession.map { callback in
+                        { context in callback(pr, context) }
+                    },
+                    onEnableAutoMerge: onEnableAutoMerge.map { callback in
+                        { strategy in callback(pr, strategy) }
+                    },
+                    onDisableAutoMerge: onDisableAutoMerge.map { callback in
+                        { callback(pr) }
                     }
                 )
-            ) {
-                // Toolbar row
+                .frame(maxWidth: .infinity)
+            }
+        }
+        .task { onRefresh() }
+    }
+
+    // MARK: - PR Table
+
+    private var prTable: some View {
+        Table(
+            of: PullRequest.self,
+            selection: Binding(
+                get: { selectedPRID },
+                set: { id in
+                    let pr = sortedPRs.first(where: { $0.id == id })
+                    onSelectPR(pr)
+                }
+            )
+        ) {
+            TableColumn("Title") { pr in
+                HStack(spacing: 4) {
+                    prStateBadge(pr)
+                    Text("#\(pr.number)")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Text(pr.title)
+                        .font(.callout)
+                        .lineLimit(1)
+                }
+            }
+            .width(min: 150)
+
+            TableColumn("Repo") { pr in
+                Text(prRepoShortName(pr))
+                    .font(.caption)
+                    .foregroundColor(theme.chrome.cyan)
+                    .lineLimit(1)
+            }
+            .width(min: 70, ideal: 130, max: 250)
+
+            TableColumn("Author") { pr in
+                Text(pr.author)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+            .width(min: 60, ideal: 90, max: 200)
+
+            TableColumn("Age") { pr in
+                Text(pr.ageText)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            .width(min: 40, ideal: 60, max: 80)
+
+            TableColumn("Checks") { pr in
+                if pr.checks.total > 0 {
+                    Text("\(pr.checks.passed)/\(pr.checks.total)")
+                        .font(.caption)
+                        .foregroundColor(
+                            pr.checks.allPassed
+                                ? theme.chrome.green
+                                : pr.checks.hasFailed ? theme.chrome.red : theme.chrome.yellow
+                        )
+                }
+            }
+            .width(min: 40, ideal: 55, max: 80)
+
+            TableColumn("Review") { pr in
+                Text(reviewLabel(pr.reviewDecision))
+                    .font(.caption)
+                    .foregroundColor(reviewColor(pr.reviewDecision))
+            }
+            .width(min: 50, ideal: 70, max: 100)
+
+            TableColumn("Merge") { pr in
+                Text(mergeLabel(pr))
+                    .font(.caption)
+                    .foregroundColor(mergeColor(pr))
+            }
+            .width(min: 50, ideal: 70, max: 100)
+        } rows: {
+            ForEach(sortedPRs) { pr in
+                TableRow(pr)
+                    .contextMenu {
+                        if let onReviewPR {
+                            Button("Open Review Session") { onReviewPR(pr) }
+                        }
+                    }
+            }
+        }
+        .tableStyle(.inset(alternatesRowBackgrounds: true))
+        .safeAreaInset(edge: .top, spacing: 0) {
+            VStack(spacing: 0) {
+                // Toolbar
                 HStack(spacing: 0) {
                     ForEach(PRTab.allCases, id: \.self) { tab in
                         tabButton(tab)
@@ -238,9 +352,11 @@ public struct PRDashboardView: View {
                     .buttonStyle(IconButtonStyle())
                     .padding(.trailing, 8)
                 }
-                .listRowInsets(EdgeInsets())
-                .listRowSeparator(.hidden)
-                .tag("__toolbar__")
+                .padding(.horizontal)
+                .padding(.vertical, 8)
+                .background(theme.chrome.surface)
+
+                Divider()
 
                 // Filter bar
                 PRFilterBar(
@@ -250,73 +366,73 @@ public struct PRDashboardView: View {
                     ),
                     pullRequests: filteredPRs
                 )
-                .listRowInsets(EdgeInsets())
-                .listRowSeparator(.hidden)
-                .tag("__filter__")
 
-                // Column headers
-                PRColumnHeader(
-                    sortField: Binding(
-                        get: { sortField },
-                        set: { sortField = $0 }
-                    ),
-                    sortOrder: Binding(
-                        get: { sortOrder },
-                        set: { sortOrder = $0 }
-                    ),
-                    columnWidths: Binding(
-                        get: { columnWidths },
-                        set: { columnWidths = $0 }
-                    )
-                )
-                .listRowInsets(EdgeInsets())
-                .tag("__columns__")
-
-                // PR rows
-                ForEach(sortedPRs) { pr in
-                    PRRowView(
-                        pr: pr,
-                        columnWidths: columnWidths,
-                        onReview: onReviewPR.map { callback in { callback(pr) } }
-                    )
-                    .tag(pr.id)
-                    .listRowInsets(EdgeInsets())
-                }
-            }
-            .listStyle(.plain)
-            .scrollContentBackground(.hidden)
-            .frame(minWidth: 300)
-            .frame(maxWidth: selectedPR == nil ? .infinity : CGFloat(prListWidth))
-
-            // Right: PR detail drawer
-            if let pr = selectedPR {
-                ResizableDivider(width: $prListWidth)
-                PRDetailDrawer(
-                    pr: pr,
-                    detail: detail,
-                    onClose: { onSelectPR(nil) },
-                    onApprove: { onApprove(pr) },
-                    onComment: { body in onComment(pr, body) },
-                    onRequestChanges: { body in onRequestChanges?(pr, body) },
-                    onMerge: { strategy in onMerge?(pr, strategy) },
-                    onToggleDraft: { onToggleDraft?(pr) },
-                    onUpdateBranch: onUpdateBranch.map { callback in
-                        { rebase in callback(pr, rebase) }
-                    },
-                    onSendToSession: onSendToSession.map { callback in
-                        { context in callback(pr, context) }
-                    },
-                    onEnableAutoMerge: onEnableAutoMerge.map { callback in
-                        { strategy in callback(pr, strategy) }
-                    },
-                    onDisableAutoMerge: onDisableAutoMerge.map { callback in
-                        { callback(pr) }
-                    }
-                )
-                .frame(maxWidth: .infinity)
+                Divider()
             }
         }
-        .task { onRefresh() }
+    }
+
+    // MARK: - Cell Helpers
+
+    @ViewBuilder
+    private func prStateBadge(_ pr: PullRequest) -> some View {
+        switch pr.state {
+        case .open:
+            Circle().fill(theme.chrome.green).frame(width: 8, height: 8)
+        case .draft:
+            Circle().stroke(theme.chrome.textDim, lineWidth: 1.5).frame(width: 8, height: 8)
+        case .merged:
+            Circle().fill(theme.chrome.purple).frame(width: 8, height: 8)
+        case .closed:
+            Circle().fill(theme.chrome.red).frame(width: 8, height: 8)
+        }
+    }
+
+    private func prRepoShortName(_ pr: PullRequest) -> String {
+        if let idx = pr.repo.lastIndex(of: "/") {
+            return String(pr.repo[pr.repo.index(after: idx)...])
+        }
+        return pr.repo
+    }
+
+    private func reviewLabel(_ decision: ReviewDecision) -> String {
+        switch decision {
+        case .approved: "Approved"
+        case .changesRequested: "Changes"
+        case .pending: "Review"
+        case .none: ""
+        }
+    }
+
+    private func reviewColor(_ decision: ReviewDecision) -> Color {
+        switch decision {
+        case .approved: theme.chrome.green
+        case .changesRequested: theme.chrome.orange
+        case .pending: theme.chrome.yellow
+        case .none: .clear
+        }
+    }
+
+    private func mergeLabel(_ pr: PullRequest) -> String {
+        if pr.mergeable == .conflicting { return "Conflicts" }
+        switch pr.mergeStateStatus {
+        case .blocked: return "Blocked"
+        case .behind: return "Behind"
+        case .clean, .hasHooks: return "Clean"
+        case .dirty: return "Dirty"
+        case .unstable: return "Unstable"
+        default: return ""
+        }
+    }
+
+    private func mergeColor(_ pr: PullRequest) -> Color {
+        if pr.mergeable == .conflicting { return theme.chrome.red }
+        switch pr.mergeStateStatus {
+        case .blocked, .dirty: return theme.chrome.orange
+        case .behind, .unstable: return theme.chrome.yellow
+        case .clean, .hasHooks: return theme.chrome.green
+        default: return .clear
+        }
     }
 
     // MARK: - Tab Button
@@ -388,166 +504,4 @@ public enum PRTab: String, CaseIterable, Sendable {
     case all = "All"
     case mine = "Mine"
     case reviewRequested = "Review Requests"
-}
-
-// MARK: - PR Row View
-
-struct PRRowView: View {
-    let pr: PullRequest
-    let columnWidths: PRColumnWidths
-    var onReview: (() -> Void)?
-    @Environment(\.theme) private var theme
-
-    var body: some View {
-        HStack(spacing: 0) {
-            // Title column (flexible)
-            HStack(spacing: 4) {
-                stateBadge
-                Text("#\(pr.number)")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                Text(pr.title)
-                    .font(.callout)
-                    .foregroundStyle(.primary)
-                    .lineLimit(1)
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .clipped()
-
-            // Repo column
-            Text(repoShortName)
-                .font(.caption)
-                .foregroundColor(theme.chrome.cyan)
-                .lineLimit(1)
-                .frame(width: columnWidths.repo, alignment: .leading)
-                .clipped()
-
-            // Author column
-            Text(pr.author)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
-                .frame(width: columnWidths.author, alignment: .leading)
-                .clipped()
-
-            // Age column
-            Text(pr.ageText)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
-                .frame(width: columnWidths.age, alignment: .leading)
-                .clipped()
-
-            // Checks column
-            checksText
-                .frame(width: columnWidths.checks, alignment: .leading)
-
-            // Review column
-            reviewText
-                .frame(width: columnWidths.review, alignment: .leading)
-
-            // Merge column
-            mergeText
-                .frame(width: columnWidths.merge, alignment: .leading)
-        }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 4)
-        .opacity(pr.isDraft ? 0.5 : 1.0)
-        .contextMenu {
-            if let onReview {
-                Button("Open Review Session") { onReview() }
-            }
-        }
-    }
-
-    // MARK: - Column Text
-
-    @ViewBuilder
-    private var checksText: some View {
-        if pr.checks.total > 0 {
-            Text("\(pr.checks.passed)/\(pr.checks.total)")
-                .font(.caption)
-                .foregroundColor(
-                    pr.checks.allPassed
-                        ? theme.chrome.green
-                        : pr.checks.hasFailed ? theme.chrome.red : theme.chrome.yellow
-                )
-        }
-    }
-
-    @ViewBuilder
-    private var reviewText: some View {
-        switch pr.reviewDecision {
-        case .approved:
-            Text("Approved")
-                .font(.caption)
-                .foregroundColor(theme.chrome.green)
-        case .changesRequested:
-            Text("Changes")
-                .font(.caption)
-                .foregroundColor(theme.chrome.orange)
-        case .pending:
-            Text("Review")
-                .font(.caption)
-                .foregroundColor(theme.chrome.yellow)
-        case .none:
-            EmptyView()
-        }
-    }
-
-    @ViewBuilder
-    private var mergeText: some View {
-        if pr.mergeable == .conflicting {
-            Text("Conflicts")
-                .font(.caption)
-                .foregroundColor(theme.chrome.red)
-        } else {
-            switch pr.mergeStateStatus {
-            case .blocked:
-                Text("Blocked")
-                    .font(.caption)
-                    .foregroundColor(theme.chrome.orange)
-            case .behind:
-                Text("Behind")
-                    .font(.caption)
-                    .foregroundColor(theme.chrome.yellow)
-            case .clean, .hasHooks:
-                Text("Clean")
-                    .font(.caption)
-                    .foregroundColor(theme.chrome.green)
-            case .dirty:
-                Text("Dirty")
-                    .font(.caption)
-                    .foregroundColor(theme.chrome.orange)
-            case .unstable:
-                Text("Unstable")
-                    .font(.caption)
-                    .foregroundColor(theme.chrome.yellow)
-            default:
-                EmptyView()
-            }
-        }
-    }
-
-    /// Extract short repo name from "owner/repo" format.
-    private var repoShortName: String {
-        if let slashIndex = pr.repo.lastIndex(of: "/") {
-            return String(pr.repo[pr.repo.index(after: slashIndex)...])
-        }
-        return pr.repo
-    }
-
-    @ViewBuilder
-    private var stateBadge: some View {
-        switch pr.state {
-        case .open:
-            Circle().fill(theme.chrome.green).frame(width: 8, height: 8)
-        case .draft:
-            Circle().stroke(theme.chrome.textDim, lineWidth: 1.5).frame(width: 8, height: 8)
-        case .merged:
-            Circle().fill(theme.chrome.purple).frame(width: 8, height: 8)
-        case .closed:
-            Circle().fill(theme.chrome.red).frame(width: 8, height: 8)
-        }
-    }
 }
