@@ -439,16 +439,19 @@ struct PRRowView: View {
 
             // Checks column
             CheckSummaryBadge(checks: pr.checks)
+                .lineLimit(1)
                 .frame(width: columnWidths.checks, alignment: .leading)
                 .clipped()
 
             // Review column
             ReviewDecisionBadge(decision: pr.reviewDecision)
+                .lineLimit(1)
                 .frame(width: columnWidths.review, alignment: .leading)
                 .clipped()
 
             // Merge column
             MergeStatusBadge(mergeable: pr.mergeable, mergeStateStatus: pr.mergeStateStatus)
+                .lineLimit(1)
                 .frame(width: columnWidths.merge, alignment: .leading)
                 .clipped()
         }

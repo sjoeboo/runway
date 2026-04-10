@@ -134,15 +134,15 @@ public struct PRColumnWidths: Sendable {
     public var merge: CGFloat
 
     public static let defaults = PRColumnWidths(
-        repo: 100, author: 70, age: 50, checks: 55, review: 55, merge: 65
+        repo: 140, author: 100, age: 60, checks: 60, review: 80, merge: 85
     )
 
     public static let minimums = PRColumnWidths(
-        repo: 50, author: 40, age: 35, checks: 40, review: 40, merge: 45
+        repo: 70, author: 60, age: 45, checks: 45, review: 60, merge: 60
     )
 
     public static let maximums = PRColumnWidths(
-        repo: 200, author: 150, age: 80, checks: 100, review: 100, merge: 120
+        repo: 250, author: 200, age: 100, checks: 120, review: 130, merge: 140
     )
 
     public init(
