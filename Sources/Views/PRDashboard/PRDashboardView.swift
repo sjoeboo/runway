@@ -186,125 +186,104 @@ public struct PRDashboardView: View {
 
     public var body: some View {
         HStack(spacing: 0) {
-            // Left: PR list
-            VStack(spacing: 0) {
-                // Toolbar
-                HStack(spacing: 0) {
-                    ForEach(PRTab.allCases, id: \.self) { tab in
-                        tabButton(tab)
+            // Left: PR list — single List containing everything
+            List(
+                selection: Binding(
+                    get: { selectedPRID },
+                    set: { id in
+                        let pr = sortedPRs.first(where: { $0.id == id })
+                        onSelectPR(pr)
                     }
-                    Spacer()
-
-                    if isLoading {
-                        ProgressView()
-                            .controlSize(.small)
-                            .padding(.trailing, 8)
-                    }
-
-                    // Sessions filter toggle
-                    Button {
-                        showSessionPRsOnly.toggle()
-                    } label: {
-                        Image(systemName: showSessionPRsOnly ? "terminal.fill" : "terminal")
-                            .font(.callout)
-                    }
-                    .buttonStyle(IconButtonStyle())
-                    .help(showSessionPRsOnly ? "Showing session PRs only" : "Show only session PRs")
-                    .padding(.trailing, 4)
-
-                    Button {
-                        hideDrafts.toggle()
-                    } label: {
-                        Image(systemName: hideDrafts ? "eye.slash" : "eye")
-                            .font(.callout)
-                    }
-                    .buttonStyle(IconButtonStyle())
-                    .help(hideDrafts ? "Show drafts" : "Hide drafts")
-                    .padding(.trailing, 4)
-
-                    Button(action: onRefresh) {
-                        Image(systemName: "arrow.clockwise")
-                            .font(.callout)
-                    }
-                    .buttonStyle(IconButtonStyle())
-                    .padding(.trailing, 8)
-                }
-                .padding(.horizontal)
-                .padding(.vertical, 8)
-                .background(theme.chrome.surface)
-
-                Divider()
-
-                PRFilterBar(
-                    filter: Binding(
-                        get: { filterState },
-                        set: { filterState = $0 }
-                    ),
-                    pullRequests: filteredPRs
                 )
-                Divider()
-                PRColumnHeader(
-                    sortField: Binding(
-                        get: { sortField },
-                        set: { sortField = $0 }
-                    ),
-                    sortOrder: Binding(
-                        get: { sortOrder },
-                        set: { sortOrder = $0 }
-                    ),
-                    columnWidths: Binding(
-                        get: { columnWidths },
-                        set: { columnWidths = $0 }
-                    )
-                )
-                Divider()
+            ) {
+                // Toolbar row
+                Section {
+                    HStack(spacing: 0) {
+                        ForEach(PRTab.allCases, id: \.self) { tab in
+                            tabButton(tab)
+                        }
+                        Spacer()
 
-                GeometryReader { _ in
-                    List(
-                        selection: Binding(
-                            get: { selectedPRID },
-                            set: { id in
-                                let pr = sortedPRs.first(where: { $0.id == id })
-                                onSelectPR(pr)
-                            }
+                        if isLoading {
+                            ProgressView()
+                                .controlSize(.small)
+                                .padding(.trailing, 8)
+                        }
+
+                        Button {
+                            showSessionPRsOnly.toggle()
+                        } label: {
+                            Image(systemName: showSessionPRsOnly ? "terminal.fill" : "terminal")
+                                .font(.callout)
+                        }
+                        .buttonStyle(IconButtonStyle())
+                        .help(
+                            showSessionPRsOnly ? "Showing session PRs only" : "Show only session PRs"
                         )
-                    ) {
-                        ForEach(sortedPRs) { pr in
-                            PRRowView(
-                                pr: pr,
-                                columnWidths: columnWidths,
-                                onReview: onReviewPR.map { callback in { callback(pr) } }
-                            )
-                            .tag(pr.id)
-                            .listRowInsets(EdgeInsets())
+                        .padding(.trailing, 4)
+
+                        Button {
+                            hideDrafts.toggle()
+                        } label: {
+                            Image(systemName: hideDrafts ? "eye.slash" : "eye")
+                                .font(.callout)
                         }
-                    }
-                    .listStyle(.plain)
-                    .scrollContentBackground(.hidden)
-                    .overlay {
-                        if sortedPRs.isEmpty && !isLoading {
-                            VStack(spacing: 8) {
-                                Image(systemName: "pull.request")
-                                    .font(.largeTitle)
-                                    .foregroundStyle(.secondary)
-                                if filterState.isActive {
-                                    Text("No PRs match current filters")
-                                        .foregroundStyle(.secondary)
-                                    Button("Clear Filters") {
-                                        filterState = PRFilterState()
-                                    }
-                                    .controlSize(.small)
-                                } else {
-                                    Text("No pull requests")
-                                        .foregroundStyle(.secondary)
-                                    Button("Refresh") { onRefresh() }
-                                        .controlSize(.small)
-                                }
-                            }
+                        .buttonStyle(IconButtonStyle())
+                        .help(hideDrafts ? "Show drafts" : "Hide drafts")
+                        .padding(.trailing, 4)
+
+                        Button(action: onRefresh) {
+                            Image(systemName: "arrow.clockwise")
+                                .font(.callout)
                         }
+                        .buttonStyle(IconButtonStyle())
+                        .padding(.trailing, 8)
                     }
+                    .listRowInsets(EdgeInsets())
+                    .listRowSeparator(.hidden)
+
+                    // Filter bar
+                    PRFilterBar(
+                        filter: Binding(
+                            get: { filterState },
+                            set: { filterState = $0 }
+                        ),
+                        pullRequests: filteredPRs
+                    )
+                    .listRowInsets(EdgeInsets())
+                    .listRowSeparator(.hidden)
+
+                    // Column headers
+                    PRColumnHeader(
+                        sortField: Binding(
+                            get: { sortField },
+                            set: { sortField = $0 }
+                        ),
+                        sortOrder: Binding(
+                            get: { sortOrder },
+                            set: { sortOrder = $0 }
+                        ),
+                        columnWidths: Binding(
+                            get: { columnWidths },
+                            set: { columnWidths = $0 }
+                        )
+                    )
+                    .listRowInsets(EdgeInsets())
+                }
+
+                // PR rows
+                ForEach(sortedPRs) { pr in
+                    PRRowView(
+                        pr: pr,
+                        columnWidths: columnWidths,
+                        onReview: onReviewPR.map { callback in { callback(pr) } }
+                    )
+                    .tag(pr.id)
+                    .listRowInsets(EdgeInsets())
                 }
             }
+            .listStyle(.inset(alternatesRowBackgrounds: false))
+            .scrollContentBackground(.hidden)
             .frame(minWidth: 300)
             .frame(maxWidth: selectedPR == nil ? .infinity : CGFloat(prListWidth))
 
