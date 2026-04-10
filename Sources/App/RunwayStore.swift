@@ -1285,6 +1285,17 @@ public final class RunwayStore {
         }
     }
 
+    func closePR(_ pr: PullRequest) async {
+        let host = prManager.hostFromURL(pr.url)
+        do {
+            try await prManager.close(repo: pr.repo, number: pr.number, host: host)
+            statusMessage = .success("Closed #\(pr.number)")
+            await refreshPRAfterAction(pr)
+        } catch {
+            statusMessage = .error("Close failed: \(error.localizedDescription)")
+        }
+    }
+
     func updatePRBranch(_ pr: PullRequest, rebase: Bool = false) async {
         let host = prManager.hostFromURL(pr.url)
         do {

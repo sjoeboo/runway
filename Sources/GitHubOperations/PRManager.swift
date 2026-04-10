@@ -253,6 +253,14 @@ public actor PRManager {
         )
     }
 
+    /// Close a PR without merging.
+    public func close(repo: String, number: Int, host: String? = nil) async throws {
+        try await runGH(
+            args: ["pr", "close", "\(number)", "--repo", repo],
+            host: host
+        )
+    }
+
     /// Update a PR branch with the latest base branch (merge or rebase).
     public func updateBranch(repo: String, number: Int, rebase: Bool = false, host: String? = nil) async throws {
         var args = ["pr", "update-branch", "\(number)", "--repo", repo]

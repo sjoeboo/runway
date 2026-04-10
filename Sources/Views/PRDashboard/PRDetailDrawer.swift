@@ -17,11 +17,13 @@ public struct PRDetailDrawer: View {
     var onSendToSession: ((String) -> Void)?
     var onEnableAutoMerge: ((MergeStrategy) -> Void)?
     var onDisableAutoMerge: (() -> Void)?
+    var onClosePR: (() -> Void)?
 
     @State private var selectedTab: PRDetailTab = .overview
     @State private var sheetCommentText: String = ""
     @State private var inlineCommentText: String = ""
     @State private var showMergeConfirm: Bool = false
+    @State private var showCloseConfirm: Bool = false
     @State private var selectedMergeStrategy: MergeStrategy = .squash
     @State private var requestChangesText: String = ""
     @State private var activeSheet: ActiveSheet?
@@ -46,7 +48,8 @@ public struct PRDetailDrawer: View {
         onUpdateBranch: ((Bool) -> Void)? = nil,
         onSendToSession: ((String) -> Void)? = nil,
         onEnableAutoMerge: ((MergeStrategy) -> Void)? = nil,
-        onDisableAutoMerge: (() -> Void)? = nil
+        onDisableAutoMerge: (() -> Void)? = nil,
+        onClosePR: (() -> Void)? = nil
     ) {
         self.pr = pr
         self.detail = detail
@@ -60,6 +63,7 @@ public struct PRDetailDrawer: View {
         self.onUpdateBranch = onUpdateBranch
         self.onEnableAutoMerge = onEnableAutoMerge
         self.onDisableAutoMerge = onDisableAutoMerge
+        self.onClosePR = onClosePR
     }
 
     public var body: some View {
@@ -175,6 +179,16 @@ public struct PRDetailDrawer: View {
                     autoMergeButton
                 }
 
+                if let onClosePR, pr.state == .open || pr.state == .draft {
+                    Button {
+                        showCloseConfirm = true
+                    } label: {
+                        Label("Close", systemImage: "xmark.circle")
+                    }
+                    .controlSize(.small)
+                    .tint(theme.chrome.red)
+                }
+
                 if let onSendToSession {
                     Button {
                         let context = "Review PR #\(pr.number): \(pr.title)"
@@ -203,6 +217,14 @@ public struct PRDetailDrawer: View {
                 }
             } message: {
                 Text("This will \(selectedMergeStrategy.displayName.lowercased()) #\(pr.number) into \(pr.baseBranch).")
+            }
+            .alert("Close Pull Request", isPresented: $showCloseConfirm) {
+                Button("Cancel", role: .cancel) {}
+                Button("Close", role: .destructive) {
+                    onClosePR?()
+                }
+            } message: {
+                Text("Close #\(pr.number) without merging?")
             }
             .sheet(item: $activeSheet) { sheet in
                 switch sheet {

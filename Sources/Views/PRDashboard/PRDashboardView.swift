@@ -22,6 +22,7 @@ public struct PRDashboardView: View {
     var onReviewPR: ((PullRequest) -> Void)?
     var onEnableAutoMerge: ((PullRequest, MergeStrategy) -> Void)?
     var onDisableAutoMerge: ((PullRequest) -> Void)?
+    var onClosePR: ((PullRequest) -> Void)?
 
     @AppStorage("prListWidth") private var prListWidth: Double = 380
     @AppStorage("hideDrafts") private var hideDrafts: Bool = false
@@ -76,7 +77,8 @@ public struct PRDashboardView: View {
         onSendToSession: ((PullRequest, String) -> Void)? = nil,
         onReviewPR: ((PullRequest) -> Void)? = nil,
         onEnableAutoMerge: ((PullRequest, MergeStrategy) -> Void)? = nil,
-        onDisableAutoMerge: ((PullRequest) -> Void)? = nil
+        onDisableAutoMerge: ((PullRequest) -> Void)? = nil,
+        onClosePR: ((PullRequest) -> Void)? = nil
     ) {
         self.pullRequests = pullRequests
         self.selectedPRID = selectedPRID
@@ -96,6 +98,7 @@ public struct PRDashboardView: View {
         self.onReviewPR = onReviewPR
         self.onEnableAutoMerge = onEnableAutoMerge
         self.onDisableAutoMerge = onDisableAutoMerge
+        self.onClosePR = onClosePR
     }
 
     private var selectedPR: PullRequest? {
@@ -181,6 +184,9 @@ public struct PRDashboardView: View {
                         { strategy in callback(pr, strategy) }
                     },
                     onDisableAutoMerge: onDisableAutoMerge.map { callback in
+                        { callback(pr) }
+                    },
+                    onClosePR: onClosePR.map { callback in
                         { callback(pr) }
                     }
                 )
@@ -272,6 +278,10 @@ public struct PRDashboardView: View {
                     .contextMenu {
                         if let onReviewPR {
                             Button("Open Review Session") { onReviewPR(pr) }
+                        }
+                        if let onClosePR, pr.state == .open || pr.state == .draft {
+                            Divider()
+                            Button("Close PR", role: .destructive) { onClosePR(pr) }
                         }
                     }
             }
