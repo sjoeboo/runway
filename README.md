@@ -118,6 +118,9 @@ Status shows in the sidebar as colored indicators: green (running), yellow (wait
 Built-in PR management powered by `gh` CLI:
 
 - **Three views**: All PRs, Mine, Review Requested
+- **Sortable columns** — click column headers to sort by title, status, author, date, or review state
+- **Filter bar** — quick text filtering across PR titles, branches, and authors
+- **Native Table view** — macOS-native table layout with resizable columns
 - **PR grouping** by status with merge-state badges
 - **Detail drawer** with Overview, Diff, and Conversation tabs (`Ctrl+1/2/3`)
 - **Actions**: approve, request changes, comment, merge (squash/merge/rebase), toggle draft, toggle automerge
@@ -244,7 +247,7 @@ Runway auto-injects hooks into `~/.claude/settings.json` on every launch, subscr
 
 ## CI & Testing
 
-- **273 tests** across 8 test targets
+- **293 tests** across 8 test targets
 - **GitHub Actions CI** on every PR: build, test, SwiftLint, swift-format
 - **Branch protection** on `master` — CI must pass before merging
 - **Pre-commit hooks** run lint + format checks locally

@@ -5,6 +5,23 @@ All notable changes to Runway are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.7.0] — 2026-04-10
+
+### Added
+
+- **PR dashboard overhaul** — sortable columns, filter bar, and native macOS Table view replace the previous list-based layout ([#296](https://github.com/sjoeboo/runway/pull/296))
+
+### Fixed
+
+- **Crash when syntax highlighting code blocks** — fixed a crash in the packaged app caused by missing syntax highlighting resources ([#295](https://github.com/sjoeboo/runway/pull/295))
+- **PR branch checkout for GHE monorepos** — robust 3-strategy fallback ensures checkout works reliably in GitHub Enterprise monorepo sparse checkouts ([#294](https://github.com/sjoeboo/runway/pull/294))
+
+### Maintenance
+
+- Test suite expanded from 273 to 293 tests
+
+[0.7.0]: https://github.com/sjoeboo/runway/compare/v0.6.2...v0.7.0
+
 ## [0.6.0] — 2026-04-09
 
 ### Added

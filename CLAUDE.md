@@ -75,7 +75,7 @@ Dual-path: HTTP hooks (ephemeral port, force-injected on every launch into `~/.c
 
 ## Testing
 
-273 tests across 8 targets: ModelsTests, PersistenceTests, StatusDetectionTests, GitOperationsTests, ThemeTests, GitHubOperationsTests, TerminalTests, ViewsTests.
+293 tests across 8 targets: ModelsTests, PersistenceTests, StatusDetectionTests, GitOperationsTests, ThemeTests, GitHubOperationsTests, TerminalTests, ViewsTests.
 
 ## Keyboard Shortcuts
 
