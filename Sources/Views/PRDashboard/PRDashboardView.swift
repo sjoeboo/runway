@@ -240,6 +240,7 @@ public struct PRDashboardView: View {
                 }
                 .listRowInsets(EdgeInsets())
                 .listRowSeparator(.hidden)
+                .tag("__toolbar__")
 
                 // Filter bar
                 PRFilterBar(
@@ -251,6 +252,7 @@ public struct PRDashboardView: View {
                 )
                 .listRowInsets(EdgeInsets())
                 .listRowSeparator(.hidden)
+                .tag("__filter__")
 
                 // Column headers
                 PRColumnHeader(
@@ -268,6 +270,7 @@ public struct PRDashboardView: View {
                     )
                 )
                 .listRowInsets(EdgeInsets())
+                .tag("__columns__")
 
                 // PR rows
                 ForEach(sortedPRs) { pr in
