@@ -125,11 +125,11 @@ struct PRFilterBar: View {
 
     private func reviewLabel(_ decision: ReviewDecision?) -> String {
         switch decision {
-        case .approved: "Approved"
-        case .changesRequested: "Changes Requested"
-        case .pending: "Pending"
-        case .none: "All"
+        case .some(.approved): "Approved"
+        case .some(.changesRequested): "Changes Requested"
+        case .some(.pending): "Pending"
         case .some(.none): "All"
+        case nil: "All"
         }
     }
 }
