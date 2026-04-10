@@ -334,6 +334,7 @@ public struct PRDashboardView: View {
                 .frame(maxWidth: .infinity)
             }
         }
+        .toolbarTitleDisplayMode(.inline)
         .task { onRefresh() }
     }
 
