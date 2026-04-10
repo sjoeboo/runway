@@ -408,55 +408,53 @@ struct PRRowView: View {
     @Environment(\.theme) private var theme
 
     var body: some View {
-        HStack(spacing: 8) {
-            stateBadge
-
-            VStack(alignment: .leading, spacing: 2) {
-                HStack(spacing: 4) {
-                    Text("#\(pr.number)")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    Text(pr.title)
-                        .font(.body)
-                        .foregroundStyle(.primary)
-                        .lineLimit(1)
-                }
-
-                HStack(spacing: 8) {
-                    Text(pr.repo)
-                        .font(.caption)
-                        .foregroundColor(theme.chrome.cyan)
-                    Text(pr.author)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    if !pr.headBranch.isEmpty {
-                        Text(pr.headBranch)
-                            .font(.caption)
-                            .foregroundColor(theme.chrome.accent)
-                    }
-                    Text(pr.ageText)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    CheckSummaryBadge(checks: pr.checks)
-                    ReviewDecisionBadge(decision: pr.reviewDecision)
-                    MergeStatusBadge(mergeable: pr.mergeable, mergeStateStatus: pr.mergeStateStatus)
-                }
-            }
-
-            Spacer()
-
-            if pr.additions > 0 || pr.deletions > 0 {
-                Text("+\(pr.additions) -\(pr.deletions)")
+        HStack(spacing: 0) {
+            // Title column (flexible)
+            HStack(spacing: 4) {
+                stateBadge
+                Text("#\(pr.number)")
                     .font(.caption)
                     .foregroundStyle(.secondary)
-                    .frame(minWidth: 60, alignment: .trailing)
-            } else if pr.checks.total == 0 {
-                // Unenriched — reserve space with loading indicator
-                ProgressView()
-                    .controlSize(.mini)
-                    .frame(minWidth: 60, alignment: .trailing)
+                Text(pr.title)
+                    .font(.callout)
+                    .foregroundStyle(.primary)
+                    .lineLimit(1)
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+            // Repo column
+            Text(repoShortName)
+                .font(.caption)
+                .foregroundColor(theme.chrome.cyan)
+                .lineLimit(1)
+                .frame(width: 100, alignment: .leading)
+
+            // Author column
+            Text(pr.author)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .frame(width: 70, alignment: .leading)
+
+            // Age column
+            Text(pr.ageText)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .frame(width: 50, alignment: .leading)
+
+            // Checks column
+            CheckSummaryBadge(checks: pr.checks)
+                .frame(width: 55, alignment: .leading)
+
+            // Review column
+            ReviewDecisionBadge(decision: pr.reviewDecision)
+                .frame(width: 55, alignment: .leading)
+
+            // Merge column
+            MergeStatusBadge(mergeable: pr.mergeable, mergeStateStatus: pr.mergeStateStatus)
+                .frame(width: 65, alignment: .leading)
         }
+        .padding(.horizontal, 12)
         .padding(.vertical, 4)
         .opacity(pr.isDraft ? 0.5 : 1.0)
         .contextMenu {
@@ -464,6 +462,14 @@ struct PRRowView: View {
                 Button("Open Review Session") { onReview() }
             }
         }
+    }
+
+    /// Extract short repo name from "owner/repo" format.
+    private var repoShortName: String {
+        if let slashIndex = pr.repo.lastIndex(of: "/") {
+            return String(pr.repo[pr.repo.index(after: slashIndex)...])
+        }
+        return pr.repo
     }
 
     @ViewBuilder
