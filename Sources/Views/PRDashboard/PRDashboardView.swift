@@ -259,45 +259,47 @@ public struct PRDashboardView: View {
                 )
                 Divider()
 
-                List(
-                    selection: Binding(
-                        get: { selectedPRID },
-                        set: { id in
-                            let pr = sortedPRs.first(where: { $0.id == id })
-                            onSelectPR(pr)
-                        }
-                    )
-                ) {
-                    ForEach(sortedPRs) { pr in
-                        PRRowView(
-                            pr: pr,
-                            columnWidths: columnWidths,
-                            onReview: onReviewPR.map { callback in { callback(pr) } }
+                GeometryReader { _ in
+                    List(
+                        selection: Binding(
+                            get: { selectedPRID },
+                            set: { id in
+                                let pr = sortedPRs.first(where: { $0.id == id })
+                                onSelectPR(pr)
+                            }
                         )
-                        .tag(pr.id)
-                        .listRowInsets(EdgeInsets())
+                    ) {
+                        ForEach(sortedPRs) { pr in
+                            PRRowView(
+                                pr: pr,
+                                columnWidths: columnWidths,
+                                onReview: onReviewPR.map { callback in { callback(pr) } }
+                            )
+                            .tag(pr.id)
+                            .listRowInsets(EdgeInsets())
+                        }
                     }
-                }
-                .listStyle(.plain)
-                .scrollContentBackground(.hidden)
-                .overlay {
-                    if sortedPRs.isEmpty && !isLoading {
-                        VStack(spacing: 8) {
-                            Image(systemName: "pull.request")
-                                .font(.largeTitle)
-                                .foregroundStyle(.secondary)
-                            if filterState.isActive {
-                                Text("No PRs match current filters")
+                    .listStyle(.plain)
+                    .scrollContentBackground(.hidden)
+                    .overlay {
+                        if sortedPRs.isEmpty && !isLoading {
+                            VStack(spacing: 8) {
+                                Image(systemName: "pull.request")
+                                    .font(.largeTitle)
                                     .foregroundStyle(.secondary)
-                                Button("Clear Filters") {
-                                    filterState = PRFilterState()
-                                }
-                                .controlSize(.small)
-                            } else {
-                                Text("No pull requests")
-                                    .foregroundStyle(.secondary)
-                                Button("Refresh") { onRefresh() }
+                                if filterState.isActive {
+                                    Text("No PRs match current filters")
+                                        .foregroundStyle(.secondary)
+                                    Button("Clear Filters") {
+                                        filterState = PRFilterState()
+                                    }
                                     .controlSize(.small)
+                                } else {
+                                    Text("No pull requests")
+                                        .foregroundStyle(.secondary)
+                                    Button("Refresh") { onRefresh() }
+                                        .controlSize(.small)
+                                }
                             }
                         }
                     }
@@ -334,7 +336,6 @@ public struct PRDashboardView: View {
                 .frame(maxWidth: .infinity)
             }
         }
-        .toolbarTitleDisplayMode(.inline)
         .task { onRefresh() }
     }
 
