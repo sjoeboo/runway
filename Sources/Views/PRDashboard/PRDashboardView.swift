@@ -372,13 +372,17 @@ public struct PRDashboardView: View {
                                                 onReview: onReviewPR.map { callback in { callback(pr) } }
                                             )
                                             .tag(pr.id)
+                                            .listRowInsets(EdgeInsets())
                                         }
                                     }
                                 } header: {
                                     groupHeader(entry.group, count: entry.prs.count)
+                                        .listRowInsets(EdgeInsets())
                                 }
                             }
                         }
+                        .listStyle(.plain)
+                        .scrollContentBackground(.hidden)
                     }
                 }
             }
@@ -454,6 +458,7 @@ public struct PRDashboardView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
+            .padding(.horizontal, 12)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
