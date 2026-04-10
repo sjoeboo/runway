@@ -125,6 +125,18 @@ sed -e "s/__VERSION__/$VERSION/g" \
 cp "$PROJECT_DIR/images/Runway.icns" "$RESOURCES/Runway.icns"
 cp "$PROJECT_DIR/images/App-icon-1024.png" "$RESOURCES/App-icon-1024.png"
 
+# Copy highlight.min.js for syntax highlighting.
+# SPM's Bundle.module accessor uses Bundle.main.bundleURL (the .app root) which
+# conflicts with hardened-runtime code signing. Our SyntaxHighlighter loads the
+# JS from Bundle.main.resourceURL (Contents/Resources/) instead.
+HLJS_SOURCE="$PROJECT_DIR/.build/checkouts/highlightswift/Sources/HighlightSwift/HighlightJS/highlight.min.js"
+if [[ -f "$HLJS_SOURCE" ]]; then
+    echo "    Copying highlight.min.js for syntax highlighting"
+    cp "$HLJS_SOURCE" "$RESOURCES/highlight.min.js"
+else
+    echo "Warning: highlight.min.js not found — syntax highlighting will be unavailable" >&2
+fi
+
 # Embed Sparkle.framework (SPM builds it as a dynamic framework)
 FRAMEWORKS="$CONTENTS/Frameworks"
 mkdir -p "$FRAMEWORKS"

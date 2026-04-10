@@ -8,6 +8,8 @@ struct CodeBlockView: View {
     let language: String?
     let theme: AppTheme
 
+    private let highlighter = SyntaxHighlighter.shared
+
     @State private var highlighted: AttributedString?
     @State private var isHovering = false
     @State private var copied = false
@@ -82,16 +84,16 @@ struct CodeBlockView: View {
 
     private func highlightCode() async {
         let themeBridge = MarkdownThemeBridge(theme: theme)
-        let highlight = Highlight()
+        let css = themeBridge.highlightColors.css
         do {
+            let result: HighlightJSResult
             if let language, !language.isEmpty {
-                highlighted = try await highlight.attributedText(
-                    code, language: language, colors: themeBridge.highlightColors
-                )
+                result = try await highlighter.highlight(code, language: language)
             } else {
-                highlighted = try await highlight.attributedText(
-                    code, colors: themeBridge.highlightColors
-                )
+                result = try await highlighter.highlightAuto(code)
+            }
+            if result.value != "undefined" {
+                highlighted = try await highlighter.attributedText(html: result.value, css: css)
             }
         } catch {
             // Keep plain text on failure — no crash, no spinner
