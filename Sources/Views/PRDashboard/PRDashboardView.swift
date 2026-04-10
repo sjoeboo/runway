@@ -26,12 +26,37 @@ public struct PRDashboardView: View {
     @AppStorage("prListWidth") private var prListWidth: Double = 380
     @AppStorage("hideDrafts") private var hideDrafts: Bool = false
     @AppStorage("showSessionPRsOnly") private var showSessionPRsOnly: Bool = false
-    @AppStorage("prGroupNeedsAttentionExpanded") private var needsAttentionExpanded: Bool = true
-    @AppStorage("prGroupInProgressExpanded") private var inProgressExpanded: Bool = true
-    @AppStorage("prGroupReadyExpanded") private var readyExpanded: Bool = true
-    @AppStorage("prGroupWaitingForReviewExpanded") private var waitingForReviewExpanded: Bool = true
-    @AppStorage("prGroupDraftsExpanded") private var draftsExpanded: Bool = false
+    @AppStorage("prFilterRepo") private var filterRepo: String = ""
+    @AppStorage("prFilterAuthor") private var filterAuthor: String = ""
+    @AppStorage("prFilterAge") private var filterAgeRaw: String = PRAgeBucket.any.rawValue
+    @AppStorage("prFilterChecks") private var filterChecksRaw: String = ""
+    @AppStorage("prFilterReview") private var filterReviewRaw: String = ""
+    @AppStorage("prFilterMerge") private var filterMergeRaw: String = ""
+    @State private var tableSortOrder: [KeyPathComparator<PullRequest>] = [
+        KeyPathComparator(\.createdAt, order: .reverse)
+    ]
     @Environment(\.theme) private var theme
+
+    private var filterState: PRFilterState {
+        get {
+            var state = PRFilterState()
+            state.repo = filterRepo.isEmpty ? nil : filterRepo
+            state.author = filterAuthor.isEmpty ? nil : filterAuthor
+            state.ageBucket = PRAgeBucket(rawValue: filterAgeRaw) ?? .any
+            state.checks = CheckStatus(rawValue: filterChecksRaw)
+            state.review = filterReviewRaw.isEmpty ? nil : ReviewDecision(rawValue: filterReviewRaw)
+            state.mergeFilter = filterMergeRaw.isEmpty ? nil : PRMergeFilter(rawValue: filterMergeRaw)
+            return state
+        }
+        nonmutating set {
+            filterRepo = newValue.repo ?? ""
+            filterAuthor = newValue.author ?? ""
+            filterAgeRaw = newValue.ageBucket.rawValue
+            filterChecksRaw = newValue.checks?.rawValue ?? ""
+            filterReviewRaw = newValue.review?.rawValue ?? ""
+            filterMergeRaw = newValue.mergeFilter?.rawValue ?? ""
+        }
+    }
 
     public init(
         pullRequests: [PullRequest] = [],
@@ -99,180 +124,40 @@ public struct PRDashboardView: View {
     }
 
     private var filteredPRs: [PullRequest] {
-        applyFilters(to: pullRequests, tab: selectedTab)
+        var result = applyFilters(to: pullRequests, tab: selectedTab)
+        let currentFilter = filterState
+        if currentFilter.isActive {
+            result = result.filter { currentFilter.matches($0) }
+        }
+        return result
     }
 
     private func tabCount(_ tab: PRTab) -> Int {
         var prs = applyFilters(to: pullRequests, tab: tab)
         if hideDrafts { prs = prs.filter { !$0.isDraft } }
+        let currentFilter = filterState
+        if currentFilter.isActive {
+            prs = prs.filter { currentFilter.matches($0) }
+        }
         return prs.count
     }
 
-    // MARK: - Grouping
+    // MARK: - Sorted PRs
 
-    private func groupedPRs() -> [(group: PRGroup, prs: [PullRequest])] {
-        var byGroup: [PRGroup: [PullRequest]] = [:]
-        for pr in filteredPRs {
-            let g = prGroup(for: pr)
-            byGroup[g, default: []].append(pr)
-        }
-        return PRGroup.allCases.compactMap { g in
-            guard let prs = byGroup[g], !prs.isEmpty else { return nil }
-            return (g, prs)
-        }
-    }
-
-    private func isGroupExpanded(_ group: PRGroup) -> Bool {
-        switch group {
-        case .needsAttention: return needsAttentionExpanded
-        case .inProgress: return inProgressExpanded
-        case .ready: return readyExpanded
-        case .waitingForReview: return waitingForReviewExpanded
-        case .drafts: return draftsExpanded
-        }
-    }
-
-    private func toggleGroupExpanded(_ group: PRGroup) {
-        switch group {
-        case .needsAttention: needsAttentionExpanded.toggle()
-        case .inProgress: inProgressExpanded.toggle()
-        case .ready: readyExpanded.toggle()
-        case .waitingForReview: waitingForReviewExpanded.toggle()
-        case .drafts: draftsExpanded.toggle()
-        }
-    }
-
-    private func groupColor(_ group: PRGroup) -> Color {
-        switch group {
-        case .needsAttention: return theme.chrome.red
-        case .inProgress: return theme.chrome.yellow
-        case .ready: return theme.chrome.green
-        case .waitingForReview: return theme.chrome.accent
-        case .drafts: return theme.chrome.textDim
-        }
-    }
-
-    private func groupIcon(_ group: PRGroup) -> String {
-        switch group {
-        case .needsAttention: return "exclamationmark.circle"
-        case .inProgress: return "clock"
-        case .ready: return "checkmark.circle"
-        case .waitingForReview: return "eye"
-        case .drafts: return "circle.dashed"
-        }
+    private var sortedPRs: [PullRequest] {
+        var prs = filteredPRs
+        if hideDrafts { prs = prs.filter { !$0.isDraft } }
+        return prs.sorted(using: tableSortOrder)
     }
 
     // MARK: - Body
 
     public var body: some View {
         HStack(spacing: 0) {
-            // Left: PR list
-            VStack(spacing: 0) {
-                // Toolbar
-                HStack(spacing: 0) {
-                    ForEach(PRTab.allCases, id: \.self) { tab in
-                        tabButton(tab)
-                    }
-                    Spacer()
-
-                    if isLoading {
-                        ProgressView()
-                            .controlSize(.small)
-                            .padding(.trailing, 8)
-                    }
-
-                    // Sessions filter toggle
-                    Button {
-                        showSessionPRsOnly.toggle()
-                    } label: {
-                        Image(systemName: showSessionPRsOnly ? "terminal.fill" : "terminal")
-                            .font(.callout)
-                    }
-                    .buttonStyle(IconButtonStyle())
-                    .help(showSessionPRsOnly ? "Showing session PRs only" : "Show only session PRs")
-                    .padding(.trailing, 4)
-
-                    Button {
-                        hideDrafts.toggle()
-                    } label: {
-                        Image(systemName: hideDrafts ? "eye.slash" : "eye")
-                            .font(.callout)
-                    }
-                    .buttonStyle(IconButtonStyle())
-                    .help(hideDrafts ? "Show drafts" : "Hide drafts")
-                    .padding(.trailing, 4)
-
-                    Button(action: onRefresh) {
-                        Image(systemName: "arrow.clockwise")
-                            .font(.callout)
-                    }
-                    .buttonStyle(IconButtonStyle())
-                    .padding(.trailing, 8)
-                }
-                .padding(.horizontal)
-                .padding(.vertical, 8)
-                .background(theme.chrome.surface)
-
-                Divider()
-
-                // PR list
-                if filteredPRs.isEmpty && !isLoading {
-                    Spacer()
-                    VStack(spacing: 8) {
-                        Image(systemName: "pull.request")
-                            .font(.largeTitle)
-                            .foregroundStyle(.secondary)
-                        Text("No pull requests")
-                            .foregroundStyle(.secondary)
-                        Button("Refresh") { onRefresh() }
-                            .controlSize(.small)
-                    }
-                    Spacer()
-                } else {
-                    let visibleGroups = groupedPRs().filter { !($0.group == .drafts && hideDrafts) }
-                    if visibleGroups.isEmpty {
-                        Spacer()
-                        VStack(spacing: 8) {
-                            Image(systemName: "pull.request")
-                                .font(.largeTitle)
-                                .foregroundStyle(.secondary)
-                            Text("No pull requests")
-                                .foregroundStyle(.secondary)
-                            Button("Refresh") { onRefresh() }
-                                .controlSize(.small)
-                        }
-                        Spacer()
-                    } else {
-                        List(
-                            selection: Binding(
-                                get: { selectedPRID },
-                                set: { id in
-                                    let pr = pullRequests.first(where: { $0.id == id })
-                                    onSelectPR(pr)
-                                }
-                            )
-                        ) {
-                            ForEach(visibleGroups, id: \.group) { entry in
-                                Section {
-                                    if isGroupExpanded(entry.group) {
-                                        ForEach(entry.prs) { pr in
-                                            PRRowView(
-                                                pr: pr,
-                                                onReview: onReviewPR.map { callback in { callback(pr) } }
-                                            )
-                                            .tag(pr.id)
-                                        }
-                                    }
-                                } header: {
-                                    groupHeader(entry.group, count: entry.prs.count)
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            .frame(minWidth: 300)
-            .frame(maxWidth: selectedPR == nil ? .infinity : CGFloat(prListWidth))
+            // Left: PR table
+            prTable
+                .frame(minWidth: 300)
+                .frame(maxWidth: selectedPR == nil ? .infinity : CGFloat(prListWidth))
 
             // Right: PR detail drawer
             if let pr = selectedPR {
@@ -305,6 +190,220 @@ public struct PRDashboardView: View {
         .task { onRefresh() }
     }
 
+    // MARK: - PR Table
+
+    private var prTable: some View {
+        Table(
+            of: PullRequest.self,
+            selection: Binding(
+                get: { selectedPRID },
+                set: { id in
+                    let pr = sortedPRs.first(where: { $0.id == id })
+                    onSelectPR(pr)
+                }
+            ),
+            sortOrder: $tableSortOrder
+        ) {
+            TableColumn("Title", value: \.title) { pr in
+                HStack(spacing: 4) {
+                    prStateBadge(pr)
+                    Text("#\(pr.number)")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Text(pr.title)
+                        .font(.callout)
+                        .lineLimit(1)
+                }
+            }
+            .width(min: 150)
+
+            TableColumn("Repo", value: \.repo) { pr in
+                Text(prRepoShortName(pr))
+                    .font(.caption)
+                    .foregroundColor(theme.chrome.cyan)
+                    .lineLimit(1)
+            }
+            .width(min: 70, ideal: 130, max: 250)
+
+            TableColumn("Author", value: \.author) { pr in
+                Text(pr.author)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+            .width(min: 60, ideal: 90, max: 200)
+
+            TableColumn("Age", value: \.createdAt) { pr in
+                Text(pr.ageText)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            .width(min: 40, ideal: 60, max: 80)
+
+            TableColumn("Checks", value: \.checksPassRatio) { pr in
+                if pr.checks.total > 0 {
+                    Text("\(pr.checks.passed)/\(pr.checks.total)")
+                        .font(.caption)
+                        .foregroundColor(
+                            pr.checks.allPassed
+                                ? theme.chrome.green
+                                : pr.checks.hasFailed ? theme.chrome.red : theme.chrome.yellow
+                        )
+                }
+            }
+            .width(min: 40, ideal: 55, max: 80)
+
+            TableColumn("Review", value: \.reviewSortRank) { pr in
+                Text(reviewLabel(pr.reviewDecision))
+                    .font(.caption)
+                    .foregroundColor(reviewColor(pr.reviewDecision))
+            }
+            .width(min: 50, ideal: 70, max: 100)
+
+            TableColumn("Merge", value: \.mergeSortRank) { pr in
+                Text(mergeLabel(pr))
+                    .font(.caption)
+                    .foregroundColor(mergeColor(pr))
+            }
+            .width(min: 50, ideal: 70, max: 100)
+        } rows: {
+            ForEach(sortedPRs) { pr in
+                TableRow(pr)
+                    .contextMenu {
+                        if let onReviewPR {
+                            Button("Open Review Session") { onReviewPR(pr) }
+                        }
+                    }
+            }
+        }
+        .tableStyle(.inset(alternatesRowBackgrounds: true))
+        .safeAreaInset(edge: .top, spacing: 0) {
+            VStack(spacing: 0) {
+                // Toolbar
+                HStack(spacing: 0) {
+                    ForEach(PRTab.allCases, id: \.self) { tab in
+                        tabButton(tab)
+                    }
+                    Spacer()
+
+                    if isLoading {
+                        ProgressView()
+                            .controlSize(.small)
+                            .padding(.trailing, 8)
+                    }
+
+                    Button {
+                        showSessionPRsOnly.toggle()
+                    } label: {
+                        Image(systemName: showSessionPRsOnly ? "terminal.fill" : "terminal")
+                            .font(.callout)
+                    }
+                    .buttonStyle(IconButtonStyle())
+                    .help(
+                        showSessionPRsOnly ? "Showing session PRs only" : "Show only session PRs"
+                    )
+                    .padding(.trailing, 4)
+
+                    Button {
+                        hideDrafts.toggle()
+                    } label: {
+                        Image(systemName: hideDrafts ? "eye.slash" : "eye")
+                            .font(.callout)
+                    }
+                    .buttonStyle(IconButtonStyle())
+                    .help(hideDrafts ? "Show drafts" : "Hide drafts")
+                    .padding(.trailing, 4)
+
+                    Button(action: onRefresh) {
+                        Image(systemName: "arrow.clockwise")
+                            .font(.callout)
+                    }
+                    .buttonStyle(IconButtonStyle())
+                    .padding(.trailing, 8)
+                }
+                .padding(.horizontal)
+                .padding(.vertical, 8)
+                .background(theme.chrome.surface)
+
+                Divider()
+
+                // Filter bar
+                PRFilterBar(
+                    filter: Binding(
+                        get: { filterState },
+                        set: { filterState = $0 }
+                    ),
+                    pullRequests: filteredPRs
+                )
+
+                Divider()
+            }
+        }
+    }
+
+    // MARK: - Cell Helpers
+
+    @ViewBuilder
+    private func prStateBadge(_ pr: PullRequest) -> some View {
+        switch pr.state {
+        case .open:
+            Circle().fill(theme.chrome.green).frame(width: 8, height: 8)
+        case .draft:
+            Circle().stroke(theme.chrome.textDim, lineWidth: 1.5).frame(width: 8, height: 8)
+        case .merged:
+            Circle().fill(theme.chrome.purple).frame(width: 8, height: 8)
+        case .closed:
+            Circle().fill(theme.chrome.red).frame(width: 8, height: 8)
+        }
+    }
+
+    private func prRepoShortName(_ pr: PullRequest) -> String {
+        if let idx = pr.repo.lastIndex(of: "/") {
+            return String(pr.repo[pr.repo.index(after: idx)...])
+        }
+        return pr.repo
+    }
+
+    private func reviewLabel(_ decision: ReviewDecision) -> String {
+        switch decision {
+        case .approved: "Approved"
+        case .changesRequested: "Changes"
+        case .pending: "Review"
+        case .none: ""
+        }
+    }
+
+    private func reviewColor(_ decision: ReviewDecision) -> Color {
+        switch decision {
+        case .approved: theme.chrome.green
+        case .changesRequested: theme.chrome.orange
+        case .pending: theme.chrome.yellow
+        case .none: .clear
+        }
+    }
+
+    private func mergeLabel(_ pr: PullRequest) -> String {
+        if pr.mergeable == .conflicting { return "Conflicts" }
+        switch pr.mergeStateStatus {
+        case .blocked: return "Blocked"
+        case .behind: return "Behind"
+        case .clean, .hasHooks: return "Clean"
+        case .dirty: return "Dirty"
+        case .unstable: return "Unstable"
+        default: return ""
+        }
+    }
+
+    private func mergeColor(_ pr: PullRequest) -> Color {
+        if pr.mergeable == .conflicting { return theme.chrome.red }
+        switch pr.mergeStateStatus {
+        case .blocked, .dirty: return theme.chrome.orange
+        case .behind, .unstable: return theme.chrome.yellow
+        case .clean, .hasHooks: return theme.chrome.green
+        default: return .clear
+        }
+    }
+
     // MARK: - Tab Button
 
     private func tabButton(_ tab: PRTab) -> some View {
@@ -323,30 +422,6 @@ public struct PRDashboardView: View {
         .accessibilityAddTraits(selectedTab == tab ? .isSelected : [])
     }
 
-    // MARK: - Group Header
-
-    private func groupHeader(_ group: PRGroup, count: Int) -> some View {
-        Button(action: { toggleGroupExpanded(group) }) {
-            HStack(spacing: 6) {
-                Image(systemName: groupIcon(group))
-                    .font(.callout)
-                    .foregroundColor(groupColor(group))
-                Text(group.rawValue)
-                    .font(.callout)
-                    .fontWeight(.semibold)
-                    .foregroundStyle(.secondary)
-                Text("(\(count))")
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-                Spacer()
-                Image(systemName: isGroupExpanded(group) ? "chevron.down" : "chevron.right")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-    }
 }
 
 // MARK: - Grouping
@@ -398,85 +473,4 @@ public enum PRTab: String, CaseIterable, Sendable {
     case all = "All"
     case mine = "Mine"
     case reviewRequested = "Review Requests"
-}
-
-// MARK: - PR Row View
-
-struct PRRowView: View {
-    let pr: PullRequest
-    var onReview: (() -> Void)?
-    @Environment(\.theme) private var theme
-
-    var body: some View {
-        HStack(spacing: 8) {
-            stateBadge
-
-            VStack(alignment: .leading, spacing: 2) {
-                HStack(spacing: 4) {
-                    Text("#\(pr.number)")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    Text(pr.title)
-                        .font(.body)
-                        .foregroundStyle(.primary)
-                        .lineLimit(1)
-                }
-
-                HStack(spacing: 8) {
-                    Text(pr.repo)
-                        .font(.caption)
-                        .foregroundColor(theme.chrome.cyan)
-                    Text(pr.author)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    if !pr.headBranch.isEmpty {
-                        Text(pr.headBranch)
-                            .font(.caption)
-                            .foregroundColor(theme.chrome.accent)
-                    }
-                    Text(pr.ageText)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    CheckSummaryBadge(checks: pr.checks)
-                    ReviewDecisionBadge(decision: pr.reviewDecision)
-                    MergeStatusBadge(mergeable: pr.mergeable, mergeStateStatus: pr.mergeStateStatus)
-                }
-            }
-
-            Spacer()
-
-            if pr.additions > 0 || pr.deletions > 0 {
-                Text("+\(pr.additions) -\(pr.deletions)")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .frame(minWidth: 60, alignment: .trailing)
-            } else if pr.checks.total == 0 {
-                // Unenriched — reserve space with loading indicator
-                ProgressView()
-                    .controlSize(.mini)
-                    .frame(minWidth: 60, alignment: .trailing)
-            }
-        }
-        .padding(.vertical, 4)
-        .opacity(pr.isDraft ? 0.5 : 1.0)
-        .contextMenu {
-            if let onReview {
-                Button("Open Review Session") { onReview() }
-            }
-        }
-    }
-
-    @ViewBuilder
-    private var stateBadge: some View {
-        switch pr.state {
-        case .open:
-            Circle().fill(theme.chrome.green).frame(width: 8, height: 8)
-        case .draft:
-            Circle().stroke(theme.chrome.textDim, lineWidth: 1.5).frame(width: 8, height: 8)
-        case .merged:
-            Circle().fill(theme.chrome.purple).frame(width: 8, height: 8)
-        case .closed:
-            Circle().fill(theme.chrome.red).frame(width: 8, height: 8)
-        }
-    }
 }
