@@ -289,104 +289,8 @@ public struct PRDashboardView: View {
 
                 Divider()
 
-                // Filter bar
-                PRFilterBar(
-                    filter: Binding(
-                        get: { filterState },
-                        set: { filterState = $0 }
-                    ),
-                    pullRequests: filteredPRs
-                )
-
-                Divider()
-
-                // Column headers
-                PRColumnHeader(
-                    sortField: Binding(
-                        get: { sortField },
-                        set: { sortField = $0 }
-                    ),
-                    sortOrder: Binding(
-                        get: { sortOrder },
-                        set: { sortOrder = $0 }
-                    ),
-                    columnWidths: Binding(
-                        get: { columnWidths },
-                        set: { columnWidths = $0 }
-                    )
-                )
-
-                Divider()
-
-                // PR list
-                if filteredPRs.isEmpty && !isLoading {
-                    Spacer()
-                    VStack(spacing: 8) {
-                        Image(systemName: "pull.request")
-                            .font(.largeTitle)
-                            .foregroundStyle(.secondary)
-                        if filterState.isActive {
-                            Text("No PRs match current filters")
-                                .foregroundStyle(.secondary)
-                            Button("Clear Filters") { filterState = PRFilterState() }
-                                .controlSize(.small)
-                        } else {
-                            Text("No pull requests")
-                                .foregroundStyle(.secondary)
-                            Button("Refresh") { onRefresh() }
-                                .controlSize(.small)
-                        }
-                    }
-                    Spacer()
-                } else {
-                    let visibleGroups = groupedPRs().filter { !($0.group == .drafts && hideDrafts) }
-                    if visibleGroups.isEmpty {
-                        Spacer()
-                        VStack(spacing: 8) {
-                            Image(systemName: "pull.request")
-                                .font(.largeTitle)
-                                .foregroundStyle(.secondary)
-                            Text("No pull requests")
-                                .foregroundStyle(.secondary)
-                            Button("Refresh") { onRefresh() }
-                                .controlSize(.small)
-                        }
-                        Spacer()
-                    } else {
-                        ScrollView {
-                            LazyVStack(spacing: 0, pinnedViews: .sectionHeaders) {
-                                ForEach(visibleGroups, id: \.group) { entry in
-                                    Section {
-                                        if isGroupExpanded(entry.group) {
-                                            ForEach(entry.prs) { pr in
-                                                PRRowView(
-                                                    pr: pr,
-                                                    columnWidths: columnWidths,
-                                                    onReview: onReviewPR.map { callback in
-                                                        { callback(pr) }
-                                                    }
-                                                )
-                                                .background(
-                                                    selectedPRID == pr.id
-                                                        ? theme.chrome.accent.opacity(0.15)
-                                                        : Color.clear
-                                                )
-                                                .onTapGesture {
-                                                    onSelectPR(
-                                                        selectedPRID == pr.id ? nil : pr
-                                                    )
-                                                }
-                                            }
-                                        }
-                                    } header: {
-                                        groupHeader(entry.group, count: entry.prs.count)
-                                            .background(theme.chrome.background)
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
+                // PR list with pinned filter bar + column headers
+                prListContent
             }
             .frame(minWidth: 300)
             .frame(maxWidth: selectedPR == nil ? .infinity : CGFloat(prListWidth))
@@ -420,6 +324,105 @@ public struct PRDashboardView: View {
             }
         }
         .task { onRefresh() }
+    }
+
+    // MARK: - PR List Content
+
+    /// The filter bar, column headers, and scrollable PR list as one cohesive unit.
+    /// Filter bar and column headers are pinned above the scroll content via safeAreaInset.
+    @ViewBuilder
+    private var prListContent: some View {
+        if filteredPRs.isEmpty && !isLoading {
+            Spacer()
+            VStack(spacing: 8) {
+                Image(systemName: "pull.request")
+                    .font(.largeTitle)
+                    .foregroundStyle(.secondary)
+                if filterState.isActive {
+                    Text("No PRs match current filters")
+                        .foregroundStyle(.secondary)
+                    Button("Clear Filters") { filterState = PRFilterState() }
+                        .controlSize(.small)
+                } else {
+                    Text("No pull requests")
+                        .foregroundStyle(.secondary)
+                    Button("Refresh") { onRefresh() }
+                        .controlSize(.small)
+                }
+            }
+            Spacer()
+        } else {
+            let visibleGroups = groupedPRs().filter { !($0.group == .drafts && hideDrafts) }
+            if visibleGroups.isEmpty {
+                Spacer()
+                VStack(spacing: 8) {
+                    Image(systemName: "pull.request")
+                        .font(.largeTitle)
+                        .foregroundStyle(.secondary)
+                    Text("No pull requests")
+                        .foregroundStyle(.secondary)
+                    Button("Refresh") { onRefresh() }
+                        .controlSize(.small)
+                }
+                Spacer()
+            } else {
+                ScrollView {
+                    LazyVStack(spacing: 0) {
+                        ForEach(visibleGroups, id: \.group) { entry in
+                            groupHeader(entry.group, count: entry.prs.count)
+                                .background(theme.chrome.background)
+                            if isGroupExpanded(entry.group) {
+                                ForEach(entry.prs) { pr in
+                                    PRRowView(
+                                        pr: pr,
+                                        columnWidths: columnWidths,
+                                        onReview: onReviewPR.map { callback in
+                                            { callback(pr) }
+                                        }
+                                    )
+                                    .background(
+                                        selectedPRID == pr.id
+                                            ? theme.chrome.accent.opacity(0.15)
+                                            : Color.clear
+                                    )
+                                    .onTapGesture {
+                                        onSelectPR(selectedPRID == pr.id ? nil : pr)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                .safeAreaInset(edge: .top, spacing: 0) {
+                    VStack(spacing: 0) {
+                        PRFilterBar(
+                            filter: Binding(
+                                get: { filterState },
+                                set: { filterState = $0 }
+                            ),
+                            pullRequests: filteredPRs
+                        )
+                        Divider()
+                        PRColumnHeader(
+                            sortField: Binding(
+                                get: { sortField },
+                                set: { sortField = $0 }
+                            ),
+                            sortOrder: Binding(
+                                get: { sortOrder },
+                                set: { sortOrder = $0 }
+                            ),
+                            columnWidths: Binding(
+                                get: { columnWidths },
+                                set: { columnWidths = $0 }
+                            )
+                        )
+                        Divider()
+                    }
+                    .background(theme.chrome.background)
+                }
+            }
+        }
     }
 
     // MARK: - Tab Button
@@ -540,6 +543,7 @@ struct PRRowView: View {
                     .lineLimit(1)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
+            .clipped()
 
             // Repo column
             Text(repoShortName)
@@ -547,6 +551,7 @@ struct PRRowView: View {
                 .foregroundColor(theme.chrome.cyan)
                 .lineLimit(1)
                 .frame(width: columnWidths.repo, alignment: .leading)
+                .clipped()
 
             // Author column
             Text(pr.author)
@@ -554,24 +559,30 @@ struct PRRowView: View {
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
                 .frame(width: columnWidths.author, alignment: .leading)
+                .clipped()
 
             // Age column
             Text(pr.ageText)
                 .font(.caption)
                 .foregroundStyle(.secondary)
+                .lineLimit(1)
                 .frame(width: columnWidths.age, alignment: .leading)
+                .clipped()
 
             // Checks column
             CheckSummaryBadge(checks: pr.checks)
                 .frame(width: columnWidths.checks, alignment: .leading)
+                .clipped()
 
             // Review column
             ReviewDecisionBadge(decision: pr.reviewDecision)
                 .frame(width: columnWidths.review, alignment: .leading)
+                .clipped()
 
             // Merge column
             MergeStatusBadge(mergeable: pr.mergeable, mergeStateStatus: pr.mergeStateStatus)
                 .frame(width: columnWidths.merge, alignment: .leading)
+                .clipped()
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 4)
