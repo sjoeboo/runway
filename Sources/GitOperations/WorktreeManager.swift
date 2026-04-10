@@ -61,37 +61,81 @@ public actor WorktreeManager {
     /// - Returns: Path to the created worktree directory
     public func checkoutWorktree(
         repoPath: String,
-        branch: String
+        branch: String,
+        prNumber: Int? = nil,
+        ghHost: String? = nil
     ) async throws -> String {
         let sanitized = sanitizeBranchName(branch)
         let worktreePath = "\(repoPath)/.worktrees/\(sanitized)"
 
-        // Fetch the branch from origin (non-fatal if no remote)
-        _ = try? await runGit(in: repoPath, args: ["fetch", "origin", branch])
+        // Strategy 1: git-native fetch + tracking worktree
+        // Try fetching the branch by name with explicit refspec.
+        _ = try? await runGit(
+            in: repoPath,
+            args: [
+                "fetch", "origin",
+                "+refs/heads/\(branch):refs/remotes/origin/\(branch)",
+            ])
 
-        // Try creating worktree tracking the remote branch
         do {
             try await runGit(
                 in: repoPath,
                 args: [
                     "worktree", "add", "--track", "-b", sanitized, worktreePath, "origin/\(branch)",
                 ])
+            return worktreePath
         } catch {
-            // Clean up partial directory from failed attempt before retry
             if FileManager.default.fileExists(atPath: worktreePath) {
                 try? FileManager.default.removeItem(atPath: worktreePath)
-                // Prune stale worktree references
                 _ = try? await runGit(in: repoPath, args: ["worktree", "prune"])
             }
-            // Fallback: local branch already exists — reuse it
-            try await runGit(
-                in: repoPath,
-                args: [
-                    "worktree", "add", worktreePath, sanitized,
-                ])
         }
 
-        return worktreePath
+        // Strategy 2: existing local branch (try original name then sanitized)
+        for candidate in (branch != sanitized ? [branch, sanitized] : [sanitized]) {
+            do {
+                try await runGit(
+                    in: repoPath,
+                    args: ["worktree", "add", worktreePath, candidate])
+                return worktreePath
+            } catch {
+                if FileManager.default.fileExists(atPath: worktreePath) {
+                    try? FileManager.default.removeItem(atPath: worktreePath)
+                    _ = try? await runGit(in: repoPath, args: ["worktree", "prune"])
+                }
+            }
+        }
+
+        // Strategy 3: gh pr checkout — handles auth, forks, and GHE remote configs
+        // that prevent git-native fetches from working.
+        // Use --detach to avoid "cannot set up tracking" errors when the remote
+        // ref isn't a regular branch, then create a local branch from the result.
+        if let prNumber {
+            try await runGit(in: repoPath, args: ["worktree", "add", "--detach", worktreePath])
+            do {
+                try await ShellRunner.runGH(
+                    args: ["pr", "checkout", "\(prNumber)", "--detach", "--force"],
+                    cwd: worktreePath,
+                    host: ghHost
+                )
+                // Create a named branch from the detached HEAD.
+                // Use the original branch name (not sanitized) so tools like
+                // `gh pr status` can match this branch back to the PR.
+                try await runGit(in: worktreePath, args: ["checkout", "-b", branch])
+                return worktreePath
+            } catch {
+                // gh pr checkout failed — clean up the detached worktree
+                try? await runGit(in: repoPath, args: ["worktree", "remove", worktreePath, "--force"])
+                throw error
+            }
+        }
+
+        // All strategies exhausted
+        throw GitError.commandFailed(
+            args: ["worktree", "add", worktreePath, branch],
+            exitCode: 128,
+            stderr: "fatal: could not check out branch '\(branch)' — fetch and local lookup both failed"
+        )
     }
 
     /// List all worktrees for a repository.

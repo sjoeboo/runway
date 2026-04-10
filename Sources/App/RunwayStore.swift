@@ -1525,7 +1525,9 @@ public final class RunwayStore {
             do {
                 sessionPath = try await worktreeManager.checkoutWorktree(
                     repoPath: project.path,
-                    branch: pr.headBranch
+                    branch: pr.headBranch,
+                    prNumber: pr.number,
+                    ghHost: project.ghHost
                 )
             } catch {
                 print("[Runway] Worktree checkout failed for PR review: \(error)")
