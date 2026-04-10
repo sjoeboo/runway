@@ -392,7 +392,7 @@ public struct PRDashboardView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 ScrollView {
-                    LazyVStack(spacing: 0) {
+                    LazyVStack(alignment: .leading, spacing: 0) {
                         ForEach(visibleGroups, id: \.group) { entry in
                             groupHeader(entry.group, count: entry.prs.count)
                                 .background(theme.chrome.background)
@@ -417,7 +417,9 @@ public struct PRDashboardView: View {
                             }
                         }
                     }
+                    .frame(maxWidth: .infinity)
                 }
+                .frame(maxHeight: .infinity, alignment: .top)
             }
         }
     }
