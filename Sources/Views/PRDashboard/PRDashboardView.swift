@@ -235,8 +235,73 @@ public struct PRDashboardView: View {
 
                 Divider()
 
-                // PR list with pinned filter bar + column headers
-                prListContent
+                PRFilterBar(
+                    filter: Binding(
+                        get: { filterState },
+                        set: { filterState = $0 }
+                    ),
+                    pullRequests: filteredPRs
+                )
+                Divider()
+                PRColumnHeader(
+                    sortField: Binding(
+                        get: { sortField },
+                        set: { sortField = $0 }
+                    ),
+                    sortOrder: Binding(
+                        get: { sortOrder },
+                        set: { sortOrder = $0 }
+                    ),
+                    columnWidths: Binding(
+                        get: { columnWidths },
+                        set: { columnWidths = $0 }
+                    )
+                )
+                Divider()
+
+                List(
+                    selection: Binding(
+                        get: { selectedPRID },
+                        set: { id in
+                            let pr = sortedPRs.first(where: { $0.id == id })
+                            onSelectPR(pr)
+                        }
+                    )
+                ) {
+                    ForEach(sortedPRs) { pr in
+                        PRRowView(
+                            pr: pr,
+                            columnWidths: columnWidths,
+                            onReview: onReviewPR.map { callback in { callback(pr) } }
+                        )
+                        .tag(pr.id)
+                        .listRowInsets(EdgeInsets())
+                    }
+                }
+                .listStyle(.plain)
+                .scrollContentBackground(.hidden)
+                .overlay {
+                    if sortedPRs.isEmpty && !isLoading {
+                        VStack(spacing: 8) {
+                            Image(systemName: "pull.request")
+                                .font(.largeTitle)
+                                .foregroundStyle(.secondary)
+                            if filterState.isActive {
+                                Text("No PRs match current filters")
+                                    .foregroundStyle(.secondary)
+                                Button("Clear Filters") {
+                                    filterState = PRFilterState()
+                                }
+                                .controlSize(.small)
+                            } else {
+                                Text("No pull requests")
+                                    .foregroundStyle(.secondary)
+                                Button("Refresh") { onRefresh() }
+                                    .controlSize(.small)
+                            }
+                        }
+                    }
+                }
             }
             .frame(minWidth: 300)
             .frame(maxWidth: selectedPR == nil ? .infinity : CGFloat(prListWidth))
@@ -270,79 +335,6 @@ public struct PRDashboardView: View {
             }
         }
         .task { onRefresh() }
-    }
-
-    // MARK: - PR List Content
-
-    /// The filter bar, column headers, and scrollable PR list.
-    @ViewBuilder
-    private var prListContent: some View {
-        PRFilterBar(
-            filter: Binding(
-                get: { filterState },
-                set: { filterState = $0 }
-            ),
-            pullRequests: filteredPRs
-        )
-        Divider()
-        PRColumnHeader(
-            sortField: Binding(
-                get: { sortField },
-                set: { sortField = $0 }
-            ),
-            sortOrder: Binding(
-                get: { sortOrder },
-                set: { sortOrder = $0 }
-            ),
-            columnWidths: Binding(
-                get: { columnWidths },
-                set: { columnWidths = $0 }
-            )
-        )
-        Divider()
-
-        let prs = sortedPRs
-        if prs.isEmpty && !isLoading {
-            VStack(spacing: 8) {
-                Image(systemName: "pull.request")
-                    .font(.largeTitle)
-                    .foregroundStyle(.secondary)
-                if filterState.isActive {
-                    Text("No PRs match current filters")
-                        .foregroundStyle(.secondary)
-                    Button("Clear Filters") { filterState = PRFilterState() }
-                        .controlSize(.small)
-                } else {
-                    Text("No pull requests")
-                        .foregroundStyle(.secondary)
-                    Button("Refresh") { onRefresh() }
-                        .controlSize(.small)
-                }
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-        } else {
-            List(
-                selection: Binding(
-                    get: { selectedPRID },
-                    set: { id in
-                        let pr = prs.first(where: { $0.id == id })
-                        onSelectPR(pr)
-                    }
-                )
-            ) {
-                ForEach(prs) { pr in
-                    PRRowView(
-                        pr: pr,
-                        columnWidths: columnWidths,
-                        onReview: onReviewPR.map { callback in { callback(pr) } }
-                    )
-                    .tag(pr.id)
-                    .listRowInsets(EdgeInsets())
-                }
-            }
-            .listStyle(.plain)
-            .scrollContentBackground(.hidden)
-        }
     }
 
     // MARK: - Tab Button
