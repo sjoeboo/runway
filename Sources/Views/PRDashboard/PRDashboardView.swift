@@ -26,31 +26,16 @@ public struct PRDashboardView: View {
     @AppStorage("prListWidth") private var prListWidth: Double = 380
     @AppStorage("hideDrafts") private var hideDrafts: Bool = false
     @AppStorage("showSessionPRsOnly") private var showSessionPRsOnly: Bool = false
-    @AppStorage("prSortField") private var sortFieldRaw: String = PRSortField.age.rawValue
-    @AppStorage("prSortOrder") private var sortOrderRaw: String = PRSortOrder.descending.rawValue
     @AppStorage("prFilterRepo") private var filterRepo: String = ""
     @AppStorage("prFilterAuthor") private var filterAuthor: String = ""
     @AppStorage("prFilterAge") private var filterAgeRaw: String = PRAgeBucket.any.rawValue
     @AppStorage("prFilterChecks") private var filterChecksRaw: String = ""
     @AppStorage("prFilterReview") private var filterReviewRaw: String = ""
     @AppStorage("prFilterMerge") private var filterMergeRaw: String = ""
-    @AppStorage("prColRepo") private var colRepo: Double = Double(PRColumnWidths.defaults.repo)
-    @AppStorage("prColAuthor") private var colAuthor: Double = Double(PRColumnWidths.defaults.author)
-    @AppStorage("prColAge") private var colAge: Double = Double(PRColumnWidths.defaults.age)
-    @AppStorage("prColChecks") private var colChecks: Double = Double(PRColumnWidths.defaults.checks)
-    @AppStorage("prColReview") private var colReview: Double = Double(PRColumnWidths.defaults.review)
-    @AppStorage("prColMerge") private var colMerge: Double = Double(PRColumnWidths.defaults.merge)
+    @State private var tableSortOrder: [KeyPathComparator<PullRequest>] = [
+        KeyPathComparator(\.createdAt, order: .reverse)
+    ]
     @Environment(\.theme) private var theme
-
-    private var sortField: PRSortField {
-        get { PRSortField(rawValue: sortFieldRaw) ?? .age }
-        nonmutating set { sortFieldRaw = newValue.rawValue }
-    }
-
-    private var sortOrder: PRSortOrder {
-        get { PRSortOrder(rawValue: sortOrderRaw) ?? .descending }
-        nonmutating set { sortOrderRaw = newValue.rawValue }
-    }
 
     private var filterState: PRFilterState {
         get {
@@ -70,23 +55,6 @@ public struct PRDashboardView: View {
             filterChecksRaw = newValue.checks?.rawValue ?? ""
             filterReviewRaw = newValue.review?.rawValue ?? ""
             filterMergeRaw = newValue.mergeFilter?.rawValue ?? ""
-        }
-    }
-
-    private var columnWidths: PRColumnWidths {
-        get {
-            PRColumnWidths(
-                repo: CGFloat(colRepo), author: CGFloat(colAuthor), age: CGFloat(colAge),
-                checks: CGFloat(colChecks), review: CGFloat(colReview), merge: CGFloat(colMerge)
-            )
-        }
-        nonmutating set {
-            colRepo = Double(newValue.repo)
-            colAuthor = Double(newValue.author)
-            colAge = Double(newValue.age)
-            colChecks = Double(newValue.checks)
-            colReview = Double(newValue.review)
-            colMerge = Double(newValue.merge)
         }
     }
 
@@ -179,7 +147,7 @@ public struct PRDashboardView: View {
     private var sortedPRs: [PullRequest] {
         var prs = filteredPRs
         if hideDrafts { prs = prs.filter { !$0.isDraft } }
-        return sortPRs(prs, by: sortField, order: sortOrder)
+        return prs.sorted(using: tableSortOrder)
     }
 
     // MARK: - Body
@@ -233,9 +201,10 @@ public struct PRDashboardView: View {
                     let pr = sortedPRs.first(where: { $0.id == id })
                     onSelectPR(pr)
                 }
-            )
+            ),
+            sortOrder: $tableSortOrder
         ) {
-            TableColumn("Title") { pr in
+            TableColumn("Title", value: \.title) { pr in
                 HStack(spacing: 4) {
                     prStateBadge(pr)
                     Text("#\(pr.number)")
@@ -248,7 +217,7 @@ public struct PRDashboardView: View {
             }
             .width(min: 150)
 
-            TableColumn("Repo") { pr in
+            TableColumn("Repo", value: \.repo) { pr in
                 Text(prRepoShortName(pr))
                     .font(.caption)
                     .foregroundColor(theme.chrome.cyan)
@@ -256,7 +225,7 @@ public struct PRDashboardView: View {
             }
             .width(min: 70, ideal: 130, max: 250)
 
-            TableColumn("Author") { pr in
+            TableColumn("Author", value: \.author) { pr in
                 Text(pr.author)
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -264,14 +233,14 @@ public struct PRDashboardView: View {
             }
             .width(min: 60, ideal: 90, max: 200)
 
-            TableColumn("Age") { pr in
+            TableColumn("Age", value: \.createdAt) { pr in
                 Text(pr.ageText)
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
             .width(min: 40, ideal: 60, max: 80)
 
-            TableColumn("Checks") { pr in
+            TableColumn("Checks", value: \.checksPassRatio) { pr in
                 if pr.checks.total > 0 {
                     Text("\(pr.checks.passed)/\(pr.checks.total)")
                         .font(.caption)
@@ -284,14 +253,14 @@ public struct PRDashboardView: View {
             }
             .width(min: 40, ideal: 55, max: 80)
 
-            TableColumn("Review") { pr in
+            TableColumn("Review", value: \.reviewSortRank) { pr in
                 Text(reviewLabel(pr.reviewDecision))
                     .font(.caption)
                     .foregroundColor(reviewColor(pr.reviewDecision))
             }
             .width(min: 50, ideal: 70, max: 100)
 
-            TableColumn("Merge") { pr in
+            TableColumn("Merge", value: \.mergeSortRank) { pr in
                 Text(mergeLabel(pr))
                     .font(.caption)
                     .foregroundColor(mergeColor(pr))

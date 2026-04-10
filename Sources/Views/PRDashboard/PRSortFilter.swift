@@ -121,6 +121,38 @@ public struct PRFilterState: Sendable {
     }
 }
 
+// MARK: - Comparable Sort Properties
+
+extension PullRequest {
+    /// Checks pass ratio for column sorting. -1 when no checks configured.
+    public var checksPassRatio: Double {
+        checks.total > 0 ? Double(checks.passed) / Double(checks.total) : -1
+    }
+
+    /// Numeric rank for review decision sorting (lower = better).
+    public var reviewSortRank: Int {
+        switch reviewDecision {
+        case .approved: 0
+        case .pending: 1
+        case .none: 2
+        case .changesRequested: 3
+        }
+    }
+
+    /// Numeric rank for merge status sorting (lower = more ready).
+    public var mergeSortRank: Int {
+        if mergeable == .conflicting { return 4 }
+        switch mergeStateStatus {
+        case .clean, .hasHooks: return 0
+        case .behind: return 1
+        case .unstable: return 2
+        case .dirty: return 3
+        case .blocked: return 5
+        default: return 6
+        }
+    }
+}
+
 // MARK: - Column Widths
 
 /// Resizable column widths for the PR list grid.
