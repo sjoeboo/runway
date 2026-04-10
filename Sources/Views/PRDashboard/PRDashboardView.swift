@@ -438,22 +438,16 @@ struct PRRowView: View {
                 .clipped()
 
             // Checks column
-            CheckSummaryBadge(checks: pr.checks)
-                .lineLimit(1)
+            checksText
                 .frame(width: columnWidths.checks, alignment: .leading)
-                .clipped()
 
             // Review column
-            ReviewDecisionBadge(decision: pr.reviewDecision)
-                .lineLimit(1)
+            reviewText
                 .frame(width: columnWidths.review, alignment: .leading)
-                .clipped()
 
             // Merge column
-            MergeStatusBadge(mergeable: pr.mergeable, mergeStateStatus: pr.mergeStateStatus)
-                .lineLimit(1)
+            mergeText
                 .frame(width: columnWidths.merge, alignment: .leading)
-                .clipped()
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 4)
@@ -461,6 +455,75 @@ struct PRRowView: View {
         .contextMenu {
             if let onReview {
                 Button("Open Review Session") { onReview() }
+            }
+        }
+    }
+
+    // MARK: - Column Text
+
+    @ViewBuilder
+    private var checksText: some View {
+        if pr.checks.total > 0 {
+            Text("\(pr.checks.passed)/\(pr.checks.total)")
+                .font(.caption)
+                .foregroundColor(
+                    pr.checks.allPassed
+                        ? theme.chrome.green
+                        : pr.checks.hasFailed ? theme.chrome.red : theme.chrome.yellow
+                )
+        }
+    }
+
+    @ViewBuilder
+    private var reviewText: some View {
+        switch pr.reviewDecision {
+        case .approved:
+            Text("Approved")
+                .font(.caption)
+                .foregroundColor(theme.chrome.green)
+        case .changesRequested:
+            Text("Changes")
+                .font(.caption)
+                .foregroundColor(theme.chrome.orange)
+        case .pending:
+            Text("Review")
+                .font(.caption)
+                .foregroundColor(theme.chrome.yellow)
+        case .none:
+            EmptyView()
+        }
+    }
+
+    @ViewBuilder
+    private var mergeText: some View {
+        if pr.mergeable == .conflicting {
+            Text("Conflicts")
+                .font(.caption)
+                .foregroundColor(theme.chrome.red)
+        } else {
+            switch pr.mergeStateStatus {
+            case .blocked:
+                Text("Blocked")
+                    .font(.caption)
+                    .foregroundColor(theme.chrome.orange)
+            case .behind:
+                Text("Behind")
+                    .font(.caption)
+                    .foregroundColor(theme.chrome.yellow)
+            case .clean, .hasHooks:
+                Text("Clean")
+                    .font(.caption)
+                    .foregroundColor(theme.chrome.green)
+            case .dirty:
+                Text("Dirty")
+                    .font(.caption)
+                    .foregroundColor(theme.chrome.orange)
+            case .unstable:
+                Text("Unstable")
+                    .font(.caption)
+                    .foregroundColor(theme.chrome.yellow)
+            default:
+                EmptyView()
             }
         }
     }
