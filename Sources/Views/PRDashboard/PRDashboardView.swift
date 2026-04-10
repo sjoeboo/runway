@@ -280,7 +280,7 @@ public struct PRDashboardView: View {
                     .listRowInsets(EdgeInsets())
                 }
             }
-            .listStyle(.inset(alternatesRowBackgrounds: false))
+            .listStyle(.plain)
             .scrollContentBackground(.hidden)
             .frame(minWidth: 300)
             .frame(maxWidth: selectedPR == nil ? .infinity : CGFloat(prListWidth))
