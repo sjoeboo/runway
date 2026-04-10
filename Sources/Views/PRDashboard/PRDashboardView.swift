@@ -197,79 +197,77 @@ public struct PRDashboardView: View {
                 )
             ) {
                 // Toolbar row
-                Section {
-                    HStack(spacing: 0) {
-                        ForEach(PRTab.allCases, id: \.self) { tab in
-                            tabButton(tab)
-                        }
-                        Spacer()
-
-                        if isLoading {
-                            ProgressView()
-                                .controlSize(.small)
-                                .padding(.trailing, 8)
-                        }
-
-                        Button {
-                            showSessionPRsOnly.toggle()
-                        } label: {
-                            Image(systemName: showSessionPRsOnly ? "terminal.fill" : "terminal")
-                                .font(.callout)
-                        }
-                        .buttonStyle(IconButtonStyle())
-                        .help(
-                            showSessionPRsOnly ? "Showing session PRs only" : "Show only session PRs"
-                        )
-                        .padding(.trailing, 4)
-
-                        Button {
-                            hideDrafts.toggle()
-                        } label: {
-                            Image(systemName: hideDrafts ? "eye.slash" : "eye")
-                                .font(.callout)
-                        }
-                        .buttonStyle(IconButtonStyle())
-                        .help(hideDrafts ? "Show drafts" : "Hide drafts")
-                        .padding(.trailing, 4)
-
-                        Button(action: onRefresh) {
-                            Image(systemName: "arrow.clockwise")
-                                .font(.callout)
-                        }
-                        .buttonStyle(IconButtonStyle())
-                        .padding(.trailing, 8)
+                HStack(spacing: 0) {
+                    ForEach(PRTab.allCases, id: \.self) { tab in
+                        tabButton(tab)
                     }
-                    .listRowInsets(EdgeInsets())
-                    .listRowSeparator(.hidden)
+                    Spacer()
 
-                    // Filter bar
-                    PRFilterBar(
-                        filter: Binding(
-                            get: { filterState },
-                            set: { filterState = $0 }
-                        ),
-                        pullRequests: filteredPRs
-                    )
-                    .listRowInsets(EdgeInsets())
-                    .listRowSeparator(.hidden)
+                    if isLoading {
+                        ProgressView()
+                            .controlSize(.small)
+                            .padding(.trailing, 8)
+                    }
 
-                    // Column headers
-                    PRColumnHeader(
-                        sortField: Binding(
-                            get: { sortField },
-                            set: { sortField = $0 }
-                        ),
-                        sortOrder: Binding(
-                            get: { sortOrder },
-                            set: { sortOrder = $0 }
-                        ),
-                        columnWidths: Binding(
-                            get: { columnWidths },
-                            set: { columnWidths = $0 }
-                        )
+                    Button {
+                        showSessionPRsOnly.toggle()
+                    } label: {
+                        Image(systemName: showSessionPRsOnly ? "terminal.fill" : "terminal")
+                            .font(.callout)
+                    }
+                    .buttonStyle(IconButtonStyle())
+                    .help(
+                        showSessionPRsOnly ? "Showing session PRs only" : "Show only session PRs"
                     )
-                    .listRowInsets(EdgeInsets())
+                    .padding(.trailing, 4)
+
+                    Button {
+                        hideDrafts.toggle()
+                    } label: {
+                        Image(systemName: hideDrafts ? "eye.slash" : "eye")
+                            .font(.callout)
+                    }
+                    .buttonStyle(IconButtonStyle())
+                    .help(hideDrafts ? "Show drafts" : "Hide drafts")
+                    .padding(.trailing, 4)
+
+                    Button(action: onRefresh) {
+                        Image(systemName: "arrow.clockwise")
+                            .font(.callout)
+                    }
+                    .buttonStyle(IconButtonStyle())
+                    .padding(.trailing, 8)
                 }
+                .listRowInsets(EdgeInsets())
+                .listRowSeparator(.hidden)
+
+                // Filter bar
+                PRFilterBar(
+                    filter: Binding(
+                        get: { filterState },
+                        set: { filterState = $0 }
+                    ),
+                    pullRequests: filteredPRs
+                )
+                .listRowInsets(EdgeInsets())
+                .listRowSeparator(.hidden)
+
+                // Column headers
+                PRColumnHeader(
+                    sortField: Binding(
+                        get: { sortField },
+                        set: { sortField = $0 }
+                    ),
+                    sortOrder: Binding(
+                        get: { sortOrder },
+                        set: { sortOrder = $0 }
+                    ),
+                    columnWidths: Binding(
+                        get: { columnWidths },
+                        set: { columnWidths = $0 }
+                    )
+                )
+                .listRowInsets(EdgeInsets())
 
                 // PR rows
                 ForEach(sortedPRs) { pr in
