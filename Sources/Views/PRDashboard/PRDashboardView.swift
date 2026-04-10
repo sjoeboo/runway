@@ -353,36 +353,38 @@ public struct PRDashboardView: View {
                         }
                         Spacer()
                     } else {
-                        List(
-                            selection: Binding(
-                                get: { selectedPRID },
-                                set: { id in
-                                    let pr = pullRequests.first(where: { $0.id == id })
-                                    onSelectPR(pr)
-                                }
-                            )
-                        ) {
-                            ForEach(visibleGroups, id: \.group) { entry in
-                                Section {
-                                    if isGroupExpanded(entry.group) {
-                                        ForEach(entry.prs) { pr in
-                                            PRRowView(
-                                                pr: pr,
-                                                columnWidths: columnWidths,
-                                                onReview: onReviewPR.map { callback in { callback(pr) } }
-                                            )
-                                            .tag(pr.id)
-                                            .listRowInsets(EdgeInsets())
+                        ScrollView {
+                            LazyVStack(spacing: 0, pinnedViews: .sectionHeaders) {
+                                ForEach(visibleGroups, id: \.group) { entry in
+                                    Section {
+                                        if isGroupExpanded(entry.group) {
+                                            ForEach(entry.prs) { pr in
+                                                PRRowView(
+                                                    pr: pr,
+                                                    columnWidths: columnWidths,
+                                                    onReview: onReviewPR.map { callback in
+                                                        { callback(pr) }
+                                                    }
+                                                )
+                                                .background(
+                                                    selectedPRID == pr.id
+                                                        ? theme.chrome.accent.opacity(0.15)
+                                                        : Color.clear
+                                                )
+                                                .onTapGesture {
+                                                    onSelectPR(
+                                                        selectedPRID == pr.id ? nil : pr
+                                                    )
+                                                }
+                                            }
                                         }
+                                    } header: {
+                                        groupHeader(entry.group, count: entry.prs.count)
+                                            .background(theme.chrome.background)
                                     }
-                                } header: {
-                                    groupHeader(entry.group, count: entry.prs.count)
-                                        .listRowInsets(EdgeInsets())
                                 }
                             }
                         }
-                        .listStyle(.plain)
-                        .scrollContentBackground(.hidden)
                     }
                 }
             }
