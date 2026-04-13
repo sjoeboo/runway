@@ -5,6 +5,35 @@ All notable changes to Runway are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.9.0] — 2026-04-13
+
+### Added
+
+- **Saved prompts** — save and reuse frequently-sent prompts in the send bar, with global and per-project scope ([#300](https://github.com/sjoeboo/runway/pull/300))
+- **Transcript viewer** — read-only JSONL transcript viewer for browsing session conversations ([#300](https://github.com/sjoeboo/runway/pull/300))
+- **Commit history popover** — browse branch commit history from the session header with rollback capability ([#301](https://github.com/sjoeboo/runway/pull/301))
+- **PR status badges** — visual merge-state badges in the PR dashboard and project PR tabs ([#300](https://github.com/sjoeboo/runway/pull/300))
+- **VoiceOver accessibility** — comprehensive accessibility labels across sidebar, session detail, PR dashboard, and dialog views ([#301](https://github.com/sjoeboo/runway/pull/301))
+
+### Fixed
+
+- **Branch name sanitization** — fixed `sanitizeBranchName` replacing `/` with `-`, which broke PR-to-session linking and branch deletion for `feature/` and `fix/` branches ([#300](https://github.com/sjoeboo/runway/pull/300))
+- **TerminalPalette crash** — replaced `precondition(ansi.count == 16)` with pad/truncate so malformed theme JSON no longer crashes the app ([#300](https://github.com/sjoeboo/runway/pull/300))
+- **GraphQL injection** — PR node IDs are now validated before interpolation into mutation strings ([#300](https://github.com/sjoeboo/runway/pull/300))
+- **Cache eviction process leak** — LRU eviction now terminates the PTY process before dropping the terminal view ([#301](https://github.com/sjoeboo/runway/pull/301))
+- **ShellRunner timeout** — `ShellRunner.run()` now has a configurable timeout so a hung subprocess no longer blocks the calling actor forever ([#300](https://github.com/sjoeboo/runway/pull/300))
+- **HookServer reliability** — added connection timeout and auto-restart on failed state ([#300](https://github.com/sjoeboo/runway/pull/300))
+- **PTY process safety** — fixed write/resize race with FD close; deinit now calls `waitpid()` to prevent zombie processes ([#300](https://github.com/sjoeboo/runway/pull/300))
+- **Theme color consistency** — activity log and settings views now use theme colors instead of hardcoded system colors ([#300](https://github.com/sjoeboo/runway/pull/300))
+
+### Maintenance
+
+- Extracted PRCoordinator (~400 LOC) from RunwayStore, reducing it from ~1,700 to ~900 lines for better `@Observable` invalidation scope ([#301](https://github.com/sjoeboo/runway/pull/301))
+- Test suite expanded from 293 to 329 tests with new coverage for WorktreeManager, ShellRunner, HookServer, and TerminalSessionCache ([#300](https://github.com/sjoeboo/runway/pull/300), [#301](https://github.com/sjoeboo/runway/pull/301))
+- Added ROADMAP-1.0.md tracking remaining work toward 1.0 release ([#300](https://github.com/sjoeboo/runway/pull/300))
+
+[0.9.0]: https://github.com/sjoeboo/runway/compare/v0.8.0...v0.9.0
+
 ## [0.8.0] — 2026-04-13
 
 ### Added

@@ -88,6 +88,9 @@ Create named sessions tied to projects. Each session launches a terminal running
 - **Session restart/resume** — restart stopped sessions from the sidebar context menu, resuming from where they left off
 - **Fork session** — create a new session forked from an existing one, inheriting configuration and branch
 - **Session search** — `Cmd+K` filters the sidebar by session name, branch, or project name
+- **Saved prompts** — save and reuse frequently-sent prompts in the send bar, with global and per-project scope
+- **Transcript viewer** — browse session conversation transcripts in a read-only JSONL viewer
+- **Commit history** — view branch commit history from the session header with rollback capability
 
 ### Live Status Detection
 
@@ -247,7 +250,7 @@ Runway auto-injects hooks into `~/.claude/settings.json` on every launch, subscr
 
 ## CI & Testing
 
-- **293 tests** across 8 test targets
+- **329 tests** across 8 test targets
 - **GitHub Actions CI** on every PR: build, test, SwiftLint, swift-format
 - **Branch protection** on `master` — CI must pass before merging
 - **Pre-commit hooks** run lint + format checks locally
