@@ -24,11 +24,9 @@ public struct DiffView: View {
 
     public var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 0) {
-                // Summary header
+            LazyVStack(alignment: .leading, spacing: 0) {
                 diffSummary
 
-                // File list
                 ForEach(files) { file in
                     fileSection(file)
                 }
@@ -76,9 +74,8 @@ public struct DiffView: View {
                 .buttonStyle(.plain)
             }
 
-            // Diff content
             if isExpanded {
-                VStack(alignment: .leading, spacing: 0) {
+                LazyVStack(alignment: .leading, spacing: 0) {
                     ForEach(file.lines) { line in
                         diffLine(line)
                     }

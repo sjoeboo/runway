@@ -78,6 +78,20 @@ public enum FileTreeNode: Identifiable, Sendable {
     }
 }
 
+extension Array where Element == FileTreeNode {
+    /// Total number of leaf file nodes in the tree.
+    public var flatCount: Int {
+        reduce(0) { sum, node in
+            switch node {
+            case .directory(_, _, let children, _, _):
+                return sum + children.flatCount
+            case .file:
+                return sum + 1
+            }
+        }
+    }
+}
+
 // MARK: - Tree Builder
 
 /// Builds a tree of FileTreeNode from a flat list of FileChange.

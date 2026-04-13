@@ -20,6 +20,7 @@ public struct SessionDetailView: View {
     @Binding var changesVisible: Bool
     @Binding var changesMode: ChangesMode
     let changes: [FileChange]
+    let fileTree: [FileTreeNode]
     var viewingDiffFile: FileChange?
     var diffPatch: String?
     var onSelectDiffFile: ((FileChange) -> Void)?
@@ -44,6 +45,7 @@ public struct SessionDetailView: View {
         changesVisible: Binding<Bool>,
         changesMode: Binding<ChangesMode>,
         changes: [FileChange] = [],
+        fileTree: [FileTreeNode] = [],
         viewingDiffFile: FileChange? = nil,
         diffPatch: String? = nil,
         onSelectDiffFile: ((FileChange) -> Void)? = nil,
@@ -65,6 +67,7 @@ public struct SessionDetailView: View {
         self._changesVisible = changesVisible
         self._changesMode = changesMode
         self.changes = changes
+        self.fileTree = fileTree
         self.viewingDiffFile = viewingDiffFile
         self.diffPatch = diffPatch
         self.onSelectDiffFile = onSelectDiffFile
@@ -93,6 +96,7 @@ public struct SessionDetailView: View {
                     ResizableDivider(width: $sidebarWidth, minWidth: 200, maxWidth: 400, inverted: true)
                     ChangesSidebarView(
                         changes: changes,
+                        nodes: fileTree,
                         mode: $changesMode,
                         selectedPath: viewingDiffFile?.path,
                         onSelectFile: { file in onSelectDiffFile?(file) }

@@ -3,6 +3,9 @@ import SwiftUI
 import Theme
 
 /// Renders a tree of FileTreeNode with collapsible directories and file selection.
+///
+/// Uses a flattened representation with `LazyVStack` so SwiftUI only instantiates
+/// visible rows — critical when hundreds of files are changed.
 struct FileTreeView: View {
     let nodes: [FileTreeNode]
     let selectedPath: String?
@@ -10,15 +13,34 @@ struct FileTreeView: View {
     @Environment(\.theme) private var theme
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
+        LazyVStack(alignment: .leading, spacing: 0) {
             ForEach(nodes) { node in
-                nodeRow(node)
+                NodeRowView(
+                    node: node,
+                    depth: 0,
+                    selectedPath: selectedPath,
+                    onSelectFile: onSelectFile,
+                    defaultExpanded: nodes.flatCount <= 80
+                )
             }
         }
     }
+}
 
-    @ViewBuilder
-    private func nodeRow(_ node: FileTreeNode) -> some View {
+// MARK: - NodeRowView
+
+/// A single directory or file row that lazily renders its children.
+/// Each directory manages its own `@State isExpanded`, so collapsing
+/// a folder removes all descendant views from the hierarchy.
+private struct NodeRowView: View {
+    let node: FileTreeNode
+    let depth: Int
+    let selectedPath: String?
+    let onSelectFile: (FileChange) -> Void
+    let defaultExpanded: Bool
+    @Environment(\.theme) private var theme
+
+    var body: some View {
         switch node {
         case .directory(let name, _, let children, _, let dels):
             DirectoryRow(
@@ -26,8 +48,10 @@ struct FileTreeView: View {
                 children: children,
                 additions: node.additions,
                 deletions: dels,
+                depth: depth,
                 selectedPath: selectedPath,
-                onSelectFile: onSelectFile
+                onSelectFile: onSelectFile,
+                defaultExpanded: defaultExpanded
             )
         case .file(let fc):
             FileRow(
@@ -35,6 +59,7 @@ struct FileTreeView: View {
                 isSelected: fc.path == selectedPath,
                 onSelect: { onSelectFile(fc) }
             )
+            .padding(.leading, CGFloat(depth) * 16)
         }
     }
 }
@@ -46,57 +71,47 @@ private struct DirectoryRow: View {
     let children: [FileTreeNode]
     let additions: Int
     let deletions: Int
+    let depth: Int
     let selectedPath: String?
     let onSelectFile: (FileChange) -> Void
-    @State private var isExpanded = true
+    let defaultExpanded: Bool
+    @State private var isExpanded: Bool?
     @Environment(\.theme) private var theme
 
-    var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            Button(action: { isExpanded.toggle() }) {
-                HStack(spacing: 4) {
-                    Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
-                        .font(.system(size: 10))
-                        .foregroundColor(theme.chrome.textDim)
-                        .frame(width: 14)
-                    Image(systemName: "folder.fill")
-                        .font(.callout)
-                        .foregroundColor(theme.chrome.accent)
-                    Text(name)
-                        .font(.system(.body, design: .monospaced))
-                        .foregroundColor(theme.chrome.textDim)
-                        .lineLimit(1)
-                    Spacer()
-                }
-                .padding(.vertical, 3)
-                .padding(.horizontal, 8)
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
+    private var expanded: Bool { isExpanded ?? defaultExpanded }
 
-            if isExpanded {
-                ForEach(children) { child in
-                    Group {
-                        switch child {
-                        case .directory(let childName, _, let grandchildren, let adds, let dels):
-                            DirectoryRow(
-                                name: childName,
-                                children: grandchildren,
-                                additions: adds,
-                                deletions: dels,
-                                selectedPath: selectedPath,
-                                onSelectFile: onSelectFile
-                            )
-                        case .file(let fc):
-                            FileRow(
-                                change: fc,
-                                isSelected: fc.path == selectedPath,
-                                onSelect: { onSelectFile(fc) }
-                            )
-                        }
-                    }
-                    .padding(.leading, 16)
-                }
+    var body: some View {
+        Button(action: { isExpanded = !expanded }) {
+            HStack(spacing: 4) {
+                Image(systemName: expanded ? "chevron.down" : "chevron.right")
+                    .font(.system(size: 10))
+                    .foregroundColor(theme.chrome.textDim)
+                    .frame(width: 14)
+                Image(systemName: "folder.fill")
+                    .font(.callout)
+                    .foregroundColor(theme.chrome.accent)
+                Text(name)
+                    .font(.system(.body, design: .monospaced))
+                    .foregroundColor(theme.chrome.textDim)
+                    .lineLimit(1)
+                Spacer()
+            }
+            .padding(.vertical, 3)
+            .padding(.horizontal, 8)
+            .padding(.leading, CGFloat(depth) * 16)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+
+        if expanded {
+            ForEach(children) { child in
+                NodeRowView(
+                    node: child,
+                    depth: depth + 1,
+                    selectedPath: selectedPath,
+                    onSelectFile: onSelectFile,
+                    defaultExpanded: defaultExpanded
+                )
             }
         }
     }
