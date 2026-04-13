@@ -21,10 +21,12 @@ public struct SessionDetailView: View {
     @Binding var changesMode: ChangesMode
     let changes: [FileChange]
     let fileTree: [FileTreeNode]
-    var viewingDiffFile: FileChange?
-    var diffPatch: String?
+    var activeDiffPath: String?
     var onSelectDiffFile: ((FileChange) -> Void)?
-    var onDismissDiff: (() -> Void)?
+    var pendingDiffPath: String?
+    var pendingDiffPatch: String?
+    var diffOpenTrigger: Int = 0
+    var onActiveDiffPathChanged: ((String?) -> Void)?
     var onToggleChanges: (() -> Void)?
     @AppStorage("changesSidebarWidth") private var sidebarWidth: Double = 260
     @Environment(\.theme) private var theme
@@ -46,10 +48,12 @@ public struct SessionDetailView: View {
         changesMode: Binding<ChangesMode>,
         changes: [FileChange] = [],
         fileTree: [FileTreeNode] = [],
-        viewingDiffFile: FileChange? = nil,
-        diffPatch: String? = nil,
+        activeDiffPath: String? = nil,
         onSelectDiffFile: ((FileChange) -> Void)? = nil,
-        onDismissDiff: (() -> Void)? = nil,
+        pendingDiffPath: String? = nil,
+        pendingDiffPatch: String? = nil,
+        diffOpenTrigger: Int = 0,
+        onActiveDiffPathChanged: ((String?) -> Void)? = nil,
         onToggleChanges: (() -> Void)? = nil
     ) {
         self.session = session
@@ -68,10 +72,12 @@ public struct SessionDetailView: View {
         self._changesMode = changesMode
         self.changes = changes
         self.fileTree = fileTree
-        self.viewingDiffFile = viewingDiffFile
-        self.diffPatch = diffPatch
+        self.activeDiffPath = activeDiffPath
         self.onSelectDiffFile = onSelectDiffFile
-        self.onDismissDiff = onDismissDiff
+        self.pendingDiffPath = pendingDiffPath
+        self.pendingDiffPatch = pendingDiffPatch
+        self.diffOpenTrigger = diffOpenTrigger
+        self.onActiveDiffPathChanged = onActiveDiffPathChanged
         self.onToggleChanges = onToggleChanges
     }
 
@@ -98,7 +104,7 @@ public struct SessionDetailView: View {
                         changes: changes,
                         nodes: fileTree,
                         mode: $changesMode,
-                        selectedPath: viewingDiffFile?.path,
+                        selectedPath: activeDiffPath,
                         onSelectFile: { file in onSelectDiffFile?(file) }
                     )
                     .frame(width: CGFloat(sidebarWidth))
@@ -118,36 +124,18 @@ public struct SessionDetailView: View {
 
     @ViewBuilder
     private var mainContent: some View {
-        if let diffPatch, viewingDiffFile != nil {
-            VStack(spacing: 0) {
-                HStack {
-                    Button(action: { onDismissDiff?() }) {
-                        HStack(spacing: 4) {
-                            Image(systemName: "chevron.left")
-                            Text("Back to terminal")
-                        }
-                        .font(.caption)
-                    }
-                    .buttonStyle(.plain)
-                    Spacer()
-                }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 6)
-                .background(theme.chrome.surface.opacity(0.3))
-
-                DiffView(patch: diffPatch)
-                    .id(viewingDiffFile?.path ?? "diff")
-            }
-        } else {
-            TerminalTabView(
-                session: session,
-                tmuxManager: tmuxManager,
-                showSearch: $showTerminalSearch,
-                splitHorizontalTrigger: $splitHorizontalTrigger,
-                splitVerticalTrigger: $splitVerticalTrigger,
-                terminalRestartTrigger: $terminalRestartTrigger
-            )
-            .id("terminal-\(session.id)-\(terminalRestartTrigger)")
-        }
+        TerminalTabView(
+            session: session,
+            tmuxManager: tmuxManager,
+            showSearch: $showTerminalSearch,
+            splitHorizontalTrigger: $splitHorizontalTrigger,
+            splitVerticalTrigger: $splitVerticalTrigger,
+            terminalRestartTrigger: $terminalRestartTrigger,
+            pendingDiffPath: pendingDiffPath,
+            pendingDiffPatch: pendingDiffPatch,
+            diffOpenTrigger: diffOpenTrigger,
+            onActiveDiffPathChanged: onActiveDiffPathChanged
+        )
+        .id("terminal-\(session.id)-\(terminalRestartTrigger)")
     }
 }

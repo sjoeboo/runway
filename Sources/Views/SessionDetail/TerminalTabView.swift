@@ -5,18 +5,37 @@ import Terminal
 import TerminalView
 import Theme
 
-/// A tab model for terminal instances within a session.
+/// A tab model for terminal or diff instances within a session.
 struct TerminalTab: Identifiable {
     let id: String
     let title: String
-    let config: TerminalConfig
     let isMain: Bool
+
+    enum Content {
+        case terminal(TerminalConfig)
+        case diff(filePath: String, patch: String)
+    }
+
+    let content: Content
+
+    /// The terminal config, if this is a terminal tab.
+    var config: TerminalConfig? {
+        if case .terminal(let config) = content { return config }
+        return nil
+    }
 
     init(id: String, title: String, config: TerminalConfig, isMain: Bool = false) {
         self.id = id
         self.title = title
-        self.config = config
         self.isMain = isMain
+        self.content = .terminal(config)
+    }
+
+    init(id: String, title: String, filePath: String, patch: String) {
+        self.id = id
+        self.title = title
+        self.isMain = false
+        self.content = .diff(filePath: filePath, patch: patch)
     }
 }
 
@@ -28,6 +47,10 @@ public struct TerminalTabView: View {
     @Binding var splitHorizontalTrigger: Int
     @Binding var splitVerticalTrigger: Int
     @Binding var terminalRestartTrigger: Int
+    let pendingDiffPath: String?
+    let pendingDiffPatch: String?
+    let diffOpenTrigger: Int
+    var onActiveDiffPathChanged: ((String?) -> Void)?
     @State private var tabs: [TerminalTab] = []
     @State private var selectedTabID: String?
     @State private var shellCounter: Int = 0
@@ -41,7 +64,11 @@ public struct TerminalTabView: View {
         showSearch: Binding<Bool>,
         splitHorizontalTrigger: Binding<Int> = .constant(0),
         splitVerticalTrigger: Binding<Int> = .constant(0),
-        terminalRestartTrigger: Binding<Int> = .constant(0)
+        terminalRestartTrigger: Binding<Int> = .constant(0),
+        pendingDiffPath: String? = nil,
+        pendingDiffPatch: String? = nil,
+        diffOpenTrigger: Int = 0,
+        onActiveDiffPathChanged: ((String?) -> Void)? = nil
     ) {
         self.session = session
         self.tmuxManager = tmuxManager
@@ -49,6 +76,10 @@ public struct TerminalTabView: View {
         self._splitHorizontalTrigger = splitHorizontalTrigger
         self._splitVerticalTrigger = splitVerticalTrigger
         self._terminalRestartTrigger = terminalRestartTrigger
+        self.pendingDiffPath = pendingDiffPath
+        self.pendingDiffPatch = pendingDiffPatch
+        self.diffOpenTrigger = diffOpenTrigger
+        self.onActiveDiffPathChanged = onActiveDiffPathChanged
     }
 
     public var body: some View {
@@ -74,38 +105,43 @@ public struct TerminalTabView: View {
                     .font(.caption)
                 Spacer()
             } else if let tab = selectedTab {
-                ZStack(alignment: .topTrailing) {
-                    TerminalPane(
-                        config: tab.config,
-                        sessionID: session.id,
-                        tabID: tab.id
-                    )
-                    .id("\(session.id)_\(tab.id)")
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                switch tab.content {
+                case .terminal(let config):
+                    ZStack(alignment: .topTrailing) {
+                        TerminalPane(
+                            config: config,
+                            sessionID: session.id,
+                            tabID: tab.id
+                        )
+                        .id("\(session.id)_\(tab.id)")
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
 
-                    TerminalSearchBar(
-                        isVisible: $showSearch,
-                        onFindNext: { term in
-                            guard !term.isEmpty else { return false }
-                            return TerminalSessionCache.shared.existing(sessionID: session.id, tabID: tab.id)?
-                                .findNext(term) ?? false
-                        },
-                        onFindPrevious: { term in
-                            guard !term.isEmpty else { return false }
-                            return TerminalSessionCache.shared.existing(sessionID: session.id, tabID: tab.id)?
-                                .findPrevious(term) ?? false
-                        },
-                        onCountMatches: { term in
-                            guard !term.isEmpty,
-                                let terminal = TerminalSessionCache.shared.existing(sessionID: session.id, tabID: tab.id)
-                            else { return nil }
-                            return countMatches(term, in: terminal)
-                        },
-                        onDismiss: {
-                            TerminalSessionCache.shared.existing(sessionID: session.id, tabID: tab.id)?
-                                .clearSearch()
-                        }
-                    )
+                        TerminalSearchBar(
+                            isVisible: $showSearch,
+                            onFindNext: { term in
+                                guard !term.isEmpty else { return false }
+                                return TerminalSessionCache.shared.existing(sessionID: session.id, tabID: tab.id)?
+                                    .findNext(term) ?? false
+                            },
+                            onFindPrevious: { term in
+                                guard !term.isEmpty else { return false }
+                                return TerminalSessionCache.shared.existing(sessionID: session.id, tabID: tab.id)?
+                                    .findPrevious(term) ?? false
+                            },
+                            onCountMatches: { term in
+                                guard !term.isEmpty,
+                                    let terminal = TerminalSessionCache.shared.existing(sessionID: session.id, tabID: tab.id)
+                                else { return nil }
+                                return countMatches(term, in: terminal)
+                            },
+                            onDismiss: {
+                                TerminalSessionCache.shared.existing(sessionID: session.id, tabID: tab.id)?
+                                    .clearSearch()
+                            }
+                        )
+                    }
+                case .diff(_, let patch):
+                    DiffView(patch: patch)
                 }
             }
         }
@@ -139,6 +175,13 @@ public struct TerminalTabView: View {
                 initializeTabs()
             }
         }
+        .onChange(of: diffOpenTrigger) { _, _ in
+            guard let path = pendingDiffPath, let patch = pendingDiffPatch else { return }
+            openOrFocusDiffTab(path: path, patch: patch)
+        }
+        .onChange(of: selectedTabID) { _, _ in
+            notifyActiveDiffPath()
+        }
     }
 
     // MARK: - Tab Bar
@@ -162,8 +205,8 @@ public struct TerminalTabView: View {
 
             Spacer()
 
-            // Split pane buttons
-            if selectedTab != nil {
+            // Split pane buttons (terminal tabs only)
+            if let tab = selectedTab, case .terminal = tab.content {
                 HStack(spacing: 2) {
                     Button(action: splitDown) {
                         Image(systemName: "rectangle.split.1x2")
@@ -200,12 +243,15 @@ public struct TerminalTabView: View {
             if tab.isMain {
                 Image(systemName: "terminal")
                     .font(.caption2)
+            } else if case .diff = tab.content {
+                Image(systemName: "doc.text")
+                    .font(.caption2)
             }
             Text(tab.title)
                 .font(.caption)
                 .lineLimit(1)
 
-            if !tab.isMain && tabs.count > 1 {
+            if !tab.isMain {
                 Button(action: { closeTab(tab.id) }) {
                     Image(systemName: "xmark")
                         .font(.caption2.weight(.bold))
@@ -358,7 +404,8 @@ public struct TerminalTabView: View {
 
     /// Split the current pane top/bottom (creates a horizontal divider).
     private func splitDown() {
-        guard let tab = selectedTab, let tmuxName = tab.config.tmuxSessionName else { return }
+        guard let tab = selectedTab, let config = tab.config, let tmuxName = config.tmuxSessionName
+        else { return }
         Task {
             try? await tmuxManager.splitWindow(
                 sessionName: tmuxName, direction: .horizontal, workDir: session.path
@@ -368,7 +415,8 @@ public struct TerminalTabView: View {
 
     /// Split the current pane left/right (creates a vertical divider).
     private func splitRight() {
-        guard let tab = selectedTab, let tmuxName = tab.config.tmuxSessionName else { return }
+        guard let tab = selectedTab, let config = tab.config, let tmuxName = config.tmuxSessionName
+        else { return }
         Task {
             try? await tmuxManager.splitWindow(
                 sessionName: tmuxName, direction: .vertical, workDir: session.path
@@ -377,9 +425,9 @@ public struct TerminalTabView: View {
     }
 
     private func closeTab(_ id: String) {
-        // Kill tmux session for this tab
+        // Kill tmux session for terminal tabs
         if let tab = tabs.first(where: { $0.id == id }),
-            let tmuxName = tab.config.tmuxSessionName
+            let tmuxName = tab.config?.tmuxSessionName
         {
             Task {
                 let manager = tmuxManager
@@ -391,6 +439,38 @@ public struct TerminalTabView: View {
         if selectedTabID == id {
             selectedTabID = tabs.first?.id
         }
+    }
+
+    // MARK: - Diff Tab Management
+
+    private func openOrFocusDiffTab(path: String, patch: String) {
+        let tabID = "diff-\(path)"
+        let title = Self.filename(from: path)
+
+        if let index = tabs.firstIndex(where: { $0.id == tabID }) {
+            // Update existing tab's patch (file may have changed) and select it
+            tabs[index] = TerminalTab(id: tabID, title: title, filePath: path, patch: patch)
+            selectedTabID = tabID
+        } else {
+            let tab = TerminalTab(id: tabID, title: title, filePath: path, patch: patch)
+            tabs.append(tab)
+            selectedTabID = tabID
+        }
+    }
+
+    private func notifyActiveDiffPath() {
+        if let tab = selectedTab, case .diff(let path, _) = tab.content {
+            onActiveDiffPathChanged?(path)
+        } else {
+            onActiveDiffPathChanged?(nil)
+        }
+    }
+
+    private static func filename(from path: String) -> String {
+        if let lastSlash = path.lastIndex(of: "/") {
+            return String(path[path.index(after: lastSlash)...])
+        }
+        return path
     }
 
     /// Count occurrences of a search term in the terminal buffer text.
