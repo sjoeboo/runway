@@ -5,6 +5,14 @@ All notable changes to Runway are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.7.2] — 2026-04-13
+
+### Fixed
+
+- **Diff sidebar freeze with many changed files** — resolved a UI freeze when viewing PRs with a large number of changed files ([#298](https://github.com/sjoeboo/runway/pull/298))
+
+[0.7.2]: https://github.com/sjoeboo/runway/compare/v0.7.1...v0.7.2
+
 ## [0.7.1] — 2026-04-10
 
 ### Added
