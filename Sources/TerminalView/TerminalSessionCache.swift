@@ -17,14 +17,21 @@ public final class TerminalSessionCache {
     /// re-attaching later simply creates a new SwiftTerm view.
     /// Sized generously because re-attach causes a visible "replay" as tmux
     /// dumps the pane buffer through the new PTY.
-    public let maxSize: Int = 30
+    public let maxSize: Int
 
     private var views: [String: LocalProcessTerminalView] = [:]
 
     /// Tracks the last-access time for each cache key.
     private var lastAccess: [String: Date] = [:]
 
-    private init() {}
+    private init() {
+        self.maxSize = 30
+    }
+
+    /// Internal initializer for testing with a custom cache size.
+    init(maxSize: Int) {
+        self.maxSize = maxSize
+    }
 
     /// Get or create a terminal view for the given session ID.
     /// If a view already exists, it's returned as-is (preserving the running PTY).

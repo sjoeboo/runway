@@ -87,14 +87,15 @@
 - ProjectPageView (tab bar)
 - SessionHeaderView (cost badge, tool badge, PR number)
 
-#### Remaining Tests (5 from QA2's top 10)
+#### Remaining Tests (5 from QA2's top 10) — DONE
 Tests already added: migration safety, cost tracking, housekeeping, saved prompts, branch sanitization, worktree with slashes, HookEvent cost fields, Session Equatable.
-**Still needed:**
-1. `RunwayStore.deleteSession(deleteWorktree: true)` — most destructive user operation
-2. `TerminalSessionCache` LRU eviction — validate process cleanup
-3. `ShellRunner.run()` timeout behavior — verify SIGTERM on timeout
-4. `RunwayStore.cleanOrphanedWorktrees()` — protect unmerged branches
-5. HookServer → StatusDetector end-to-end — event wiring
+**Added (17 tests across 4 files):**
+1. [x] `deleteSession(deleteWorktree: true)` — removeWorktree protects unmerged branches via `-d`, deletes merged
+2. [x] `TerminalSessionCache` LRU eviction — eviction order, refresh on access, removal, get-or-create identity
+3. [x] `ShellRunner.run()` timeout — SIGTERM on timeout, success within timeout, non-zero exit handling
+4. [x] `cleanOrphanedWorktrees()` — full list→identify→merge-check→remove flow, owned preserved, unmerged preserved
+5. [x] HookServer → handler e2e — full JSON decode with header override + cost fields, without header
+**Bug fixed:** `isBranchMerged` didn't strip `+ ` prefix from `git branch --merged` output (worktree checkout marker)
 
 ### Medium Priority
 
@@ -136,7 +137,7 @@ Backend exists (`commitLog`, `resetToCommit` on WorktreeManager). Needs:
 |--------|--------|-------------------|---------------|
 | Critical bugs | 4 | **0** | 0 |
 | Major bugs | ~20 | **~2** | 0 |
-| Test count | 292 | **312** | 340+ |
+| Test count | 292 | **329** | 340+ |
 | DB migrations | 14 | **17** | 17+ |
 | Features added | — | **8 new** | — |
 | RunwayStore LOC | 1708 | ~1850 | ~1200 (after P1) |

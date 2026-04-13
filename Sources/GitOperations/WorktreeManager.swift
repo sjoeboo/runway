@@ -149,7 +149,13 @@ public actor WorktreeManager {
         let output = try await runGit(in: repoPath, args: ["branch", "--merged", target])
         return output.components(separatedBy: "\n")
             .map { $0.trimmingCharacters(in: .whitespaces) }
-            .map { $0.hasPrefix("* ") ? String($0.dropFirst(2)) : $0 }
+            .map { line -> String in
+                // Strip prefix markers: "* " = current branch, "+ " = checked out in another worktree
+                if line.hasPrefix("* ") || line.hasPrefix("+ ") {
+                    return String(line.dropFirst(2))
+                }
+                return line
+            }
             .filter { !$0.isEmpty }
             .contains(branch)
     }

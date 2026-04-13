@@ -141,12 +141,12 @@ let package = Package(
         ),
         .testTarget(
             name: "StatusDetectionTests",
-            dependencies: ["StatusDetection"],
+            dependencies: ["StatusDetection", "Models"],
             path: "Tests/StatusDetectionTests"
         ),
         .testTarget(
             name: "GitOperationsTests",
-            dependencies: ["GitOperations"],
+            dependencies: ["GitOperations", "Models"],
             path: "Tests/GitOperationsTests"
         ),
         .testTarget(
@@ -163,6 +163,11 @@ let package = Package(
             name: "TerminalTests",
             dependencies: ["Terminal"],
             path: "Tests/TerminalTests"
+        ),
+        .testTarget(
+            name: "TerminalViewTests",
+            dependencies: ["TerminalView"],
+            path: "Tests/TerminalViewTests"
         ),
         .testTarget(
             name: "ViewsTests",
