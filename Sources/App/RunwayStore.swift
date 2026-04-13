@@ -43,6 +43,8 @@ public final class RunwayStore {
 
     /// Session IDs with in-progress worktree creation (transient, not persisted)
     var provisioningWorktreeIDs: Set<String> = []
+    /// Tracks provisioning Tasks so they can be cancelled if the session is deleted mid-provision.
+    private var provisioningTasks: [String: Task<Void, Never>] = [:]
 
     func profileForSession(_ session: Session) -> AgentProfile {
         if case .custom(let name) = session.tool,
@@ -351,11 +353,14 @@ public final class RunwayStore {
 
         let prompt = "Implement the changes described in issue #\(issue.number): \(issue.title)"
 
+        // Use the project's most recent session tool, defaulting to .claude
+        let projectTool = sessions.last(where: { $0.projectID == projectID })?.tool ?? .claude
+
         let request = NewSessionRequest(
             title: issue.title,
             projectID: projectID,
             path: project.path,
-            tool: .claude,
+            tool: projectTool,
             useWorktree: true,
             branchName: branchName,
             permissionMode: project.permissionMode ?? .default,
@@ -413,7 +418,9 @@ public final class RunwayStore {
 
             provisioningWorktreeIDs.insert(session.id)
 
-            Task {
+            let sessionID = session.id
+            provisioningTasks[sessionID] = Task {
+                defer { provisioningTasks.removeValue(forKey: sessionID) }
                 let sessionPath: String
                 let actualBranch: String
                 do {
@@ -604,6 +611,8 @@ public final class RunwayStore {
         try? database?.deleteSession(id: id)
         TerminalSessionCache.shared.removeAll(forSessionID: id)
         prCoordinator.sessionDeleted(id: id)
+        provisioningTasks[id]?.cancel()
+        provisioningTasks.removeValue(forKey: id)
         lastHookEventTime.removeValue(forKey: id)
         sessionChanges.removeValue(forKey: id)
         sessionFileTree.removeValue(forKey: id)
@@ -1237,7 +1246,9 @@ public final class RunwayStore {
         // Provision worktree in background, then start tmux
         provisioningWorktreeIDs.insert(session.id)
 
-        Task {
+        let reviewSessionID = session.id
+        provisioningTasks[reviewSessionID] = Task {
+            defer { provisioningTasks.removeValue(forKey: reviewSessionID) }
             let sessionPath: String
             do {
                 sessionPath = try await worktreeManager.checkoutWorktree(

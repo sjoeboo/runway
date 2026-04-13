@@ -16,6 +16,8 @@ public actor HookServer {
     private var listener: NWListener?
     private var handlers: [EventHandler] = []
     private let connectionQueue = DispatchQueue(label: "runway.hookserver.conn")
+    /// Active connections tracked for cancellation on stop().
+    private var activeConnections: [NWConnection] = []
 
     /// The actual port the server is listening on (available after `start()` returns).
     public private(set) var actualPort: UInt16?
@@ -100,8 +102,12 @@ public actor HookServer {
         }
     }
 
-    /// Stop the hook server.
+    /// Stop the hook server and cancel all in-flight connections.
     public func stop() {
+        for connection in activeConnections {
+            connection.cancel()
+        }
+        activeConnections.removeAll()
         listener?.cancel()
         listener = nil
         actualPort = nil
@@ -113,6 +119,7 @@ public actor HookServer {
     private static let connectionTimeout: TimeInterval = 30
 
     private func handleConnection(_ connection: NWConnection) {
+        activeConnections.append(connection)
         connection.start(queue: connectionQueue)
 
         // Schedule a timeout to prevent slow/idle connections from leaking resources
@@ -181,6 +188,9 @@ public actor HookServer {
     }
 
     private func processRequest(data: Data, connection: NWConnection) {
+        // Remove from active connections list
+        activeConnections.removeAll { $0 === connection }
+
         // Send 200 OK response immediately — don't block the agent waiting for
         // handler dispatch, which may await MainActor and exceed the hook timeout.
         let response = "HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n"

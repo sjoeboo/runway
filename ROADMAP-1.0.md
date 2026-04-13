@@ -109,20 +109,20 @@ NewSessionDialog, NewProjectDialog, ReviewPRSheet (2), ProjectSettingsSheet.
 Replaced 4 independent booleans (`showNewSessionDialog`, `showNewProjectDialog`, `showReviewPRSheet`,
 `showReviewPRDialog`) with single `ActiveSheet` enum + `.sheet(item:)` modifier.
 
-### Low Priority
+### Low Priority — DONE
 
-| Item | File | Notes |
-|------|------|-------|
-| DatabaseQueue → DatabasePool | Database.swift | Concurrent reads during writes |
-| Consolidate 3 Color(hex:) initializers | Theme module | Dedup |
-| startSessionFromIssue hardcoded .claude | RunwayStore.swift | Use project default tool when available |
-| P4: async let actor serialization | PRManager.swift | Needs nonisolated helper methods |
-| P2: Reduce enrichPath timeout to 1s | ShellRunner.swift | Minor launch time improvement |
-| [weak self] on bufferDetectionTask | RunwayStore.swift | Consistency (already has jitter) |
-| PullRequest + CheckSummary Equatable | Models | Optimize SwiftUI diffing |
-| Remove precondition(inMemory) from Database test init | Database.swift | Replace with throwing |
-| HookServer stop() cancel in-flight connections | HookServer.swift | Track + cancel active connections |
-| Orphaned Task tracking | RunwayStore.swift | Store provisioning Tasks, cancel on delete |
+| Item | File | Status |
+|------|------|--------|
+| DatabaseQueue → DatabasePool | Database.swift | ✅ Pool for prod, Queue for tests, via `any DatabaseWriter` |
+| Consolidate 3 Color(hex:) initializers | Theme module | ✅ Failable `init?(hex:)` moved to Theme, removed from NewIssueSheet |
+| startSessionFromIssue hardcoded .claude | RunwayStore.swift | ✅ Uses project's most recent session tool |
+| P4: async let actor serialization | PRManager.swift | ✅ Nonisolated static helper for parallel fetch |
+| P2: Reduce enrichPath timeout to 1s | ShellRunner.swift | ✅ 3s → 1s |
+| [weak self] on bufferDetectionTask | RunwayStore.swift | ✅ Already present |
+| PullRequest + CheckSummary Equatable | Models | ✅ Auto-synthesized conformance |
+| Remove precondition(inMemory) from Database test init | Database.swift | ✅ Removed (param kept, no default) |
+| HookServer stop() cancel in-flight connections | HookServer.swift | ✅ Tracks + cancels active connections |
+| Orphaned Task tracking | RunwayStore.swift | ✅ provisioningTasks dict, cancelled on delete |
 
 ---
 
@@ -131,7 +131,7 @@ Replaced 4 independent booleans (`showNewSessionDialog`, `showNewProjectDialog`,
 | Metric | v0.8.0 | Current (v0.9.0) | Target v1.0.0 |
 |--------|--------|-------------------|---------------|
 | Critical bugs | 4 | **0** | 0 |
-| Major bugs | ~20 | **~2** | 0 |
+| Major bugs | ~20 | **0** | 0 |
 | Test count | 292 | **329** | 340+ |
 | DB migrations | 14 | **17** | 17+ |
 | Features added | — | **8 new** | — |
