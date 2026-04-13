@@ -33,7 +33,7 @@ struct ChangesSidebarView: View {
 
             Spacer()
 
-            Picker("", selection: $mode) {
+            Picker("Changes compared to", selection: $mode) {
                 Text("vs Main").tag(ChangesMode.branch)
                 Text("Uncommitted").tag(ChangesMode.working)
             }

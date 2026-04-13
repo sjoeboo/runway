@@ -318,6 +318,10 @@ public struct PRDashboardView: View {
                     .help(
                         showSessionPRsOnly ? "Showing session PRs only" : "Show only session PRs"
                     )
+                    .accessibilityLabel(
+                        showSessionPRsOnly
+                            ? "Showing session PRs only" : "Show only session PRs"
+                    )
                     .padding(.trailing, 4)
 
                     Button {
@@ -328,6 +332,7 @@ public struct PRDashboardView: View {
                     }
                     .buttonStyle(IconButtonStyle())
                     .help(hideDrafts ? "Show drafts" : "Hide drafts")
+                    .accessibilityLabel(hideDrafts ? "Show drafts" : "Hide drafts")
                     .padding(.trailing, 4)
 
                     Button(action: onRefresh) {
@@ -335,6 +340,7 @@ public struct PRDashboardView: View {
                             .font(.callout)
                     }
                     .buttonStyle(IconButtonStyle())
+                    .accessibilityLabel("Refresh pull requests")
                     .padding(.trailing, 8)
                 }
                 .padding(.horizontal)

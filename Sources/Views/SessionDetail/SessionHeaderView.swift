@@ -97,6 +97,7 @@ public struct SessionHeaderView: View {
                                 .foregroundStyle(theme.chrome.accent)
                         }
                         .buttonStyle(.plain)
+                        .accessibilityLabel("View parent session: \(parent.title)")
                     }
                 }
 
@@ -140,6 +141,7 @@ public struct SessionHeaderView: View {
                                 }
                                 .buttonStyle(LinkButtonStyle())
                                 .help(onSelectPR != nil ? "View PR details" : "Open PR in browser")
+                                .accessibilityLabel("Pull request #\(pr.number)")
 
                                 // Check summary
                                 CheckSummaryBadge(checks: pr.checks, style: .inline)
@@ -162,6 +164,9 @@ public struct SessionHeaderView: View {
                                         .padding(.vertical, 2)
                                         .background(theme.chrome.accent.opacity(0.12))
                                         .clipShape(Capsule())
+                                        .accessibilityLabel(
+                                            "\(inlineCount) inline comment\(inlineCount == 1 ? "" : "s")"
+                                        )
                                     }
                                 }
 

@@ -72,6 +72,10 @@ public struct DiffView: View {
                     }
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel(
+                    isExpanded
+                        ? "Collapse \(file.path)" : "Expand \(file.path)"
+                )
             }
 
             if isExpanded {

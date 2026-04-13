@@ -87,6 +87,7 @@ struct PRFilterBar: View {
                     .font(.caption)
                     .foregroundColor(theme.chrome.accent)
                     .buttonStyle(.plain)
+                    .accessibilityLabel("Clear all filters")
             }
 
             Spacer()

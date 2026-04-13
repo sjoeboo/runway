@@ -66,21 +66,18 @@
 All PR state, polling, enrichment, actions, and detail caching moved to separate @Observable class.
 RunwayStore holds `let prCoordinator: PRCoordinator` with weak back-reference for cross-cutting concerns.
 
-#### U1: VoiceOver Accessibility Pass
+#### U1: VoiceOver Accessibility Pass — DONE
 **Impact:** Required for 1.0 — app is essentially unusable with VoiceOver.
 **Scope:** ~25 view files need `.accessibilityLabel()` added.
 **Already done:** SendTextBar, sidebar search/clear/action buttons, PRDetailDrawer close, IssueDetailDrawer close, PRBadges (already had labels), ResizableDivider (already had labels).
-**Still needs labels:**
-- DiffView (file headers, line numbers)
-- ChangesSidebarView (file entries)
-- FileTreeView (file status)
-- PRDashboardView (table cells, action buttons)
-- PRFilterBar (filter toggles)
-- NewSessionDialog (form fields)
-- NewProjectDialog (form fields)
-- NewIssueSheet, EditIssueSheet, ManageLabelsSheet, ManageAssigneesSheet
-- ProjectPageView (tab bar)
-- SessionHeaderView (cost badge, tool badge, PR number)
+**Added (14 labels across 8 files):**
+- [x] DiffView — file expand/collapse toggle button
+- [x] ChangesSidebarView — comparison mode picker label
+- [x] FileTreeView — directory expand/collapse, file row with status and diff stats
+- [x] PRDashboardView — session PRs toggle, hide drafts toggle, refresh button
+- [x] PRFilterBar — clear all filters button
+- [x] ProjectPageView — settings gear button
+- [x] SessionHeaderView — parent session link, PR number button, inline comments badge
 
 #### Remaining Tests (5 from QA2's top 10) — DONE
 Tests already added: migration safety, cost tracking, housekeeping, saved prompts, branch sanitization, worktree with slashes, HookEvent cost fields, Session Equatable.

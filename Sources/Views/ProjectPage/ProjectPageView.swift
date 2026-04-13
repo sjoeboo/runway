@@ -173,6 +173,7 @@ public struct ProjectPageView: View {
                 }
                 .buttonStyle(IconButtonStyle())
                 .help("Project Settings")
+                .accessibilityLabel("Project settings")
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 12)
