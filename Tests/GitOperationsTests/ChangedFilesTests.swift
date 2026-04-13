@@ -50,7 +50,7 @@ import Testing
     #expect(changes.isEmpty)
 }
 
-@Test func parseChangedFilesRenamedFile() {
+@Test func parseChangedFilesRenamedFile() throws {
     // R100 status + "old => new" in numstat
     let numstat = """
         3\t1\tSources/{Old => New}/File.swift
@@ -61,12 +61,12 @@ import Testing
 
     let changes = parseChangedFiles(numstat: numstat, nameStatus: nameStatus)
     #expect(changes.count == 1)
-    let change = try? #require(changes.first)
-    #expect(change?.status == .renamed)
+    let change = try #require(changes.first)
+    #expect(change.status == .renamed)
     // The path should be the new path from name-status
-    #expect(change?.path == "Sources/New/File.swift")
-    #expect(change?.additions == 3)
-    #expect(change?.deletions == 1)
+    #expect(change.path == "Sources/New/File.swift")
+    #expect(change.additions == 3)
+    #expect(change.deletions == 1)
 }
 
 // MARK: - Integration Tests (temp git repo)

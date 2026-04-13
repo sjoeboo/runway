@@ -180,7 +180,7 @@ public struct PRDetailDrawer: View {
                     autoMergeButton
                 }
 
-                if let onClosePR, pr.state == .open || pr.state == .draft {
+                if onClosePR != nil, pr.state == .open || pr.state == .draft {
                     Button {
                         showCloseConfirm = true
                     } label: {

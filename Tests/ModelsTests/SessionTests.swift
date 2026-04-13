@@ -172,7 +172,7 @@ import Testing
 }
 
 @Test func sessionEquatableExcludesTransientFields() {
-    var s1 = Session(title: "test", path: "/tmp")
+    let s1 = Session(title: "test", path: "/tmp")
     var s2 = s1
     s2.lastActivityText = "different"
     s2.lastError = "some error"

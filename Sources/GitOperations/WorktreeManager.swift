@@ -120,7 +120,7 @@ public actor WorktreeManager {
                 return worktreePath
             } catch {
                 // gh pr checkout failed — clean up the detached worktree
-                try? await runGit(in: repoPath, args: ["worktree", "remove", worktreePath, "--force"])
+                _ = try? await runGit(in: repoPath, args: ["worktree", "remove", worktreePath, "--force"])
                 throw error
             }
         }

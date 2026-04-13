@@ -161,7 +161,6 @@ private func withTempGitRepo(_ body: (String) async throws -> Void) async throws
 @Test func checkoutExistingBranch() async throws {
     try await withTempGitRepo { repoPath in
         let manager = WorktreeManager()
-        let currentBranch = await manager.currentBranch(path: repoPath) ?? "main"
 
         // Create a branch to simulate an existing remote branch
         let process = Process()
