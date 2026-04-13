@@ -97,6 +97,8 @@ public final class RunwayStore {
     var sessionFileTree: [String: [FileTreeNode]] = [:]
     var viewingDiffFile: FileChange? = nil
     var viewingDiffPatch: String? = nil
+    var diffOpenTrigger: Int = 0
+    var activeDiffPath: String? = nil
     private var changesRefreshTask: Task<Void, Never>?
 
     private func rebuildFileTree() {
@@ -1633,13 +1635,9 @@ extension RunwayStore: SidebarActions {
     func toggleChangesSidebar() {
         changesVisible.toggle()
         if changesVisible {
-            viewingDiffFile = nil
-            viewingDiffPatch = nil
             startChangesRefresh()
         } else {
             stopChangesRefresh()
-            viewingDiffFile = nil
-            viewingDiffPatch = nil
         }
     }
 
@@ -1655,6 +1653,7 @@ extension RunwayStore: SidebarActions {
                 mode: changesMode
             )
             viewingDiffPatch = patch
+            diffOpenTrigger += 1
         }
     }
 

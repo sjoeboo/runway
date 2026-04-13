@@ -358,6 +358,7 @@ struct ContentView: View {
                 }
                 store.viewingDiffFile = nil
                 store.viewingDiffPatch = nil
+                store.activeDiffPath = nil
                 if store.changesVisible {
                     store.fetchChangesForCurrentSession()
                 }
@@ -464,10 +465,12 @@ struct ContentView: View {
                     ),
                     changes: store.sessionChanges[sessionID] ?? [],
                     fileTree: store.sessionFileTree[sessionID] ?? [],
-                    viewingDiffFile: store.viewingDiffFile,
-                    diffPatch: store.viewingDiffPatch,
+                    activeDiffPath: store.activeDiffPath,
                     onSelectDiffFile: { file in store.selectDiffFile(file) },
-                    onDismissDiff: { store.dismissDiffView() },
+                    pendingDiffPath: store.viewingDiffFile?.path,
+                    pendingDiffPatch: store.viewingDiffPatch,
+                    diffOpenTrigger: store.diffOpenTrigger,
+                    onActiveDiffPathChanged: { path in store.activeDiffPath = path },
                     onToggleChanges: { store.toggleChangesSidebar() }
                 )
             } else {
