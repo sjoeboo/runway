@@ -91,14 +91,15 @@ Tests already added: migration safety, cost tracking, housekeeping, saved prompt
 
 ### Medium Priority
 
-#### F6 UI: Git Rollback View
-Backend exists (`commitLog`, `resetToCommit` on WorktreeManager). Needs:
-- `CommitHistoryView.swift` showing commit list for the session's worktree branch
-- Rollback button with confirmation dialog
-- Integration into session detail (button or tab)
+#### F6 UI: Git Rollback View — DONE
+`CommitHistoryView.swift` shows commits since branch divergence with rollback capability.
+Integrated into SessionHeaderView as a popover from a clock icon next to the branch name.
+Rollback button with confirmation dialog, HEAD badge on latest commit.
 
-#### U9: Unified Tab Bar Component
-4 different tab bar patterns exist (dashboard, project page, PR detail, issue detail). Extract shared `TabBarView`.
+#### U9: Unified Tab Bar Component — DONE
+Extracted shared `TabBarButton` (title + count badge + underline indicator + selected trait).
+Replaces private TabButton in ProjectPageView and tabButton method in PRDashboardView.
+TerminalTabView's browser-style closeable tabs left as-is (fundamentally different pattern).
 
 #### U10: Adaptive Sheet Widths — DONE
 Replaced hardcoded `frame(width:)` with `minWidth`/`idealWidth`/`maxWidth` on 5 sheets:

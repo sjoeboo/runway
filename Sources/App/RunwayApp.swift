@@ -466,6 +466,11 @@ struct ContentView: View {
                     onActiveDiffPathChanged: { path in store.activeDiffPath = path },
                     onToggleChanges: { store.toggleChangesSidebar() },
                     onRestart: { Task { await store.restartSession(id: sessionID) } },
+                    worktreeManager: session.worktreeBranch != nil ? store.worktreeManager : nil,
+                    defaultBranch: store.projects.first(where: { $0.id == session.projectID })?.defaultBranch ?? "main",
+                    onRollback: { hash in
+                        Task { try? await store.worktreeManager.resetToCommit(path: session.path, hash: hash) }
+                    },
                     savedPrompts: store.savedPrompts
                 )
             } else {

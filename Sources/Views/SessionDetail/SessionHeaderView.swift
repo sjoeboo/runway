@@ -1,3 +1,4 @@
+import GitOperations
 import Models
 import SwiftUI
 import Theme
@@ -12,6 +13,10 @@ public struct SessionHeaderView: View {
     var onSelectSession: ((String) -> Void)? = nil
     var changesVisible: Bool = false
     var onToggleChanges: (() -> Void)? = nil
+    var worktreeManager: WorktreeManager?
+    var defaultBranch: String = "main"
+    var onRollback: ((String) -> Void)?
+    @State private var showCommitHistory = false
     @Environment(\.theme) private var theme
 
     public init(
@@ -22,7 +27,10 @@ public struct SessionHeaderView: View {
         onSelectPR: ((PullRequest) -> Void)? = nil,
         onSelectSession: ((String) -> Void)? = nil,
         changesVisible: Bool = false,
-        onToggleChanges: (() -> Void)? = nil
+        onToggleChanges: (() -> Void)? = nil,
+        worktreeManager: WorktreeManager? = nil,
+        defaultBranch: String = "main",
+        onRollback: ((String) -> Void)? = nil
     ) {
         self.session = session
         self.linkedPR = linkedPR
@@ -32,6 +40,9 @@ public struct SessionHeaderView: View {
         self.onSelectSession = onSelectSession
         self.changesVisible = changesVisible
         self.onToggleChanges = onToggleChanges
+        self.worktreeManager = worktreeManager
+        self.defaultBranch = defaultBranch
+        self.onRollback = onRollback
     }
 
     public var body: some View {
@@ -119,6 +130,27 @@ public struct SessionHeaderView: View {
                                 Text(pr.baseBranch)
                                     .font(.system(.callout, design: .monospaced))
                                     .foregroundStyle(.secondary)
+                            }
+
+                            if let worktreeManager {
+                                Button {
+                                    showCommitHistory.toggle()
+                                } label: {
+                                    Image(systemName: "clock.arrow.circlepath")
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                }
+                                .buttonStyle(.plain)
+                                .help("Commit history")
+                                .accessibilityLabel("Show commit history")
+                                .popover(isPresented: $showCommitHistory) {
+                                    CommitHistoryView(
+                                        session: session,
+                                        worktreeManager: worktreeManager,
+                                        defaultBranch: defaultBranch,
+                                        onRollback: onRollback
+                                    )
+                                }
                             }
                         }
 
