@@ -72,13 +72,13 @@ public struct ActivityLogView: View {
     private func eventIcon(_ type: String) -> some View {
         let (name, color): (String, Color) =
             switch type {
-            case "SessionStart": ("play.circle.fill", .green)
-            case "UserPromptSubmit": ("arrow.up.circle.fill", .blue)
-            case "PermissionRequest": ("hand.raised.fill", .orange)
-            case "Stop": ("pause.circle.fill", .secondary)
-            case "SessionEnd": ("stop.circle.fill", .red)
-            case "Notification": ("bell.fill", .yellow)
-            default: ("circle.fill", .secondary)
+            case "SessionStart": ("play.circle.fill", theme.chrome.green)
+            case "UserPromptSubmit": ("arrow.up.circle.fill", theme.chrome.accent)
+            case "PermissionRequest": ("hand.raised.fill", theme.chrome.orange)
+            case "Stop": ("pause.circle.fill", theme.chrome.textDim)
+            case "SessionEnd": ("stop.circle.fill", theme.chrome.red)
+            case "Notification": ("bell.fill", theme.chrome.yellow)
+            default: ("circle.fill", theme.chrome.textDim)
             }
         return Image(systemName: name)
             .font(.caption)

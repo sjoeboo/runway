@@ -23,6 +23,10 @@ struct SessionRecord: Codable, FetchableRecord, MutablePersistableRecord {
     var sortOrder: Int
     var createdAt: Date
     var lastAccessedAt: Date
+    var totalCostUSD: Double?
+    var totalInputTokens: Int?
+    var totalOutputTokens: Int?
+    var transcriptPath: String?
 
     init(_ session: Session) {
         self.id = session.id
@@ -41,6 +45,10 @@ struct SessionRecord: Codable, FetchableRecord, MutablePersistableRecord {
         self.sortOrder = session.sortOrder
         self.createdAt = session.createdAt
         self.lastAccessedAt = session.lastAccessedAt
+        self.totalCostUSD = session.totalCostUSD
+        self.totalInputTokens = session.totalInputTokens
+        self.totalOutputTokens = session.totalOutputTokens
+        self.transcriptPath = session.transcriptPath
     }
 
     func toSession() -> Session {
@@ -60,7 +68,11 @@ struct SessionRecord: Codable, FetchableRecord, MutablePersistableRecord {
             useHappy: useHappy,
             sortOrder: sortOrder,
             createdAt: createdAt,
-            lastAccessedAt: lastAccessedAt
+            lastAccessedAt: lastAccessedAt,
+            totalCostUSD: totalCostUSD,
+            totalInputTokens: totalInputTokens,
+            totalOutputTokens: totalOutputTokens,
+            transcriptPath: transcriptPath
         )
     }
 
@@ -170,6 +182,39 @@ struct SessionEventRecord: Codable, FetchableRecord, MutablePersistableRecord {
             toolName: toolName,
             message: message,
             notificationType: notificationType,
+            createdAt: createdAt
+        )
+    }
+}
+
+// MARK: - Saved Prompt Record
+
+struct SavedPromptRecord: Codable, FetchableRecord, MutablePersistableRecord {
+    static let databaseTableName = "saved_prompts"
+
+    var id: String
+    var name: String
+    var text: String
+    var projectID: String?
+    var sortOrder: Int
+    var createdAt: Date
+
+    init(_ prompt: SavedPrompt) {
+        self.id = prompt.id
+        self.name = prompt.name
+        self.text = prompt.text
+        self.projectID = prompt.projectID
+        self.sortOrder = prompt.sortOrder
+        self.createdAt = prompt.createdAt
+    }
+
+    func toPrompt() -> SavedPrompt {
+        SavedPrompt(
+            id: id,
+            name: name,
+            text: text,
+            projectID: projectID,
+            sortOrder: sortOrder,
             createdAt: createdAt
         )
     }

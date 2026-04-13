@@ -147,9 +147,11 @@ public struct TerminalPane: NSViewRepresentable {
         // Apply ANSI palette (16 colors: 0-7 normal, 8-15 bright)
         // Convert SwiftUI.Color → SwiftTerm.Color (16-bit RGB)
         let termColors = palette.ansi.map { swiftUIColor -> SwiftTerm.Color in
+            // Convert to a guaranteed RGB color space to prevent NSInternalInconsistencyException
+            // when accessing redComponent/greenComponent/blueComponent on non-RGB colors.
             let nsColor =
-                NSColor(swiftUIColor).usingColorSpace(.sRGB)
-                ?? NSColor(swiftUIColor)
+                NSColor(swiftUIColor).usingColorSpace(.deviceRGB)
+                ?? NSColor.gray
             return SwiftTerm.Color(
                 red: UInt16(nsColor.redComponent * 65535),
                 green: UInt16(nsColor.greenComponent * 65535),
@@ -230,9 +232,14 @@ class MouseSelectionMonitor {
                     // Restore after the event is dispatched so SwiftTerm's
                     // mouseUp handler still sees reporting disabled (avoids
                     // sending a spurious click to tmux).
+                    // Re-resolve the terminal from firstResponder instead of using
+                    // the captured reference — the user may have switched tabs mid-drag.
                     DispatchQueue.main.async { [self] in
                         if suppressed {
-                            terminal.allowMouseReporting = savedReporting
+                            let currentTerminal =
+                                NSApplication.shared.keyWindow?.firstResponder
+                                as? LocalProcessTerminalView
+                            (currentTerminal ?? terminal).allowMouseReporting = savedReporting
                             suppressed = false
                         }
                     }

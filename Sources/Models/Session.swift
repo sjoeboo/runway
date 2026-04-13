@@ -1,7 +1,18 @@
 import Foundation
 
 /// A managed AI coding session with an associated terminal, worktree, and status.
-public struct Session: Identifiable, Codable, Sendable {
+public struct Session: Identifiable, Codable, Sendable, Equatable {
+    /// Equatable excludes transient fields (lastActivityText, lastError) to prevent
+    /// unnecessary SwiftUI diffing when only in-memory state changes.
+    public static func == (lhs: Session, rhs: Session) -> Bool {
+        lhs.id == rhs.id && lhs.title == rhs.title && lhs.projectID == rhs.projectID
+            && lhs.path == rhs.path && lhs.tool == rhs.tool && lhs.status == rhs.status
+            && lhs.worktreeBranch == rhs.worktreeBranch && lhs.prNumber == rhs.prNumber
+            && lhs.issueNumber == rhs.issueNumber && lhs.permissionMode == rhs.permissionMode
+            && lhs.useHappy == rhs.useHappy && lhs.sortOrder == rhs.sortOrder
+            && lhs.totalCostUSD == rhs.totalCostUSD
+    }
+
     public let id: String
     public var title: String
     public var projectID: String?
@@ -19,8 +30,15 @@ public struct Session: Identifiable, Codable, Sendable {
     public var createdAt: Date
     public var lastAccessedAt: Date
 
-    /// Transient, non-persisted field for UI display of last activity.
+    // Cost tracking (updated from Stop hook events)
+    public var totalCostUSD: Double?
+    public var totalInputTokens: Int?
+    public var totalOutputTokens: Int?
+    public var transcriptPath: String?
+
+    /// Transient, non-persisted fields for UI display.
     public var lastActivityText: String?
+    public var lastError: String?
 
     public init(
         id: String = Session.generateID(),
@@ -38,7 +56,11 @@ public struct Session: Identifiable, Codable, Sendable {
         useHappy: Bool = false,
         sortOrder: Int = 0,
         createdAt: Date = Date(),
-        lastAccessedAt: Date = Date()
+        lastAccessedAt: Date = Date(),
+        totalCostUSD: Double? = nil,
+        totalInputTokens: Int? = nil,
+        totalOutputTokens: Int? = nil,
+        transcriptPath: String? = nil
     ) {
         self.id = id
         self.title = title
@@ -56,6 +78,10 @@ public struct Session: Identifiable, Codable, Sendable {
         self.sortOrder = sortOrder
         self.createdAt = createdAt
         self.lastAccessedAt = lastAccessedAt
+        self.totalCostUSD = totalCostUSD
+        self.totalInputTokens = totalInputTokens
+        self.totalOutputTokens = totalOutputTokens
+        self.transcriptPath = transcriptPath
     }
 
     /// Generate a unique session ID using UUID for full entropy.

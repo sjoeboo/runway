@@ -135,14 +135,20 @@ public struct PRDashboardView: View {
         return result
     }
 
-    private func tabCount(_ tab: PRTab) -> Int {
-        var prs = applyFilters(to: pullRequests, tab: tab)
-        if hideDrafts { prs = prs.filter { !$0.isDraft } }
+    /// Pre-compute all tab counts in a single pass over pullRequests.
+    /// Previously `tabCount(_ tab:)` was called 3x per body evaluation, each re-filtering the full array.
+    private var tabCounts: [PRTab: Int] {
         let currentFilter = filterState
-        if currentFilter.isActive {
-            prs = prs.filter { currentFilter.matches($0) }
+        var counts: [PRTab: Int] = [:]
+        for tab in PRTab.allCases {
+            var prs = applyFilters(to: pullRequests, tab: tab)
+            if hideDrafts { prs = prs.filter { !$0.isDraft } }
+            if currentFilter.isActive {
+                prs = prs.filter { currentFilter.matches($0) }
+            }
+            counts[tab] = prs.count
         }
-        return prs.count
+        return counts
     }
 
     // MARK: - Sorted PRs
@@ -353,18 +359,8 @@ public struct PRDashboardView: View {
 
     // MARK: - Cell Helpers
 
-    @ViewBuilder
     private func prStateBadge(_ pr: PullRequest) -> some View {
-        switch pr.state {
-        case .open:
-            Circle().fill(theme.chrome.green).frame(width: 8, height: 8)
-        case .draft:
-            Circle().stroke(theme.chrome.textDim, lineWidth: 1.5).frame(width: 8, height: 8)
-        case .merged:
-            Circle().fill(theme.chrome.purple).frame(width: 8, height: 8)
-        case .closed:
-            Circle().fill(theme.chrome.red).frame(width: 8, height: 8)
-        }
+        PRStateDot(state: pr.state)
     }
 
     private func prRepoShortName(_ pr: PullRequest) -> String {
@@ -417,7 +413,7 @@ public struct PRDashboardView: View {
     // MARK: - Tab Button
 
     private func tabButton(_ tab: PRTab) -> some View {
-        let count = tabCount(tab)
+        let count = tabCounts[tab] ?? 0
         return Button(action: {
             selectedTab = tab
         }) {

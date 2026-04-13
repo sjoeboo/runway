@@ -224,7 +224,7 @@ public struct SettingsView: View {
                 if defaultPermissionMode == .bypassAll {
                     Text("New sessions will skip all permission prompts by default")
                         .font(.caption)
-                        .foregroundColor(.orange)
+                        .foregroundColor(themeManager.currentTheme.chrome.orange)
                 }
             }
 
@@ -245,7 +245,7 @@ public struct SettingsView: View {
                 }
                 LabeledContent("Status") {
                     Text(hookServerPort == "—" ? "Not running" : "Running")
-                        .foregroundColor(hookServerPort == "—" ? .secondary : .green)
+                        .foregroundColor(hookServerPort == "—" ? .secondary : themeManager.currentTheme.chrome.green)
                 }
             }
 

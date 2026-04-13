@@ -61,7 +61,7 @@ Pure SwiftUI app with modular SPM targets:
 - **SidebarActions protocol** — eliminates prop drilling; `RunwayStore` conforms, Views module references protocol only
 - **Actor-based** managers for thread safety (WorktreeManager, PRManager, NativePTYProvider)
 - **TerminalProvider protocol** abstracts terminal backend (currently SwiftTerm, libghostty on standby)
-- **GRDB** for SQLite persistence with typed records and 8 migrations
+- **GRDB** for SQLite persistence with typed records and 14 migrations
 - **Theme environment** — `@Environment(\.theme)` provides current AppTheme to all views
 - **TerminalSessionCache** — LRU cache keeps terminal views alive across SwiftUI navigation
 
@@ -80,3 +80,37 @@ Dual-path: HTTP hooks (ephemeral port, force-injected on every launch into `~/.c
 ## Keyboard Shortcuts
 
 `Cmd+1/2` (views), `Cmd+N` (session), `Cmd+Shift+P` (project), `Cmd+K` (search), `Cmd+F` (terminal find), `Cmd+Shift+X` (send bar), `Ctrl+1/2/3` (PR tabs), `Shift+Enter` (newline in terminal).
+
+## Known Issues & Architecture Notes (v0.8.0 Audit)
+
+See `ROADMAP-1.0.md` for the full prioritized plan. Key things to know when working on this codebase:
+
+### Critical Bugs (fix first)
+- **Branch name sanitization** (`WorktreeManager.swift:276`): `sanitizeBranchName` replaces `/` with `-`, breaking PR-to-session linking and branch deletion for `feature/`, `fix/` branches. Fix: use original name for git branch, only sanitize directory path.
+- **TerminalPalette precondition** (`AppTheme.swift:78`): `precondition(ansi.count == 16)` crashes on malformed theme JSON. Replace with pad/truncate.
+- **GraphQL injection** (`PRManager.swift:276`): `nodeID` interpolated into mutation string. Validate characters before use.
+- **Cache eviction leaks processes** (`TerminalSessionCache.swift:87`): LRU eviction drops view without terminating PTY attach process.
+
+### Architecture Concerns
+- **RunwayStore is 1708 lines** with ~50 @Observable properties. Every property mutation invalidates the entire view tree. Plan: extract `PRCoordinator` (~400 LOC) and `SessionLifecycleCoordinator` to reduce to ~900 LOC.
+- **Buffer detection polls on MainActor** every 3s for all sessions — should be moved off-main.
+- **4 uncoordinated polling timers** (3s, 10s, 15s, 30s) align every 30s causing CPU spikes. Add jitter.
+- **`ShellRunner.run()` has no timeout** — a hung subprocess blocks the entire calling actor forever.
+
+### PTY/Terminal Safety
+- `PTYProcess.write()`/`resize()` race with FD close — check `isAlive` and use FD under same lock.
+- `PTYProcess.deinit` doesn't call `waitpid()` — zombie processes accumulate.
+- `HookServer` has no connection timeout and no auto-restart on `.failed` state.
+- Register hook event handler BEFORE `hookServer.start()`, not after.
+
+### Test Coverage Gaps
+- **RunwayStore** (1800 LOC orchestrator): ZERO tests. Highest-priority gap.
+- **TerminalView** module: ZERO tests (cache, key monitors, search).
+- No database migration upgrade path tests.
+- No end-to-end HookServer → StatusDetector integration test.
+
+### UX Gaps
+- VoiceOver accessibility labels almost entirely missing.
+- Session error/stopped state has no inline recovery action.
+- Send bar hardcodes "Claude" label regardless of tool.
+- Activity log and settings use hardcoded system colors instead of theme colors.

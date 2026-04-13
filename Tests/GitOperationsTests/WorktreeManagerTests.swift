@@ -295,3 +295,84 @@ private func withTempGitRepo(_ body: (String) async throws -> Void) async throws
         #expect(merged == false)
     }
 }
+
+// MARK: - Branch Name Sanitization
+
+@Test func sanitizeForDirectoryReplacesSlashes() async {
+    let manager = WorktreeManager()
+    let result = await manager.sanitizeForDirectory("feature/auth-login")
+    #expect(result == "feature-auth-login")
+    #expect(!result.contains("/"))
+}
+
+@Test func sanitizeForDirectoryHandlesSpecialChars() async {
+    let manager = WorktreeManager()
+    // # is not a git-invalid character, so it passes through
+    #expect(await manager.sanitizeForDirectory("Fix Bug #42") == "fix-bug-#42")
+    #expect(await manager.sanitizeForDirectory("a..b") == "a.b")
+    #expect(await manager.sanitizeForDirectory("--leading") == "leading")
+}
+
+@Test func createWorktreePreservesSlashInBranchName() async throws {
+    try await withTempGitRepo { repoPath in
+        let manager = WorktreeManager()
+        let currentBranch = await manager.currentBranch(path: repoPath) ?? "main"
+
+        try FileManager.default.createDirectory(
+            atPath: "\(repoPath)/.worktrees",
+            withIntermediateDirectories: true
+        )
+
+        let (worktreePath, actualBranch) = try await manager.createWorktree(
+            repoPath: repoPath,
+            branchName: "feature/my-work",
+            baseBranch: currentBranch
+        )
+
+        // The directory should use sanitized name (no slashes)
+        #expect(worktreePath.hasSuffix("feature-my-work"))
+
+        // The actual git branch should preserve the slash
+        #expect(actualBranch == "feature/my-work")
+
+        // Verify the worktree is on the branch with the slash
+        let branch = await manager.currentBranch(path: worktreePath)
+        #expect(branch == "feature/my-work")
+    }
+}
+
+@Test func removeWorktreeWithExplicitBranchName() async throws {
+    try await withTempGitRepo { repoPath in
+        let manager = WorktreeManager()
+        let currentBranch = await manager.currentBranch(path: repoPath) ?? "main"
+
+        try FileManager.default.createDirectory(
+            atPath: "\(repoPath)/.worktrees",
+            withIntermediateDirectories: true
+        )
+
+        let (worktreePath, actualBranch) = try await manager.createWorktree(
+            repoPath: repoPath,
+            branchName: "feature/to-delete",
+            baseBranch: currentBranch
+        )
+
+        try await manager.removeWorktree(
+            repoPath: repoPath,
+            worktreePath: worktreePath,
+            deleteBranch: true,
+            branchName: actualBranch
+        )
+
+        #expect(!FileManager.default.fileExists(atPath: worktreePath))
+    }
+}
+
+@Test func commitLogReturnsEmptyForNoNewCommits() async throws {
+    try await withTempGitRepo { repoPath in
+        let manager = WorktreeManager()
+        let currentBranch = await manager.currentBranch(path: repoPath) ?? "main"
+        let log = await manager.commitLog(path: repoPath, baseBranch: currentBranch)
+        #expect(log.isEmpty)
+    }
+}

@@ -213,6 +213,35 @@ public struct MergeStatusBadge: View {
     }
 }
 
+// MARK: - PRStateDot
+
+/// Colored dot showing PR state (open/draft/merged/closed).
+/// Shared component replacing duplicated implementations across
+/// PRDashboardView, ProjectPRsTab, and ReviewPRSheet.
+public struct PRStateDot: View {
+    let state: PRState
+    var size: CGFloat = 8
+    @Environment(\.theme) private var theme
+
+    public init(state: PRState, size: CGFloat = 8) {
+        self.state = state
+        self.size = size
+    }
+
+    public var body: some View {
+        switch state {
+        case .open:
+            Circle().fill(theme.chrome.green).frame(width: size, height: size)
+        case .draft:
+            Circle().stroke(theme.chrome.textDim, lineWidth: 1.5).frame(width: size, height: size)
+        case .merged:
+            Circle().fill(theme.chrome.purple).frame(width: size, height: size)
+        case .closed:
+            Circle().fill(theme.chrome.red).frame(width: size, height: size)
+        }
+    }
+}
+
 // MARK: - SessionStatusIndicator
 
 /// Colored dot/circle showing the current session status.

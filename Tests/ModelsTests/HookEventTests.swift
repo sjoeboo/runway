@@ -85,6 +85,33 @@ import Testing
     #expect(event.event == .afterAgent)
 }
 
+@Test func hookEventDecodesCostFields() throws {
+    let json = """
+        {
+            "session_id": "abc123",
+            "hook_event_name": "Stop",
+            "total_cost_usd": 1.23,
+            "total_input_tokens": 50000,
+            "total_output_tokens": 10000
+        }
+        """
+    let event = try JSONDecoder().decode(HookEvent.self, from: Data(json.utf8))
+    #expect(event.event == .stop)
+    #expect(event.totalCostUSD == 1.23)
+    #expect(event.totalInputTokens == 50000)
+    #expect(event.totalOutputTokens == 10000)
+}
+
+@Test func hookEventCostFieldsOptionalWhenAbsent() throws {
+    let json = """
+        {"session_id": "s1", "hook_event_name": "SessionStart"}
+        """
+    let event = try JSONDecoder().decode(HookEvent.self, from: Data(json.utf8))
+    #expect(event.totalCostUSD == nil)
+    #expect(event.totalInputTokens == nil)
+    #expect(event.totalOutputTokens == nil)
+}
+
 // MARK: - HookEventType
 
 @Test func hookEventTypeRawValues() {

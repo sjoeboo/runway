@@ -114,6 +114,7 @@ public struct IssueDetailDrawer: View {
                         .foregroundStyle(.secondary)
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel("Close detail panel")
             }
 
             Text(issue.title)

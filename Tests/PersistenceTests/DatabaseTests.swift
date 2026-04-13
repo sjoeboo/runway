@@ -230,6 +230,160 @@ import Testing
     #expect(fetched?.tool == .codex)
 }
 
+// MARK: - Cost Tracking
+
+@Test func sessionCostTrackingPersistence() throws {
+    let db = try Database(inMemory: true)
+    let session = Session(
+        title: "cost-test", path: "/tmp",
+        totalCostUSD: 1.23, totalInputTokens: 50000, totalOutputTokens: 10000,
+        transcriptPath: "/tmp/transcript.jsonl"
+    )
+    try db.saveSession(session)
+
+    let fetched = try db.session(id: session.id)
+    #expect(fetched?.totalCostUSD == 1.23)
+    #expect(fetched?.totalInputTokens == 50000)
+    #expect(fetched?.totalOutputTokens == 10000)
+    #expect(fetched?.transcriptPath == "/tmp/transcript.jsonl")
+}
+
+@Test func sessionCostFieldsDefaultNil() throws {
+    let db = try Database(inMemory: true)
+    let session = Session(title: "no-cost", path: "/tmp")
+    try db.saveSession(session)
+
+    let fetched = try db.session(id: session.id)
+    #expect(fetched?.totalCostUSD == nil)
+    #expect(fetched?.totalInputTokens == nil)
+    #expect(fetched?.totalOutputTokens == nil)
+    #expect(fetched?.transcriptPath == nil)
+}
+
+// MARK: - Housekeeping
+
+@Test func cleanStoppedSessionsRemovesOldStopped() throws {
+    let db = try Database(inMemory: true)
+
+    let old = Session(
+        title: "old-stopped", path: "/tmp", status: .stopped,
+        createdAt: Date(timeIntervalSinceNow: -86400 * 30),
+        lastAccessedAt: Date(timeIntervalSinceNow: -86400 * 30)
+    )
+    let recent = Session(
+        title: "recent-stopped", path: "/tmp", status: .stopped,
+        createdAt: Date(), lastAccessedAt: Date()
+    )
+    let running = Session(
+        title: "running", path: "/tmp", status: .running,
+        createdAt: Date(timeIntervalSinceNow: -86400 * 30),
+        lastAccessedAt: Date(timeIntervalSinceNow: -86400 * 30)
+    )
+    try db.saveSession(old)
+    try db.saveSession(recent)
+    try db.saveSession(running)
+
+    let deleted = try db.cleanStoppedSessions(maxAge: 7 * 86400)
+    #expect(deleted == 1)
+
+    let remaining = try db.allSessions()
+    #expect(remaining.count == 2)
+    #expect(remaining.contains(where: { $0.title == "recent-stopped" }))
+    #expect(remaining.contains(where: { $0.title == "running" }))
+}
+
+@Test func cleanOldEventsRemovesExpired() throws {
+    let db = try Database(inMemory: true)
+    let old = SessionEvent(
+        sessionID: "s1", eventType: "SessionStart",
+        createdAt: Date(timeIntervalSinceNow: -86400 * 30)
+    )
+    let recent = SessionEvent(
+        sessionID: "s1", eventType: "UserPromptSubmit",
+        createdAt: Date()
+    )
+    try db.saveEvent(old)
+    try db.saveEvent(recent)
+
+    let deleted = try db.cleanOldEvents(maxAge: 7 * 86400)
+    #expect(deleted == 1)
+
+    let events = try db.events(forSessionID: "s1")
+    #expect(events.count == 1)
+    #expect(events.first?.eventType == "UserPromptSubmit")
+}
+
+// MARK: - Saved Prompts
+
+@Test func savedPromptCRUD() throws {
+    let db = try Database(inMemory: true)
+    let prompt = SavedPrompt(name: "Fix tests", text: "Fix the failing tests")
+    try db.savePrompt(prompt)
+
+    let all = try db.allPrompts()
+    #expect(all.count == 1)
+    #expect(all.first?.name == "Fix tests")
+    #expect(all.first?.text == "Fix the failing tests")
+}
+
+@Test func savedPromptFilterByProject() throws {
+    let db = try Database(inMemory: true)
+    let global = SavedPrompt(name: "Global", text: "/commit")
+    let scoped = SavedPrompt(name: "Scoped", text: "/pr", projectID: "p1")
+    try db.savePrompt(global)
+    try db.savePrompt(scoped)
+
+    let forP1 = try db.prompts(forProjectID: "p1")
+    #expect(forP1.count == 1)
+    #expect(forP1.first?.name == "Scoped")
+}
+
+@Test func savedPromptDelete() throws {
+    let db = try Database(inMemory: true)
+    let prompt = SavedPrompt(name: "Delete me", text: "test")
+    try db.savePrompt(prompt)
+    try db.deletePrompt(id: prompt.id)
+
+    let all = try db.allPrompts()
+    #expect(all.isEmpty)
+}
+
+// MARK: - Migration Safety
+
+@Test func migrationRunsAllVersionsOnFreshDB() throws {
+    // This test verifies all 17 migrations apply cleanly to a fresh database.
+    // A failure here means a migration has a dependency on prior state that isn't met.
+    let db = try Database(inMemory: true)
+
+    // Verify we can write to all tables created by migrations
+    let session = Session(title: "migration-test", path: "/tmp", useHappy: true, totalCostUSD: 0.5)
+    try db.saveSession(session)
+
+    let project = Project(name: "test", path: "/tmp", issuesEnabled: true, branchPrefix: "fix/")
+    try db.saveProject(project)
+
+    let event = SessionEvent(sessionID: session.id, eventType: "SessionStart")
+    try db.saveEvent(event)
+
+    let template = SessionTemplate(name: "test-template", projectID: project.id)
+    try db.saveTemplate(template)
+
+    let prompt = SavedPrompt(name: "test-prompt", text: "/commit")
+    try db.savePrompt(prompt)
+
+    // Verify all reads work
+    #expect(try db.allSessions().count == 1)
+    #expect(try db.allProjects().count == 1)
+    #expect(try db.events(forSessionID: session.id).count == 1)
+    #expect(try db.allTemplates().count == 1)
+    #expect(try db.allPrompts().count == 1)
+
+    // Verify cost fields survived the migration
+    let loaded = try db.session(id: session.id)
+    #expect(loaded?.totalCostUSD == 0.5)
+    #expect(loaded?.useHappy == true)
+}
+
 @Test func prCacheRoundTripsNewFields() throws {
     let db = try Database(inMemory: true)
 

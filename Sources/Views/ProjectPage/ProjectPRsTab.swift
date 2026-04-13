@@ -224,18 +224,8 @@ private struct ProjectPRRowView: View {
         }
     }
 
-    @ViewBuilder
     private var stateBadge: some View {
-        switch pr.state {
-        case .open:
-            Circle().fill(theme.chrome.green).frame(width: 8, height: 8)
-        case .draft:
-            Circle().stroke(theme.chrome.textDim, lineWidth: 1.5).frame(width: 8, height: 8)
-        case .merged:
-            Circle().fill(theme.chrome.purple).frame(width: 8, height: 8)
-        case .closed:
-            Circle().fill(theme.chrome.red).frame(width: 8, height: 8)
-        }
+        PRStateDot(state: pr.state)
     }
 
 }

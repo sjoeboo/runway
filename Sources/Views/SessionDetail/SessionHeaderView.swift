@@ -53,6 +53,18 @@ public struct SessionHeaderView: View {
                     Spacer()
 
                     HStack(spacing: 8) {
+                        // Cost badge (if available from hook events)
+                        if let cost = session.totalCostUSD, cost > 0 {
+                            Text(String(format: "$%.2f", cost))
+                                .font(.caption)
+                                .foregroundColor(theme.chrome.yellow)
+                                .padding(.horizontal, 7)
+                                .padding(.vertical, 3)
+                                .background(theme.chrome.yellow.opacity(0.12))
+                                .clipShape(Capsule())
+                                .help(tokenSummary)
+                        }
+
                         // Tool + permission mode badge
                         Text(toolBadgeText)
                             .font(.caption)
@@ -185,6 +197,24 @@ public struct SessionHeaderView: View {
         }
         parts.append(session.permissionMode.badgeLabel)
         return parts.joined(separator: " · ")
+    }
+
+    /// Tooltip for the cost badge showing token breakdown.
+    private var tokenSummary: String {
+        var parts: [String] = []
+        if let input = session.totalInputTokens {
+            parts.append("\(formatTokens(input)) input")
+        }
+        if let output = session.totalOutputTokens {
+            parts.append("\(formatTokens(output)) output")
+        }
+        return parts.isEmpty ? "Session cost" : parts.joined(separator: ", ")
+    }
+
+    private func formatTokens(_ count: Int) -> String {
+        if count >= 1_000_000 { return String(format: "%.1fM", Double(count) / 1_000_000) }
+        if count >= 1_000 { return String(format: "%.1fK", Double(count) / 1_000) }
+        return "\(count)"
     }
 
     // MARK: - Status Dot
