@@ -955,11 +955,29 @@ public final class RunwayStore {
             try? database?.saveEvent(sessionEvent)
         }
 
+        // Capture transcript path from any event (it's a constant field set on every hook)
+        if let path = event.transcriptPath, !path.isEmpty,
+            let idx = sessions.firstIndex(where: { $0.id == event.sessionID }),
+            sessions[idx].transcriptPath == nil
+        {
+            sessions[idx].transcriptPath = path
+            try? database?.saveSession(sessions[idx])
+        }
+
         switch event.event {
         case .sessionStart:
             updateSessionStatus(id: event.sessionID, status: .running)
         case .sessionEnd:
             updateSessionStatus(id: event.sessionID, status: .stopped)
+            // Also capture cost data from SessionEnd (some agents send it here)
+            if event.totalCostUSD != nil || event.totalInputTokens != nil {
+                if let idx = sessions.firstIndex(where: { $0.id == event.sessionID }) {
+                    if let cost = event.totalCostUSD { sessions[idx].totalCostUSD = cost }
+                    if let input = event.totalInputTokens { sessions[idx].totalInputTokens = input }
+                    if let output = event.totalOutputTokens { sessions[idx].totalOutputTokens = output }
+                    try? database?.saveSession(sessions[idx])
+                }
+            }
         case .stop:
             updateSessionStatus(id: event.sessionID, status: .idle)
             // Capture cost/token data from Stop events

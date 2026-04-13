@@ -14,6 +14,7 @@ struct TerminalTab: Identifiable {
     enum Content {
         case terminal(TerminalConfig)
         case diff(filePath: String, patch: String)
+        case transcript(path: String)
     }
 
     let content: Content
@@ -36,6 +37,13 @@ struct TerminalTab: Identifiable {
         self.title = title
         self.isMain = false
         self.content = .diff(filePath: filePath, patch: patch)
+    }
+
+    init(id: String, title: String, transcriptPath: String) {
+        self.id = id
+        self.title = title
+        self.isMain = false
+        self.content = .transcript(path: transcriptPath)
     }
 }
 
@@ -160,6 +168,8 @@ public struct TerminalTabView: View {
                     }
                 case .diff(_, let patch):
                     DiffView(patch: patch)
+                case .transcript(let path):
+                    TranscriptView(transcriptPath: path)
                 }
             }
         }
@@ -220,6 +230,21 @@ public struct TerminalTabView: View {
             .buttonStyle(.plain)
             .help("New shell tab")
             .accessibilityLabel("New shell tab")
+
+            // Transcript tab button (if session has a transcript)
+            if let path = session.transcriptPath {
+                Button {
+                    openTranscriptTab(path: path)
+                } label: {
+                    Image(systemName: "doc.text")
+                        .font(.caption)
+                        .foregroundColor(theme.chrome.textDim)
+                        .frame(width: 28, height: 28)
+                }
+                .buttonStyle(.plain)
+                .help("View session transcript")
+                .accessibilityLabel("View transcript")
+            }
 
             Spacer()
 
@@ -471,6 +496,17 @@ public struct TerminalTabView: View {
             selectedTabID = tabID
         } else {
             let tab = TerminalTab(id: tabID, title: title, filePath: path, patch: patch)
+            tabs.append(tab)
+            selectedTabID = tabID
+        }
+    }
+
+    private func openTranscriptTab(path: String) {
+        let tabID = "transcript"
+        if tabs.contains(where: { $0.id == tabID }) {
+            selectedTabID = tabID
+        } else {
+            let tab = TerminalTab(id: tabID, title: "Transcript", transcriptPath: path)
             tabs.append(tab)
             selectedTabID = tabID
         }

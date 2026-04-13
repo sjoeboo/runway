@@ -171,6 +171,31 @@ public struct ProjectTreeView: View {
                 }
                 .buttonStyle(.plain)
                 Spacer()
+
+                Menu {
+                    Button {
+                        Task { await actions.stopAllSessions() }
+                    } label: {
+                        Label("Stop All Sessions", systemImage: "stop.circle")
+                    }
+                    Button {
+                        actions.deleteStoppedSessions(deleteWorktrees: false)
+                    } label: {
+                        Label("Delete Stopped Sessions", systemImage: "trash")
+                    }
+                    Button {
+                        actions.deleteStoppedSessions(deleteWorktrees: true)
+                    } label: {
+                        Label("Delete Stopped + Worktrees", systemImage: "trash.circle")
+                    }
+                } label: {
+                    Image(systemName: "ellipsis.circle")
+                        .font(.callout)
+                        .foregroundColor(theme.chrome.textDim)
+                }
+                .menuStyle(.button)
+                .buttonStyle(.plain)
+                .accessibilityLabel("Batch session actions")
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 10)

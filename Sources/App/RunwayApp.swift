@@ -86,6 +86,11 @@ struct RunwayApp: App {
 
                 Button("Review PR") { store.showReviewPRDialog = true }
                     .keyboardShortcut("r", modifiers: [.command, .shift])
+
+                Divider()
+
+                Button("Stop All Sessions") { Task { await store.stopAllSessions() } }
+                Button("Delete Stopped Sessions") { store.deleteStoppedSessions(deleteWorktrees: false) }
             }
         }
 
