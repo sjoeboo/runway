@@ -9,7 +9,7 @@ import Theme
 /// Includes a prompt library menu for quick access to saved/built-in prompts.
 public struct SendTextBar: View {
     @Binding var isVisible: Bool
-    let toolName: String
+    let tool: Tool
     let savedPrompts: [SavedPrompt]
     let onSend: (String) -> Void
 
@@ -19,24 +19,27 @@ public struct SendTextBar: View {
 
     public init(
         isVisible: Binding<Bool>,
-        toolName: String = "Agent",
+        tool: Tool = .claude,
         savedPrompts: [SavedPrompt] = [],
         onSend: @escaping (String) -> Void
     ) {
         self._isVisible = isVisible
-        self.toolName = toolName
+        self.tool = tool
         self.savedPrompts = savedPrompts
         self.onSend = onSend
     }
+
+    private var toolName: String { tool.displayName }
 
     public var body: some View {
         if isVisible {
             HStack(spacing: 8) {
                 // Prompt library menu
                 Menu {
-                    if !SavedPrompt.builtIn.isEmpty {
-                        Section("Quick Commands") {
-                            ForEach(SavedPrompt.builtIn) { prompt in
+                    let builtIns = SavedPrompt.builtIn(for: tool)
+                    if !builtIns.isEmpty {
+                        Section("Slash Commands") {
+                            ForEach(builtIns) { prompt in
                                 Button(prompt.name) { sendPrompt(prompt.text) }
                             }
                         }

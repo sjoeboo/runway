@@ -118,7 +118,7 @@ public struct SessionDetailView: View {
                 }
             }
             .animation(.easeOut(duration: 0.2), value: changesVisible)
-            SendTextBar(isVisible: $showSendBar, toolName: session.tool.displayName, savedPrompts: savedPrompts) { text in
+            SendTextBar(isVisible: $showSendBar, tool: session.tool, savedPrompts: savedPrompts) { text in
                 if let terminal = TerminalSessionCache.shared.mainTerminal(forSessionID: session.id) {
                     terminal.send(txt: text + "\r")
                 }
