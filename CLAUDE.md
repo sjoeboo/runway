@@ -61,7 +61,7 @@ Pure SwiftUI app with modular SPM targets:
 - **SidebarActions protocol** — eliminates prop drilling; `RunwayStore` conforms, Views module references protocol only
 - **Actor-based** managers for thread safety (WorktreeManager, PRManager, NativePTYProvider)
 - **TerminalProvider protocol** abstracts terminal backend (currently SwiftTerm, libghostty on standby)
-- **GRDB** for SQLite persistence with typed records and 14 migrations
+- **GRDB** for SQLite persistence with typed records and 17 migrations
 - **Theme environment** — `@Environment(\.theme)` provides current AppTheme to all views
 - **TerminalSessionCache** — LRU cache keeps terminal views alive across SwiftUI navigation
 
@@ -75,7 +75,7 @@ Dual-path: HTTP hooks (ephemeral port, force-injected on every launch into `~/.c
 
 ## Testing
 
-293 tests across 8 targets: ModelsTests, PersistenceTests, StatusDetectionTests, GitOperationsTests, ThemeTests, GitHubOperationsTests, TerminalTests, ViewsTests.
+312 tests across 8 targets: ModelsTests, PersistenceTests, StatusDetectionTests, GitOperationsTests, ThemeTests, GitHubOperationsTests, TerminalTests, ViewsTests.
 
 ## Keyboard Shortcuts
 
