@@ -5,6 +5,7 @@ import Theme
 /// Right sidebar showing changed files in the session's worktree.
 struct ChangesSidebarView: View {
     let changes: [FileChange]
+    let nodes: [FileTreeNode]
     @Binding var mode: ChangesMode
     let selectedPath: String?
     let onSelectFile: (FileChange) -> Void
@@ -65,7 +66,7 @@ struct ChangesSidebarView: View {
     private var fileTree: some View {
         ScrollView {
             FileTreeView(
-                nodes: buildFileTree(changes),
+                nodes: nodes,
                 selectedPath: selectedPath,
                 onSelectFile: onSelectFile
             )

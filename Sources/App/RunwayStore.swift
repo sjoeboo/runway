@@ -91,10 +91,19 @@ public final class RunwayStore {
     // MARK: - Changes Sidebar
     var changesVisible: Bool = false
     var changesMode: ChangesMode = .branch
-    var sessionChanges: [String: [FileChange]] = [:]
+    var sessionChanges: [String: [FileChange]] = [:] {
+        didSet { rebuildFileTree() }
+    }
+    var sessionFileTree: [String: [FileTreeNode]] = [:]
     var viewingDiffFile: FileChange? = nil
     var viewingDiffPatch: String? = nil
     private var changesRefreshTask: Task<Void, Never>?
+
+    private func rebuildFileTree() {
+        for (sessionID, changes) in sessionChanges {
+            sessionFileTree[sessionID] = buildFileTree(changes)
+        }
+    }
 
     var selectedProjectID: String?
     var projectIssues: [String: [GitHubIssue]] = [:]

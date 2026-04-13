@@ -463,6 +463,7 @@ struct ContentView: View {
                         }
                     ),
                     changes: store.sessionChanges[sessionID] ?? [],
+                    fileTree: store.sessionFileTree[sessionID] ?? [],
                     viewingDiffFile: store.viewingDiffFile,
                     diffPatch: store.viewingDiffPatch,
                     onSelectDiffFile: { file in store.selectDiffFile(file) },
