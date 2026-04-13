@@ -166,7 +166,7 @@ public struct ProjectSettingsSheet: View {
             .padding(.horizontal, 20)
             .padding(.vertical, 14)
         }
-        .frame(width: 400)
+        .frame(minWidth: 360, idealWidth: 400, maxWidth: 480)
         .frame(minHeight: 480, idealHeight: 480, maxHeight: 640)
         .onAppear {
             themeID = project.themeID

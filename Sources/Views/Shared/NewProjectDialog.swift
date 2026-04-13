@@ -56,7 +56,7 @@ public struct NewProjectDialog: View {
             }
         }
         .padding(24)
-        .frame(width: 420)
+        .frame(minWidth: 380, idealWidth: 420, maxWidth: 500)
         .fixedSize(horizontal: false, vertical: true)
         .onChange(of: path) { _, newPath in
             detectBranch(at: newPath)

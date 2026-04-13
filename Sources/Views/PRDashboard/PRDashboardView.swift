@@ -318,6 +318,10 @@ public struct PRDashboardView: View {
                     .help(
                         showSessionPRsOnly ? "Showing session PRs only" : "Show only session PRs"
                     )
+                    .accessibilityLabel(
+                        showSessionPRsOnly
+                            ? "Showing session PRs only" : "Show only session PRs"
+                    )
                     .padding(.trailing, 4)
 
                     Button {
@@ -328,6 +332,7 @@ public struct PRDashboardView: View {
                     }
                     .buttonStyle(IconButtonStyle())
                     .help(hideDrafts ? "Show drafts" : "Hide drafts")
+                    .accessibilityLabel(hideDrafts ? "Show drafts" : "Hide drafts")
                     .padding(.trailing, 4)
 
                     Button(action: onRefresh) {
@@ -335,6 +340,7 @@ public struct PRDashboardView: View {
                             .font(.callout)
                     }
                     .buttonStyle(IconButtonStyle())
+                    .accessibilityLabel("Refresh pull requests")
                     .padding(.trailing, 8)
                 }
                 .padding(.horizontal)
@@ -413,19 +419,13 @@ public struct PRDashboardView: View {
     // MARK: - Tab Button
 
     private func tabButton(_ tab: PRTab) -> some View {
-        let count = tabCounts[tab] ?? 0
-        return Button(action: {
+        TabBarButton(
+            title: tab.rawValue,
+            count: tabCounts[tab] ?? 0,
+            isActive: selectedTab == tab
+        ) {
             selectedTab = tab
-        }) {
-            Text("\(tab.rawValue) (\(count))")
-                .font(.callout)
-                .fontWeight(selectedTab == tab ? .semibold : .regular)
-                .foregroundColor(selectedTab == tab ? theme.chrome.accent : theme.chrome.textDim)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 6)
         }
-        .buttonStyle(.plain)
-        .accessibilityAddTraits(selectedTab == tab ? .isSelected : [])
     }
 
 }

@@ -1,3 +1,4 @@
+import GitOperations
 import Models
 import SwiftUI
 import Terminal
@@ -29,6 +30,9 @@ public struct SessionDetailView: View {
     var onActiveDiffPathChanged: ((String?) -> Void)?
     var onToggleChanges: (() -> Void)?
     var onRestart: (() -> Void)?
+    var worktreeManager: WorktreeManager?
+    var defaultBranch: String = "main"
+    var onRollback: ((String) -> Void)?
     var savedPrompts: [SavedPrompt] = []
     @AppStorage("changesSidebarWidth") private var sidebarWidth: Double = 260
     @Environment(\.theme) private var theme
@@ -58,6 +62,9 @@ public struct SessionDetailView: View {
         onActiveDiffPathChanged: ((String?) -> Void)? = nil,
         onToggleChanges: (() -> Void)? = nil,
         onRestart: (() -> Void)? = nil,
+        worktreeManager: WorktreeManager? = nil,
+        defaultBranch: String = "main",
+        onRollback: ((String) -> Void)? = nil,
         savedPrompts: [SavedPrompt] = []
     ) {
         self.session = session
@@ -84,6 +91,9 @@ public struct SessionDetailView: View {
         self.onActiveDiffPathChanged = onActiveDiffPathChanged
         self.onToggleChanges = onToggleChanges
         self.onRestart = onRestart
+        self.worktreeManager = worktreeManager
+        self.defaultBranch = defaultBranch
+        self.onRollback = onRollback
         self.savedPrompts = savedPrompts
     }
 
@@ -97,7 +107,10 @@ public struct SessionDetailView: View {
                 onSelectPR: onSelectPR,
                 onSelectSession: onSelectSession,
                 changesVisible: changesVisible,
-                onToggleChanges: onToggleChanges
+                onToggleChanges: onToggleChanges,
+                worktreeManager: worktreeManager,
+                defaultBranch: defaultBranch,
+                onRollback: onRollback
             )
             HStack(spacing: 0) {
                 // Main content: terminal or diff view

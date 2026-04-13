@@ -173,6 +173,7 @@ public struct ProjectPageView: View {
                 }
                 .buttonStyle(IconButtonStyle())
                 .help("Project Settings")
+                .accessibilityLabel("Project settings")
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 12)
@@ -181,7 +182,7 @@ public struct ProjectPageView: View {
 
             // Tab bar
             HStack(spacing: 0) {
-                TabButton(
+                TabBarButton(
                     title: "Issues",
                     count: openIssueCount,
                     isActive: selectedTab == .issues
@@ -189,7 +190,7 @@ public struct ProjectPageView: View {
                     selectedTab = .issues
                 }
 
-                TabButton(
+                TabBarButton(
                     title: "Pull Requests",
                     count: openPRCount,
                     isActive: selectedTab == .prs
@@ -270,46 +271,5 @@ public struct ProjectPageView: View {
                 onRefreshIssues()
             }
         }
-    }
-}
-
-// MARK: - Tab Button
-
-private struct TabButton: View {
-    let title: String
-    let count: Int
-    let isActive: Bool
-    let action: () -> Void
-
-    @Environment(\.theme) private var theme
-
-    var body: some View {
-        Button(action: action) {
-            VStack(spacing: 4) {
-                HStack(spacing: 4) {
-                    Text(title)
-                        .font(.body)
-                        .foregroundColor(isActive ? theme.chrome.text : theme.chrome.textDim)
-
-                    Text("\(count)")
-                        .font(.caption)
-                        .foregroundColor(isActive ? theme.chrome.text : theme.chrome.textDim)
-                        .padding(.horizontal, 5)
-                        .padding(.vertical, 1)
-                        .background(
-                            Capsule()
-                                .fill(theme.chrome.surface.opacity(0.6))
-                        )
-                }
-
-                // Underline indicator
-                Rectangle()
-                    .fill(isActive ? theme.chrome.accent : Color.clear)
-                    .frame(height: 2)
-                    .clipShape(RoundedRectangle(cornerRadius: 1))
-            }
-        }
-        .buttonStyle(.plain)
-        .padding(.trailing, 16)
     }
 }

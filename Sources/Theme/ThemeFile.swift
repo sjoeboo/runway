@@ -72,7 +72,7 @@ public struct ThemeFile: Codable {
 
 extension Color {
     /// Initialize Color from a hex string like "#1a1b26", "1a1b26", or "F00" (3-digit shorthand).
-    init(hexString: String) {
+    public init(hexString: String) {
         var hex = hexString.trimmingCharacters(in: CharacterSet(charactersIn: "#"))
         // Expand 3-digit CSS shorthand (e.g., "F00" → "FF0000")
         if hex.count == 3 {
@@ -81,5 +81,14 @@ extension Color {
         var value: UInt64 = 0
         Scanner(string: hex).scanHexInt64(&value)
         self.init(hex: UInt32(value))
+    }
+
+    /// Failable hex string initializer — returns nil for malformed strings.
+    /// Used by GitHub label colors that may contain unexpected values.
+    public init?(hex: String) {
+        var hex = hex.trimmingCharacters(in: .whitespacesAndNewlines)
+        if hex.hasPrefix("#") { hex.removeFirst() }
+        guard hex.count == 6, let int = UInt64(hex, radix: 16) else { return nil }
+        self.init(hex: UInt32(int))
     }
 }

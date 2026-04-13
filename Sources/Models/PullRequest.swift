@@ -1,7 +1,7 @@
 import Foundation
 
 /// A GitHub pull request with metadata, checks, and review status.
-public struct PullRequest: Identifiable, Codable, Sendable {
+public struct PullRequest: Identifiable, Codable, Sendable, Equatable {
     public let id: String
     public let number: Int
     public var title: String
@@ -147,7 +147,7 @@ public enum ReviewDecision: String, Codable, Sendable {
 
 // MARK: - Check Summary
 
-public struct CheckSummary: Codable, Sendable {
+public struct CheckSummary: Codable, Sendable, Equatable {
     public var passed: Int
     public var failed: Int
     public var pending: Int

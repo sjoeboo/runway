@@ -102,6 +102,7 @@ private struct DirectoryRow: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .accessibilityLabel(expanded ? "Collapse folder \(name)" : "Expand folder \(name)")
 
         if expanded {
             ForEach(children) { child in
@@ -161,6 +162,7 @@ private struct FileRow: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .accessibilityLabel("\(filename), \(change.status.rawValue), +\(change.additions) -\(change.deletions)")
     }
 
     private var filename: String {

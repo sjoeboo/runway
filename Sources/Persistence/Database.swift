@@ -2,11 +2,14 @@ import Foundation
 import GRDB
 import Models
 
-/// SQLite database manager using GRDB with WAL mode.
+/// SQLite database manager using GRDB.
+/// Production uses DatabasePool (WAL, concurrent reads during writes).
+/// Tests use DatabaseQueue (in-memory, serial).
 public final class Database: Sendable {
-    private let dbQueue: DatabaseQueue
+    private let db: any DatabaseWriter
 
     /// Open or create the database at the given path.
+    /// Uses DatabasePool for concurrent reads during writes.
     public init(path: String? = nil) throws {
         let dbPath = path ?? Database.defaultPath()
 
@@ -16,8 +19,6 @@ public final class Database: Sendable {
 
         var config = Configuration()
         config.prepareDatabase { db in
-            // WAL mode for concurrent readers
-            try db.execute(sql: "PRAGMA journal_mode = WAL")
             // NORMAL is safe with WAL — only risks data loss on power failure, not OS crash.
             // Reduces write latency by ~1ms per write (hot path: every hook status update).
             try db.execute(sql: "PRAGMA synchronous = NORMAL")
@@ -25,18 +26,19 @@ public final class Database: Sendable {
             try db.execute(sql: "PRAGMA busy_timeout = 5000")
         }
 
-        dbQueue = try DatabaseQueue(path: dbPath, configuration: config)
+        // DatabasePool enables concurrent reads during writes via WAL mode
+        db = try DatabasePool(path: dbPath, configuration: config)
         try migrate()
     }
 
     /// In-memory database for testing.
+    /// Uses DatabaseQueue since DatabasePool requires a file path for WAL.
     public init(inMemory: Bool) throws {
-        precondition(inMemory)
         var config = Configuration()
         config.prepareDatabase { db in
             try db.execute(sql: "PRAGMA busy_timeout = 5000")
         }
-        dbQueue = try DatabaseQueue(configuration: config)
+        db = try DatabaseQueue(configuration: config)
         try migrate()
     }
 
@@ -268,7 +270,7 @@ public final class Database: Sendable {
             }
         }
 
-        try migrator.migrate(dbQueue)
+        try migrator.migrate(db)
     }
 
     // MARK: - Default Path
@@ -281,32 +283,32 @@ public final class Database: Sendable {
     // MARK: - Session CRUD
 
     public func allSessions() throws -> [Session] {
-        try dbQueue.read { db in
+        try db.read { db in
             try SessionRecord.order(Column("sortOrder"), Column("createdAt")).fetchAll(db).map { $0.toSession() }
         }
     }
 
     public func session(id: String) throws -> Session? {
-        try dbQueue.read { db in
+        try db.read { db in
             try SessionRecord.fetchOne(db, key: id)?.toSession()
         }
     }
 
     public func saveSession(_ session: Session) throws {
-        try dbQueue.write { db in
+        try db.write { db in
             var record = SessionRecord(session)
             try record.save(db)
         }
     }
 
     public func deleteSession(id: String) throws {
-        try dbQueue.write { db in
+        try db.write { db in
             _ = try SessionRecord.deleteOne(db, key: id)
         }
     }
 
     public func updateSessionStatus(id: String, status: SessionStatus) throws {
-        try dbQueue.write { db in
+        try db.write { db in
             try db.execute(
                 sql: "UPDATE sessions SET status = ?, lastAccessedAt = ? WHERE id = ?",
                 arguments: [status.rawValue, Date(), id]
@@ -315,7 +317,7 @@ public final class Database: Sendable {
     }
 
     public func updateSessionPath(id: String, path: String) throws {
-        try dbQueue.write { db in
+        try db.write { db in
             try db.execute(
                 sql: "UPDATE sessions SET path = ?, lastAccessedAt = ? WHERE id = ?",
                 arguments: [path, Date(), id]
@@ -324,7 +326,7 @@ public final class Database: Sendable {
     }
 
     public func updateSessionBranch(id: String, branch: String) throws {
-        try dbQueue.write { db in
+        try db.write { db in
             try db.execute(
                 sql: "UPDATE sessions SET worktreeBranch = ?, lastAccessedAt = ? WHERE id = ?",
                 arguments: [branch, Date(), id]
@@ -333,7 +335,7 @@ public final class Database: Sendable {
     }
 
     public func updateSessionSortOrder(id: String, sortOrder: Int) throws {
-        try dbQueue.write { db in
+        try db.write { db in
             try db.execute(
                 sql: "UPDATE sessions SET sortOrder = ? WHERE id = ?",
                 arguments: [sortOrder, id]
@@ -342,7 +344,7 @@ public final class Database: Sendable {
     }
 
     public func updateProjectSortOrder(id: String, sortOrder: Int) throws {
-        try dbQueue.write { db in
+        try db.write { db in
             try db.execute(
                 sql: "UPDATE projects SET sortOrder = ? WHERE id = ?",
                 arguments: [sortOrder, id]
@@ -353,7 +355,7 @@ public final class Database: Sendable {
     // MARK: - Session Event CRUD
 
     public func saveEvent(_ event: SessionEvent) throws {
-        try dbQueue.write { db in
+        try db.write { db in
             var record = SessionEventRecord(event)
             try record.insert(db)
 
@@ -374,7 +376,7 @@ public final class Database: Sendable {
     }
 
     public func events(forSessionID sessionID: String, limit: Int = 100) throws -> [SessionEvent] {
-        try dbQueue.read { db in
+        try db.read { db in
             try SessionEventRecord
                 .filter(Column("sessionID") == sessionID)
                 .order(Column("createdAt").desc)
@@ -385,7 +387,7 @@ public final class Database: Sendable {
     }
 
     public func updateSessionIssueNumber(id: String, issueNumber: Int?) throws {
-        try dbQueue.write { db in
+        try db.write { db in
             try db.execute(
                 sql: "UPDATE sessions SET issueNumber = ? WHERE id = ?",
                 arguments: [issueNumber, id]
@@ -396,26 +398,26 @@ public final class Database: Sendable {
     // MARK: - Project CRUD
 
     public func allProjects() throws -> [Project] {
-        try dbQueue.read { db in
+        try db.read { db in
             try ProjectRecord.order(Column("sortOrder")).fetchAll(db).map { $0.toProject() }
         }
     }
 
     public func saveProject(_ project: Project) throws {
-        try dbQueue.write { db in
+        try db.write { db in
             var record = ProjectRecord(project)
             try record.save(db)
         }
     }
 
     public func deleteProject(id: String) throws {
-        try dbQueue.write { db in
+        try db.write { db in
             _ = try ProjectRecord.deleteOne(db, key: id)
         }
     }
 
     public func updateProject(_ project: Project) throws {
-        try dbQueue.write { db in
+        try db.write { db in
             let record = ProjectRecord(project)
             try record.update(db)
         }
@@ -426,7 +428,7 @@ public final class Database: Sendable {
     /// Load all cached PRs that haven't expired.
     public func cachedPRs(maxAge: TimeInterval = 300) throws -> [PullRequest] {
         let cutoff = Date().addingTimeInterval(-maxAge)
-        return try dbQueue.read { db in
+        return try db.read { db in
             let rows = try Row.fetchAll(
                 db,
                 sql: "SELECT json FROM pr_cache WHERE fetchedAt > ?",
@@ -445,7 +447,7 @@ public final class Database: Sendable {
     public func cachePR(_ pr: PullRequest) throws {
         let data = try JSONEncoder().encode(pr)
         let json = String(data: data, encoding: .utf8) ?? ""
-        try dbQueue.write { db in
+        try db.write { db in
             try db.execute(
                 sql: "INSERT OR REPLACE INTO pr_cache (id, json, fetchedAt) VALUES (?, ?, ?)",
                 arguments: [pr.id, json, Date()]
@@ -457,7 +459,7 @@ public final class Database: Sendable {
     public func cachePRs(_ prs: [PullRequest]) throws {
         let encoder = JSONEncoder()
         let now = Date()
-        try dbQueue.write { db in
+        try db.write { db in
             for pr in prs {
                 let data = try encoder.encode(pr)
                 let json = String(data: data, encoding: .utf8) ?? ""
@@ -472,7 +474,7 @@ public final class Database: Sendable {
     /// Clear expired PR cache entries.
     public func cleanPRCache(maxAge: TimeInterval = 86400) throws {
         let cutoff = Date().addingTimeInterval(-maxAge)
-        try dbQueue.write { db in
+        try db.write { db in
             try db.execute(sql: "DELETE FROM pr_cache WHERE fetchedAt < ?", arguments: [cutoff])
         }
     }
@@ -483,7 +485,7 @@ public final class Database: Sendable {
     public func cachedIssues(repo: String, maxAge: TimeInterval = 300) throws -> [GitHubIssue] {
         let cutoff = Date().addingTimeInterval(-maxAge)
         let pattern = "\(repo)#%"
-        return try dbQueue.read { db in
+        return try db.read { db in
             let rows = try Row.fetchAll(
                 db,
                 sql: "SELECT json FROM issue_cache WHERE id LIKE ? AND fetchedAt > ?",
@@ -502,7 +504,7 @@ public final class Database: Sendable {
     public func cacheIssues(_ issues: [GitHubIssue]) throws {
         let encoder = JSONEncoder()
         let now = Date()
-        try dbQueue.write { db in
+        try db.write { db in
             for issue in issues {
                 let data = try encoder.encode(issue)
                 let json = String(data: data, encoding: .utf8) ?? ""
@@ -517,7 +519,7 @@ public final class Database: Sendable {
     /// Clear expired issue cache entries.
     public func cleanIssueCache(maxAge: TimeInterval = 86400) throws {
         let cutoff = Date().addingTimeInterval(-maxAge)
-        try dbQueue.write { db in
+        try db.write { db in
             try db.execute(sql: "DELETE FROM issue_cache WHERE fetchedAt < ?", arguments: [cutoff])
         }
     }
@@ -525,7 +527,7 @@ public final class Database: Sendable {
     // MARK: - Session Template CRUD
 
     public func allTemplates() throws -> [SessionTemplate] {
-        try dbQueue.read { db in
+        try db.read { db in
             try SessionTemplateRecord
                 .order(Column("sortOrder"), Column("createdAt"))
                 .fetchAll(db)
@@ -534,7 +536,7 @@ public final class Database: Sendable {
     }
 
     public func templates(forProjectID projectID: String?) throws -> [SessionTemplate] {
-        try dbQueue.read { db in
+        try db.read { db in
             try SessionTemplateRecord
                 .filter(Column("projectID") == projectID)
                 .order(Column("sortOrder"), Column("createdAt"))
@@ -544,14 +546,14 @@ public final class Database: Sendable {
     }
 
     public func saveTemplate(_ template: SessionTemplate) throws {
-        try dbQueue.write { db in
+        try db.write { db in
             var record = SessionTemplateRecord(template)
             try record.save(db)
         }
     }
 
     public func deleteTemplate(id: String) throws {
-        try dbQueue.write { db in
+        try db.write { db in
             _ = try SessionTemplateRecord.deleteOne(db, key: id)
         }
     }
@@ -559,7 +561,7 @@ public final class Database: Sendable {
     // MARK: - Saved Prompt CRUD
 
     public func allPrompts() throws -> [SavedPrompt] {
-        try dbQueue.read { db in
+        try db.read { db in
             try SavedPromptRecord
                 .order(Column("sortOrder"), Column("createdAt"))
                 .fetchAll(db)
@@ -568,7 +570,7 @@ public final class Database: Sendable {
     }
 
     public func prompts(forProjectID projectID: String?) throws -> [SavedPrompt] {
-        try dbQueue.read { db in
+        try db.read { db in
             try SavedPromptRecord
                 .filter(Column("projectID") == projectID)
                 .order(Column("sortOrder"), Column("createdAt"))
@@ -578,14 +580,14 @@ public final class Database: Sendable {
     }
 
     public func savePrompt(_ prompt: SavedPrompt) throws {
-        try dbQueue.write { db in
+        try db.write { db in
             var record = SavedPromptRecord(prompt)
             try record.save(db)
         }
     }
 
     public func deletePrompt(id: String) throws {
-        try dbQueue.write { db in
+        try db.write { db in
             _ = try SavedPromptRecord.deleteOne(db, key: id)
         }
     }
@@ -597,7 +599,7 @@ public final class Database: Sendable {
     @discardableResult
     public func cleanStoppedSessions(maxAge: TimeInterval = 7 * 86400) throws -> Int {
         let cutoff = Date().addingTimeInterval(-maxAge)
-        return try dbQueue.write { db in
+        return try db.write { db in
             try db.execute(
                 sql: "DELETE FROM sessions WHERE status = 'stopped' AND lastAccessedAt < ?",
                 arguments: [cutoff]
@@ -611,7 +613,7 @@ public final class Database: Sendable {
     @discardableResult
     public func cleanOldEvents(maxAge: TimeInterval = 7 * 86400) throws -> Int {
         let cutoff = Date().addingTimeInterval(-maxAge)
-        return try dbQueue.write { db in
+        return try db.write { db in
             try db.execute(
                 sql: "DELETE FROM session_events WHERE createdAt < ?",
                 arguments: [cutoff]
@@ -623,7 +625,7 @@ public final class Database: Sendable {
     /// Run SQLite VACUUM to reclaim disk space after bulk deletions.
     /// Must run outside a transaction — SQLite prohibits VACUUM within transactions.
     public func vacuum() throws {
-        try dbQueue.writeWithoutTransaction { db in
+        try db.writeWithoutTransaction { db in
             try db.execute(sql: "VACUUM")
         }
     }

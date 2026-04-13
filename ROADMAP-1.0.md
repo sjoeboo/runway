@@ -60,73 +60,69 @@
 
 ### High Priority
 
-#### P1: Extract PRCoordinator from RunwayStore
+#### P1: Extract PRCoordinator from RunwayStore — DONE
 **Impact:** Biggest remaining performance win — reduces @Observable view invalidation scope.
-**Scope:** ~400 LOC moved to new file, ~200 LOC of glue changes in RunwayStore + RunwayApp.
-**Risk:** Large refactor — do on clean baseline.
-**What to extract:**
-- `pullRequests`, `selectedPRID`, `prDetail`, `prTab`, `prLastFetched`, `isLoadingPRs`
-- `enrichPRsTask`, `lastPRFingerprint`, `prPollTask`, `sessionPRPollTask`
-- `detailCache`, `detailTTL`, `sessionPRs`, `sessionPRFetchedAt`
-- Methods: `fetchPRs`, `enrichPRs`, `linkSessionPRs`, `freshenSessionPRs`, `selectPR`, `startPRPoll`, `startSessionPRPoll`
-- `loadCachedPRs`, `refreshPRsIfStale`, `reEnrichPR`, `applyEnrichment`
+**Result:** 496 LOC in new `PRCoordinator.swift`, RunwayStore reduced from 1818 → 1391 LOC.
+All PR state, polling, enrichment, actions, and detail caching moved to separate @Observable class.
+RunwayStore holds `let prCoordinator: PRCoordinator` with weak back-reference for cross-cutting concerns.
 
-#### U1: VoiceOver Accessibility Pass
+#### U1: VoiceOver Accessibility Pass — DONE
 **Impact:** Required for 1.0 — app is essentially unusable with VoiceOver.
 **Scope:** ~25 view files need `.accessibilityLabel()` added.
 **Already done:** SendTextBar, sidebar search/clear/action buttons, PRDetailDrawer close, IssueDetailDrawer close, PRBadges (already had labels), ResizableDivider (already had labels).
-**Still needs labels:**
-- DiffView (file headers, line numbers)
-- ChangesSidebarView (file entries)
-- FileTreeView (file status)
-- PRDashboardView (table cells, action buttons)
-- PRFilterBar (filter toggles)
-- NewSessionDialog (form fields)
-- NewProjectDialog (form fields)
-- NewIssueSheet, EditIssueSheet, ManageLabelsSheet, ManageAssigneesSheet
-- ProjectPageView (tab bar)
-- SessionHeaderView (cost badge, tool badge, PR number)
+**Added (14 labels across 8 files):**
+- [x] DiffView — file expand/collapse toggle button
+- [x] ChangesSidebarView — comparison mode picker label
+- [x] FileTreeView — directory expand/collapse, file row with status and diff stats
+- [x] PRDashboardView — session PRs toggle, hide drafts toggle, refresh button
+- [x] PRFilterBar — clear all filters button
+- [x] ProjectPageView — settings gear button
+- [x] SessionHeaderView — parent session link, PR number button, inline comments badge
 
-#### Remaining Tests (5 from QA2's top 10)
+#### Remaining Tests (5 from QA2's top 10) — DONE
 Tests already added: migration safety, cost tracking, housekeeping, saved prompts, branch sanitization, worktree with slashes, HookEvent cost fields, Session Equatable.
-**Still needed:**
-1. `RunwayStore.deleteSession(deleteWorktree: true)` — most destructive user operation
-2. `TerminalSessionCache` LRU eviction — validate process cleanup
-3. `ShellRunner.run()` timeout behavior — verify SIGTERM on timeout
-4. `RunwayStore.cleanOrphanedWorktrees()` — protect unmerged branches
-5. HookServer → StatusDetector end-to-end — event wiring
+**Added (17 tests across 4 files):**
+1. [x] `deleteSession(deleteWorktree: true)` — removeWorktree protects unmerged branches via `-d`, deletes merged
+2. [x] `TerminalSessionCache` LRU eviction — eviction order, refresh on access, removal, get-or-create identity
+3. [x] `ShellRunner.run()` timeout — SIGTERM on timeout, success within timeout, non-zero exit handling
+4. [x] `cleanOrphanedWorktrees()` — full list→identify→merge-check→remove flow, owned preserved, unmerged preserved
+5. [x] HookServer → handler e2e — full JSON decode with header override + cost fields, without header
+**Bug fixed:** `isBranchMerged` didn't strip `+ ` prefix from `git branch --merged` output (worktree checkout marker)
 
 ### Medium Priority
 
-#### F6 UI: Git Rollback View
-Backend exists (`commitLog`, `resetToCommit` on WorktreeManager). Needs:
-- `CommitHistoryView.swift` showing commit list for the session's worktree branch
-- Rollback button with confirmation dialog
-- Integration into session detail (button or tab)
+#### F6 UI: Git Rollback View — DONE
+`CommitHistoryView.swift` shows commits since branch divergence with rollback capability.
+Integrated into SessionHeaderView as a popover from a clock icon next to the branch name.
+Rollback button with confirmation dialog, HEAD badge on latest commit.
 
-#### U9: Unified Tab Bar Component
-4 different tab bar patterns exist (dashboard, project page, PR detail, issue detail). Extract shared `TabBarView`.
+#### U9: Unified Tab Bar Component — DONE
+Extracted shared `TabBarButton` (title + count badge + underline indicator + selected trait).
+Replaces private TabButton in ProjectPageView and tabButton method in PRDashboardView.
+TerminalTabView's browser-style closeable tabs left as-is (fundamentally different pattern).
 
-#### U10: Adaptive Sheet Widths
-~10 sheets use hardcoded `frame(width:)`. Switch to `minWidth`/`idealWidth`/`maxWidth`.
+#### U10: Adaptive Sheet Widths — DONE
+Replaced hardcoded `frame(width:)` with `minWidth`/`idealWidth`/`maxWidth` on 5 sheets:
+NewSessionDialog, NewProjectDialog, ReviewPRSheet (2), ProjectSettingsSheet.
 
-#### U11: Consolidate Sheet Booleans
-4 independent sheet booleans (`showNewSessionDialog`, `showNewProjectDialog`, `showReviewPRSheet`, `showReviewPRDialog`) → single `ActiveSheet` enum.
+#### U11: Consolidate Sheet Booleans — DONE
+Replaced 4 independent booleans (`showNewSessionDialog`, `showNewProjectDialog`, `showReviewPRSheet`,
+`showReviewPRDialog`) with single `ActiveSheet` enum + `.sheet(item:)` modifier.
 
-### Low Priority
+### Low Priority — DONE
 
-| Item | File | Notes |
-|------|------|-------|
-| DatabaseQueue → DatabasePool | Database.swift | Concurrent reads during writes |
-| Consolidate 3 Color(hex:) initializers | Theme module | Dedup |
-| startSessionFromIssue hardcoded .claude | RunwayStore.swift | Use project default tool when available |
-| P4: async let actor serialization | PRManager.swift | Needs nonisolated helper methods |
-| P2: Reduce enrichPath timeout to 1s | ShellRunner.swift | Minor launch time improvement |
-| [weak self] on bufferDetectionTask | RunwayStore.swift | Consistency (already has jitter) |
-| PullRequest + CheckSummary Equatable | Models | Optimize SwiftUI diffing |
-| Remove precondition(inMemory) from Database test init | Database.swift | Replace with throwing |
-| HookServer stop() cancel in-flight connections | HookServer.swift | Track + cancel active connections |
-| Orphaned Task tracking | RunwayStore.swift | Store provisioning Tasks, cancel on delete |
+| Item | File | Status |
+|------|------|--------|
+| DatabaseQueue → DatabasePool | Database.swift | ✅ Pool for prod, Queue for tests, via `any DatabaseWriter` |
+| Consolidate 3 Color(hex:) initializers | Theme module | ✅ Failable `init?(hex:)` moved to Theme, removed from NewIssueSheet |
+| startSessionFromIssue hardcoded .claude | RunwayStore.swift | ✅ Uses project's most recent session tool |
+| P4: async let actor serialization | PRManager.swift | ✅ Nonisolated static helper for parallel fetch |
+| P2: Reduce enrichPath timeout to 1s | ShellRunner.swift | ✅ 3s → 1s |
+| [weak self] on bufferDetectionTask | RunwayStore.swift | ✅ Already present |
+| PullRequest + CheckSummary Equatable | Models | ✅ Auto-synthesized conformance |
+| Remove precondition(inMemory) from Database test init | Database.swift | ✅ Removed (param kept, no default) |
+| HookServer stop() cancel in-flight connections | HookServer.swift | ✅ Tracks + cancels active connections |
+| Orphaned Task tracking | RunwayStore.swift | ✅ provisioningTasks dict, cancelled on delete |
 
 ---
 
@@ -135,10 +131,10 @@ Backend exists (`commitLog`, `resetToCommit` on WorktreeManager). Needs:
 | Metric | v0.8.0 | Current (v0.9.0) | Target v1.0.0 |
 |--------|--------|-------------------|---------------|
 | Critical bugs | 4 | **0** | 0 |
-| Major bugs | ~20 | **~2** | 0 |
-| Test count | 292 | **312** | 340+ |
+| Major bugs | ~20 | **0** | 0 |
+| Test count | 292 | **329** | 340+ |
 | DB migrations | 14 | **17** | 17+ |
 | Features added | — | **8 new** | — |
-| RunwayStore LOC | 1708 | ~1850 | ~1200 (after P1) |
+| RunwayStore LOC | 1708 | **1391** | ~1200 (after P1) ✅ |
 | Accessibility labels | ~10 | **~25** | 200+ |
 | Force unwrap/precondition crash risks | 3 | **0** | 0 |

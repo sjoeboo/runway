@@ -1,4 +1,5 @@
 import Foundation
+import Models
 import Testing
 
 @testable import GitOperations
@@ -368,11 +369,222 @@ private func withTempGitRepo(_ body: (String) async throws -> Void) async throws
     }
 }
 
-@Test func commitLogReturnsEmptyForNoNewCommits() async throws {
+// MARK: - deleteSession Worktree Protection (Roadmap: deleteSession(deleteWorktree: true))
+
+@Test func removeWorktreeProtectsUnmergedBranch() async throws {
+    // This is the dangerous path in RunwayStore.deleteSession(deleteWorktree: true):
+    // removeWorktree is called with deleteBranch: true, which uses `git branch -d` (safe delete).
+    // If the branch has unmerged commits, -d refuses and the branch survives.
     try await withTempGitRepo { repoPath in
         let manager = WorktreeManager()
         let currentBranch = await manager.currentBranch(path: repoPath) ?? "main"
+
+        try FileManager.default.createDirectory(
+            atPath: "\(repoPath)/.worktrees",
+            withIntermediateDirectories: true
+        )
+
+        // Create a worktree with a new branch
+        let (worktreePath, actualBranch) = try await manager.createWorktree(
+            repoPath: repoPath,
+            branchName: "unmerged-work",
+            baseBranch: currentBranch
+        )
+
+        // Add an unmerged commit to the worktree branch
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/bin/sh")
+        process.arguments = [
+            "-c",
+            """
+            echo 'important work' > work.txt && \
+            git add work.txt && \
+            git commit -m 'unmerged commit'
+            """,
+        ]
+        process.currentDirectoryURL = URL(fileURLWithPath: worktreePath)
+        process.standardOutput = FileHandle.nullDevice
+        process.standardError = FileHandle.nullDevice
+        try process.run()
+        process.waitUntilExit()
+
+        // Now delete the worktree with deleteBranch: true
+        // This is what RunwayStore.deleteSession does for deleteWorktree=true
+        try await manager.removeWorktree(
+            repoPath: repoPath,
+            worktreePath: worktreePath,
+            deleteBranch: true,
+            branchName: actualBranch
+        )
+
+        // The worktree directory should be gone
+        #expect(!FileManager.default.fileExists(atPath: worktreePath))
+
+        // But the branch should survive — git branch -d refuses to delete unmerged branches
+        let branchOutput = try await ShellRunner.runGit(in: repoPath, args: ["branch"])
+        let branches = branchOutput.components(separatedBy: "\n")
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .map { $0.hasPrefix("* ") ? String($0.dropFirst(2)) : $0 }
+            .filter { !$0.isEmpty }
+        #expect(branches.contains(actualBranch))
+    }
+}
+
+@Test func removeWorktreeDeletesMergedBranch() async throws {
+    // Complement to the above: when the branch is fully merged, -d succeeds
+    try await withTempGitRepo { repoPath in
+        let manager = WorktreeManager()
+        let currentBranch = await manager.currentBranch(path: repoPath) ?? "main"
+
+        try FileManager.default.createDirectory(
+            atPath: "\(repoPath)/.worktrees",
+            withIntermediateDirectories: true
+        )
+
+        // Create a worktree with no extra commits (branch is at same commit as main)
+        let (worktreePath, actualBranch) = try await manager.createWorktree(
+            repoPath: repoPath,
+            branchName: "merged-work",
+            baseBranch: currentBranch
+        )
+
+        // Remove with deleteBranch: true — branch is already merged (same commit)
+        try await manager.removeWorktree(
+            repoPath: repoPath,
+            worktreePath: worktreePath,
+            deleteBranch: true,
+            branchName: actualBranch
+        )
+
+        // The worktree directory should be gone
+        #expect(!FileManager.default.fileExists(atPath: worktreePath))
+
+        // The branch should also be gone — it was fully merged
+        let branchOutput = try await ShellRunner.runGit(in: repoPath, args: ["branch"])
+        let branches = branchOutput.components(separatedBy: "\n")
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .map { $0.hasPrefix("* ") ? String($0.dropFirst(2)) : $0 }
+            .filter { !$0.isEmpty }
+        #expect(!branches.contains(actualBranch))
+    }
+}
+
+// MARK: - Orphaned Worktree Cleanup (Roadmap: cleanOrphanedWorktrees)
+
+@Test func orphanedWorktreeCleanupPreservesOwnedAndProtectsUnmerged() async throws {
+    // Exercises the same WorktreeManager call sequence as RunwayStore.cleanOrphanedWorktrees():
+    // 1. pruneWorktrees  2. listWorktrees  3. identify orphans  4. isBranchMerged  5. removeWorktree
+    try await withTempGitRepo { repoPath in
+        let manager = WorktreeManager()
+        let currentBranch = await manager.currentBranch(path: repoPath) ?? "main"
+        let worktreePrefix = "\(repoPath)/.worktrees/"
+
+        try FileManager.default.createDirectory(
+            atPath: "\(repoPath)/.worktrees",
+            withIntermediateDirectories: true
+        )
+
+        // Create 3 worktrees:
+        // - "owned-session" — simulates a worktree linked to a live session
+        // - "orphan-merged" — orphaned worktree with no unmerged commits (should be fully deleted)
+        // - "orphan-unmerged" — orphaned worktree with unmerged commits (branch preserved)
+        let (ownedPath, _) = try await manager.createWorktree(
+            repoPath: repoPath, branchName: "owned-session", baseBranch: currentBranch)
+        let (orphanMergedPath, orphanMergedBranch) = try await manager.createWorktree(
+            repoPath: repoPath, branchName: "orphan-merged", baseBranch: currentBranch)
+        let (orphanUnmergedPath, orphanUnmergedBranch) = try await manager.createWorktree(
+            repoPath: repoPath, branchName: "orphan-unmerged", baseBranch: currentBranch)
+
+        // Add unmerged commit to the orphan-unmerged worktree
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/bin/sh")
+        process.arguments = [
+            "-c",
+            """
+            echo 'data' > unmerged.txt && \
+            git add unmerged.txt && \
+            git commit -m 'unmerged work'
+            """,
+        ]
+        process.currentDirectoryURL = URL(fileURLWithPath: orphanUnmergedPath)
+        process.standardOutput = FileHandle.nullDevice
+        process.standardError = FileHandle.nullDevice
+        try process.run()
+        process.waitUntilExit()
+
+        // --- Simulate cleanOrphanedWorktrees logic ---
+
+        // Step 1: Build owned paths (only "owned-session" is in our set)
+        let ownedPaths = Set([
+            ownedPath,
+            URL(fileURLWithPath: ownedPath).resolvingSymlinksInPath().path,
+        ])
+
+        // Step 2: Prune + list
+        try await manager.pruneWorktrees(repoPath: repoPath)
+        let worktrees = try await manager.listWorktrees(repoPath: repoPath)
+
+        // Step 3: Identify orphans (managed by Runway + not owned by a session)
+        let orphans = worktrees.filter { wt in
+            let resolved = URL(fileURLWithPath: wt.path).resolvingSymlinksInPath().path
+            let isManaged = resolved.hasPrefix(worktreePrefix) || wt.path.hasPrefix(worktreePrefix)
+            let isOwned = ownedPaths.contains(wt.path) || ownedPaths.contains(resolved)
+            return isManaged && !isOwned
+        }
+
+        #expect(orphans.count == 2)
+
+        // Step 4+5: For each orphan, check merged status, remove accordingly
+        // Pass branchName explicitly (same data cleanOrphanedWorktrees has from the WorktreeInfo)
+        for orphan in orphans {
+            let branchName =
+                orphan.branch.isEmpty
+                ? URL(fileURLWithPath: orphan.path).lastPathComponent
+                : orphan.branch
+            let merged =
+                (try? await manager.isBranchMerged(
+                    repoPath: repoPath, branch: branchName, into: currentBranch)) ?? false
+
+            try await manager.removeWorktree(
+                repoPath: repoPath,
+                worktreePath: orphan.path,
+                deleteBranch: merged,
+                branchName: branchName
+            )
+        }
+
+        // --- Verify results ---
+
+        // Owned worktree should still exist
+        let resolvedOwned = URL(fileURLWithPath: ownedPath).resolvingSymlinksInPath().path
+        #expect(FileManager.default.fileExists(atPath: resolvedOwned))
+
+        // Both orphan directories should be gone
+        let resolvedMerged = URL(fileURLWithPath: orphanMergedPath).resolvingSymlinksInPath().path
+        let resolvedUnmerged = URL(fileURLWithPath: orphanUnmergedPath).resolvingSymlinksInPath().path
+        #expect(!FileManager.default.fileExists(atPath: resolvedMerged))
+        #expect(!FileManager.default.fileExists(atPath: resolvedUnmerged))
+
+        // Merged orphan's branch should be deleted
+        let branchOutput = try await ShellRunner.runGit(in: repoPath, args: ["branch"])
+        let branches = branchOutput.components(separatedBy: "\n")
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .map { $0.hasPrefix("* ") ? String($0.dropFirst(2)) : $0 }
+            .filter { !$0.isEmpty }
+        #expect(!branches.contains(orphanMergedBranch))
+
+        // Unmerged orphan's branch should be PRESERVED
+        #expect(branches.contains(orphanUnmergedBranch))
+    }
+}
+
+@Test func commitLogFallsBackToRecentCommitsWhenNoBranchDivergence() async throws {
+    try await withTempGitRepo { repoPath in
+        let manager = WorktreeManager()
+        let currentBranch = await manager.currentBranch(path: repoPath) ?? "main"
+        // No branch divergence — commitLog falls back to showing recent commits
         let log = await manager.commitLog(path: repoPath, baseBranch: currentBranch)
-        #expect(log.isEmpty)
+        #expect(!log.isEmpty)
+        #expect(log.first?.subject == "Initial commit")
     }
 }

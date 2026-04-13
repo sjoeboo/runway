@@ -60,11 +60,11 @@ struct RunwayApp: App {
             CommandGroup(after: .newItem) {
                 Button("New Session") {
                     store.newSessionProjectID = nil
-                    store.showNewSessionDialog = true
+                    store.activeSheet = .newSession
                 }
                 .keyboardShortcut("n", modifiers: .command)
 
-                Button("New Project") { store.showNewProjectDialog = true }
+                Button("New Project") { store.activeSheet = .newProject }
                     .keyboardShortcut("p", modifiers: [.command, .shift])
 
                 Button("Send to Session") { store.showSendBar.toggle() }
@@ -84,7 +84,7 @@ struct RunwayApp: App {
                 Button("Search Sessions") { store.focusSidebarSearch = true }
                     .keyboardShortcut("k", modifiers: .command)
 
-                Button("Review PR") { store.showReviewPRDialog = true }
+                Button("Review PR") { store.activeSheet = .reviewPRDialog }
                     .keyboardShortcut("r", modifiers: [.command, .shift])
 
                 Divider()
@@ -146,87 +146,75 @@ struct ContentView: View {
                 toolbarContent
             }
             .sheet(
-                isPresented: Binding(
-                    get: { store.showNewSessionDialog },
+                item: Binding(
+                    get: { store.activeSheet },
                     set: {
-                        store.showNewSessionDialog = $0
-                        if !$0 {
+                        store.activeSheet = $0
+                        if $0 == nil {
                             store.newSessionProjectID = nil
                             store.newSessionParentID = nil
                             store.forkSourceSession = nil
                         }
                     }
                 )
-            ) {
-                NewSessionDialog(
-                    projects: store.projects,
-                    profiles: store.agentProfiles.isEmpty ? AgentProfile.builtIn : store.agentProfiles,
-                    initialProjectID: store.newSessionProjectID,
-                    parentID: store.newSessionParentID,
-                    templates: store.availableTemplates(forProjectID: store.newSessionProjectID),
-                    forkSource: store.forkSourceSession,
-                    onCreate: { request in
-                        Task { await store.handleNewSessionRequest(request) }
-                        store.newSessionProjectID = nil
-                        store.newSessionParentID = nil
-                        store.forkSourceSession = nil
-                    },
-                    onCreateReview: { request in
-                        try await store.handleReviewSessionRequest(request)
-                    }
-                )
-                .theme(theme)
-            }
-            .sheet(
-                isPresented: Binding(
-                    get: { store.showNewProjectDialog },
-                    set: { store.showNewProjectDialog = $0 }
-                )
-            ) {
-                NewProjectDialog { name, path, branch in
-                    store.createProject(name: name, path: path, defaultBranch: branch)
-                }
-                .theme(theme)
-            }
-            .sheet(
-                isPresented: Binding(
-                    get: { store.showReviewPRSheet },
-                    set: { store.showReviewPRSheet = $0 }
-                )
-            ) {
-                if let pr = store.reviewPRCandidate {
-                    ReviewPRSheet(
-                        pr: pr,
-                        projects: store.projects
-                    ) { sessionName, projectID, initialPrompt in
-                        Task {
-                            await store.handleReviewPR(
-                                pr: pr,
-                                sessionName: sessionName,
-                                projectID: projectID,
-                                initialPrompt: initialPrompt
-                            )
+            ) { sheet in
+                switch sheet {
+                case .newSession:
+                    NewSessionDialog(
+                        projects: store.projects,
+                        profiles: store.agentProfiles.isEmpty ? AgentProfile.builtIn : store.agentProfiles,
+                        initialProjectID: store.newSessionProjectID,
+                        parentID: store.newSessionParentID,
+                        templates: store.availableTemplates(forProjectID: store.newSessionProjectID),
+                        forkSource: store.forkSourceSession,
+                        onCreate: { request in
+                            Task { await store.handleNewSessionRequest(request) }
+                            store.newSessionProjectID = nil
+                            store.newSessionParentID = nil
+                            store.forkSourceSession = nil
+                        },
+                        onCreateReview: { request in
+                            try await store.handleReviewSessionRequest(request)
                         }
-                        store.reviewPRCandidate = nil
+                    )
+                    .theme(theme)
+
+                case .newProject:
+                    NewProjectDialog { name, path, branch in
+                        store.createProject(name: name, path: path, defaultBranch: branch)
                     }
                     .theme(theme)
-                }
-            }
-            .sheet(
-                isPresented: Binding(
-                    get: { store.showReviewPRDialog },
-                    set: { store.showReviewPRDialog = $0 }
-                )
-            ) {
-                ReviewPRNumberDialog(
-                    projects: store.projects,
-                    isResolving: store.isResolvingPR,
-                    onResolve: { number, repo, host in
-                        Task { await store.resolvePRForReview(number: number, repo: repo, host: host) }
-                        store.showReviewPRDialog = false
+
+                case .reviewPRSheet:
+                    if let pr = store.prCoordinator.reviewPRCandidate {
+                        ReviewPRSheet(
+                            pr: pr,
+                            projects: store.projects
+                        ) { sessionName, projectID, initialPrompt in
+                            Task {
+                                await store.handleReviewPR(
+                                    pr: pr,
+                                    sessionName: sessionName,
+                                    projectID: projectID,
+                                    initialPrompt: initialPrompt
+                                )
+                            }
+                            store.prCoordinator.reviewPRCandidate = nil
+                        }
+                        .theme(theme)
                     }
-                )
-                .theme(theme)
+
+                case .reviewPRDialog:
+                    ReviewPRNumberDialog(
+                        projects: store.projects,
+                        isResolving: store.prCoordinator.isResolvingPR,
+                        onResolve: { number, repo, host in
+                            Task { await store.prCoordinator.resolvePRForReview(number: number, repo: repo, host: host) }
+                            store.activeSheet = nil
+                        }
+                    )
+                    .theme(theme)
+                }
             }
 
             // Status message toast — errors persist until dismissed, others auto-dismiss
@@ -318,7 +306,7 @@ struct ContentView: View {
         return ProjectTreeView(
             projects: store.projects,
             sessions: store.sessions,
-            sessionPRs: store.sessionPRs,
+            sessionPRs: store.prCoordinator.sessionPRs,
             provisioningWorktreeIDs: store.provisioningWorktreeIDs,
             selectedSessionID: $store.selectedSessionID,
             searchQuery: $store.sidebarSearchQuery,
@@ -380,7 +368,7 @@ struct ContentView: View {
                 ProjectPageView(
                     project: project,
                     issues: store.projectIssues[projectID] ?? [],
-                    pullRequests: store.pullRequests.filter { $0.repo == project.ghRepo },
+                    pullRequests: store.prCoordinator.pullRequests.filter { $0.repo == project.ghRepo },
                     labels: store.projectLabels[projectID] ?? [],
                     isLoadingIssues: store.isLoadingIssues,
                     onRefreshIssues: { Task { await store.fetchIssues(forProject: projectID) } },
@@ -402,20 +390,20 @@ struct ContentView: View {
                     onStartSessionFromIssue: { issue in
                         Task { await store.startSessionFromIssue(issue, projectID: projectID) }
                     },
-                    onSelectPR: { pr in Task { await store.selectPR(pr, navigate: false) } },
-                    onRefreshPRs: { Task { await store.refreshPRsIfStale() } },
-                    selectedPRID: store.selectedPRID,
-                    prDetail: store.prDetail,
-                    onApprovePR: { pr in Task { await store.approvePR(pr) } },
-                    onCommentPR: { pr, body in Task { await store.commentOnPR(pr, body: body) } },
-                    onRequestChangesPR: { pr, body in Task { await store.requestChangesOnPR(pr, body: body) } },
-                    onMergePR: { pr, strategy in Task { await store.mergePR(pr, strategy: strategy) } },
-                    onToggleDraftPR: { pr in Task { await store.togglePRDraft(pr) } },
-                    onUpdateBranchPR: { pr, rebase in Task { await store.updatePRBranch(pr, rebase: rebase) } },
+                    onSelectPR: { pr in Task { await store.prCoordinator.selectPR(pr, navigate: false) } },
+                    onRefreshPRs: { Task { await store.prCoordinator.refreshPRsIfStale() } },
+                    selectedPRID: store.prCoordinator.selectedPRID,
+                    prDetail: store.prCoordinator.prDetail,
+                    onApprovePR: { pr in Task { await store.prCoordinator.approvePR(pr) } },
+                    onCommentPR: { pr, body in Task { await store.prCoordinator.commentOnPR(pr, body: body) } },
+                    onRequestChangesPR: { pr, body in Task { await store.prCoordinator.requestChangesOnPR(pr, body: body) } },
+                    onMergePR: { pr, strategy in Task { await store.prCoordinator.mergePR(pr, strategy: strategy) } },
+                    onToggleDraftPR: { pr in Task { await store.prCoordinator.togglePRDraft(pr) } },
+                    onUpdateBranchPR: { pr, rebase in Task { await store.prCoordinator.updatePRBranch(pr, rebase: rebase) } },
                     onReviewPR: { pr in store.reviewPR(pr) },
-                    onEnableAutoMergePR: { pr, strategy in Task { await store.enableAutoMerge(pr, strategy: strategy) } },
-                    onDisableAutoMergePR: { pr in Task { await store.disableAutoMerge(pr) } },
-                    onDeselectPR: { Task { await store.selectPR(nil, navigate: false) } },
+                    onEnableAutoMergePR: { pr, strategy in Task { await store.prCoordinator.enableAutoMerge(pr, strategy: strategy) } },
+                    onDisableAutoMergePR: { pr in Task { await store.prCoordinator.disableAutoMerge(pr) } },
+                    onDeselectPR: { Task { await store.prCoordinator.selectPR(nil, navigate: false) } },
                     onUpdateProject: { store.updateProjectSettings($0) },
                     onDetectRepo: { await store.detectGHRepo(for: project) },
                     onFetchLabels: { Task { await store.fetchLabels(forProject: projectID) } },
@@ -429,9 +417,9 @@ struct ContentView: View {
                 SessionDetailView(
                     session: session,
                     tmuxManager: store.tmuxManager,
-                    linkedPR: store.sessionPRs[sessionID],
-                    prDetail: store.prDetailForSession(sessionID),
-                    onSelectPR: { pr in Task { await store.selectPR(pr) } },
+                    linkedPR: store.prCoordinator.sessionPRs[sessionID],
+                    prDetail: store.prCoordinator.prDetailForSession(sessionID),
+                    onSelectPR: { pr in Task { await store.prCoordinator.selectPR(pr) } },
                     parentSession: {
                         guard let parentID = session.parentID else { return nil }
                         return store.sessions.first(where: { $0.id == parentID })
@@ -478,6 +466,11 @@ struct ContentView: View {
                     onActiveDiffPathChanged: { path in store.activeDiffPath = path },
                     onToggleChanges: { store.toggleChangesSidebar() },
                     onRestart: { Task { await store.restartSession(id: sessionID) } },
+                    worktreeManager: session.worktreeBranch != nil ? store.worktreeManager : nil,
+                    defaultBranch: store.projects.first(where: { $0.id == session.projectID })?.defaultBranch ?? "main",
+                    onRollback: { hash in
+                        Task { try? await store.worktreeManager.resetToCommit(path: session.path, hash: hash) }
+                    },
                     savedPrompts: store.savedPrompts
                 )
             } else {
@@ -487,7 +480,7 @@ struct ContentView: View {
                         title: "Welcome to Runway",
                         subtitle: "Add a project to get started with AI coding sessions, or jump straight in with a quick session.",
                         actionTitle: "Add Your First Project",
-                        onAction: { store.showNewProjectDialog = true }
+                        onAction: { store.activeSheet = .newProject }
                     )
                 } else {
                     EmptyStateView(
@@ -498,33 +491,33 @@ struct ContentView: View {
             }
         case .prs:
             PRDashboardView(
-                pullRequests: store.pullRequests,
-                selectedPRID: store.selectedPRID,
-                detail: store.prDetail,
-                isLoading: store.isLoadingPRs,
-                sessionPRIDs: store.sessionPRIDs,
+                pullRequests: store.prCoordinator.pullRequests,
+                selectedPRID: store.prCoordinator.selectedPRID,
+                detail: store.prCoordinator.prDetail,
+                isLoading: store.prCoordinator.isLoadingPRs,
+                sessionPRIDs: store.prCoordinator.sessionPRIDs,
                 selectedTab: Binding(
-                    get: { store.prTab },
-                    set: { store.prTab = $0 }
+                    get: { store.prCoordinator.prTab },
+                    set: { store.prCoordinator.prTab = $0 }
                 ),
-                onSelectPR: { pr in Task { await store.selectPR(pr) } },
-                onRefresh: { Task { await store.fetchPRs() } },
-                onApprove: { pr in Task { await store.approvePR(pr) } },
-                onComment: { pr, body in Task { await store.commentOnPR(pr, body: body) } },
-                onRequestChanges: { pr, body in Task { await store.requestChangesOnPR(pr, body: body) } },
-                onMerge: { pr, strategy in Task { await store.mergePR(pr, strategy: strategy) } },
-                onToggleDraft: { pr in Task { await store.togglePRDraft(pr) } },
-                onUpdateBranch: { pr, rebase in Task { await store.updatePRBranch(pr, rebase: rebase) } },
+                onSelectPR: { pr in Task { await store.prCoordinator.selectPR(pr) } },
+                onRefresh: { Task { await store.prCoordinator.fetchPRs() } },
+                onApprove: { pr in Task { await store.prCoordinator.approvePR(pr) } },
+                onComment: { pr, body in Task { await store.prCoordinator.commentOnPR(pr, body: body) } },
+                onRequestChanges: { pr, body in Task { await store.prCoordinator.requestChangesOnPR(pr, body: body) } },
+                onMerge: { pr, strategy in Task { await store.prCoordinator.mergePR(pr, strategy: strategy) } },
+                onToggleDraft: { pr in Task { await store.prCoordinator.togglePRDraft(pr) } },
+                onUpdateBranch: { pr, rebase in Task { await store.prCoordinator.updatePRBranch(pr, rebase: rebase) } },
                 onSendToSession: { pr, _ in
-                    if let sessionID = store.sessionPRs.first(where: { $0.value.id == pr.id })?.key {
+                    if let sessionID = store.prCoordinator.sessionPRs.first(where: { $0.value.id == pr.id })?.key {
                         store.selectSession(sessionID)
                         store.showSendBar = true
                     }
                 },
                 onReviewPR: { pr in store.reviewPR(pr) },
-                onEnableAutoMerge: { pr, strategy in Task { await store.enableAutoMerge(pr, strategy: strategy) } },
-                onDisableAutoMerge: { pr in Task { await store.disableAutoMerge(pr) } },
-                onClosePR: { pr in Task { await store.closePR(pr) } }
+                onEnableAutoMerge: { pr, strategy in Task { await store.prCoordinator.enableAutoMerge(pr, strategy: strategy) } },
+                onDisableAutoMerge: { pr in Task { await store.prCoordinator.disableAutoMerge(pr) } },
+                onClosePR: { pr in Task { await store.prCoordinator.closePR(pr) } }
             )
         }
     }
@@ -541,7 +534,7 @@ struct ContentView: View {
         ToolbarItem(placement: .primaryAction) {
             Button {
                 store.newSessionProjectID = nil
-                store.showNewSessionDialog = true
+                store.activeSheet = .newSession
             } label: {
                 Label("New Session", systemImage: "plus.rectangle")
             }

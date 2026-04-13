@@ -47,14 +47,14 @@ public enum ShellRunner {
             return
         }
 
-        // Timeout after 3 seconds — complex shell configs (nvm, rbenv, pyenv)
-        // can take a long time and this blocks the main thread at launch.
-        let deadline = DispatchTime.now() + .seconds(3)
+        // Timeout after 1 second — most login shells resolve PATH in <500ms.
+        // This blocks the main thread at launch, so keep it tight.
+        let deadline = DispatchTime.now() + .seconds(1)
         let semaphore = DispatchSemaphore(value: 0)
         process.terminationHandler = { _ in semaphore.signal() }
         if semaphore.wait(timeout: deadline) == .timedOut {
             process.terminate()
-            print("[Runway] Login shell timed out after 3s, applying fallback PATH")
+            print("[Runway] Login shell timed out after 1s, applying fallback PATH")
             applyFallbackPath(current)
             return
         }

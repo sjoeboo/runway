@@ -72,13 +72,12 @@ public actor PRManager {
     /// Each PR gets an `origin` set indicating which queries returned it.
     /// A failure in one filter does not discard results from the other.
     public func fetchAllPRs() async throws -> [PullRequest] {
-        // Use separate tasks so a failure in one doesn't discard the other's results
-        async let minePRs: [PullRequest] = {
-            (try? await fetchPRs(filter: .mine)) ?? []
-        }()
-        async let reviewPRs: [PullRequest] = {
-            (try? await fetchPRs(filter: .reviewRequested)) ?? []
-        }()
+        // Pre-resolve hosts on the actor so the parallel fetches don't re-enter.
+        // Without this, async let + actor-isolated fetchPRs serializes instead of parallelizing.
+        let hosts = await discoverHosts()
+
+        async let minePRs: [PullRequest] = Self.fetchPRsNonisolated(hosts: hosts, filter: .mine)
+        async let reviewPRs: [PullRequest] = Self.fetchPRsNonisolated(hosts: hosts, filter: .reviewRequested)
 
         let (mine, review) = await (minePRs, reviewPRs)
 
@@ -333,6 +332,32 @@ public actor PRManager {
         return PRFingerprint(latestUpdate: items.first?.updatedAt)
     }
 
+    /// Nonisolated helper for parallel PR fetching — avoids actor re-entrance serialization.
+    /// Hosts are pre-resolved on the actor; shell calls and parsing run off-actor.
+    nonisolated private static func fetchPRsNonisolated(hosts: [String], filter: PRFilter) async -> [PullRequest] {
+        var args = [
+            "search", "prs",
+            "--state", "open",
+            "--archived=false",
+            "--json", "number,title,state,repository,url,isDraft,createdAt,updatedAt,author",
+            "--limit", "50",
+        ]
+        switch filter {
+        case .mine: args += ["--author", "@me"]
+        case .reviewRequested: args += ["--review-requested", "@me"]
+        case .all: break
+        }
+
+        var allPRs: [PullRequest] = []
+        for host in hosts {
+            if let output = try? await ShellRunner.runGH(args: args, host: host) {
+                let prs = (try? parseSearchResultsStatic(output)) ?? []
+                allPRs.append(contentsOf: prs)
+            }
+        }
+        return allPRs
+    }
+
     // MARK: - Private
 
     @discardableResult
@@ -393,6 +418,12 @@ public actor PRManager {
 
         args += ["--limit", "50"]
         return args
+    }
+
+    nonisolated private static func parseSearchResultsStatic(_ json: String) throws -> [PullRequest] {
+        guard let data = json.data(using: .utf8) else { return [] }
+        let items = try JSONDecoder.gh.decode([GHSearchPRItem].self, from: data)
+        return items.map { $0.toPullRequest() }
     }
 
     private func parseSearchResults(_ json: String) throws -> [PullRequest] {

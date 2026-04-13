@@ -90,7 +90,7 @@ public struct ReviewPRSheet: View {
             }
         }
         .padding(24)
-        .frame(width: 480)
+        .frame(minWidth: 420, idealWidth: 480, maxWidth: 560)
     }
 
     private var prBanner: some View {
@@ -239,7 +239,7 @@ public struct ReviewPRNumberDialog: View {
             }
         }
         .padding(20)
-        .frame(width: 340)
+        .frame(minWidth: 300, idealWidth: 340, maxWidth: 420)
     }
 
     private func resolve() {
