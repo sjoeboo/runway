@@ -5,6 +5,14 @@ All notable changes to Runway are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.8.0] — 2026-04-13
+
+### Added
+
+- **Tabbed file diffs** — clicking a changed file in the sidebar now opens the diff in a new tab alongside the terminal, instead of replacing the session view; tabs can be closed independently and clicking the same file focuses the existing tab ([#299](https://github.com/sjoeboo/runway/pull/299))
+
+[0.8.0]: https://github.com/sjoeboo/runway/compare/v0.7.2...v0.8.0
+
 ## [0.7.2] — 2026-04-13
 
 ### Fixed

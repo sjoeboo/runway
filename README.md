@@ -75,7 +75,7 @@ Create named sessions tied to projects. Each session launches a terminal running
 - **Worktree cleanup** — delete confirmation offers "Delete Session Only" or "Delete Session & Worktree" (removes branch too)
 - **Orphan worktree cleanup** — on startup, worktrees with no matching session are automatically pruned; merged branches are deleted, unmerged branches preserved
 - **PR Review mode** — dedicated "PR Review" tab in the new session dialog (`Cmd+Shift+R`) creates a review session for any PR number
-- **Changes sidebar** — toggle with `Cmd+3` to see all changed files in the session worktree, with inline diff viewer and "vs Main" / "Uncommitted" modes
+- **Changes sidebar** — toggle with `Cmd+3` to see all changed files in the session worktree, with tabbed diff viewer (diffs open as tabs alongside the terminal) and "vs Main" / "Uncommitted" modes
 - **Default branch detection** — auto-detects `main` vs `master` via `git symbolic-ref`
 - **Permission modes** — choose Default, Accept Edits, or Bypass All per session (with color-coded badges)
 - **Multiple terminal tabs** — add shell tabs alongside your main agent session
