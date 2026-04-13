@@ -621,8 +621,9 @@ public final class Database: Sendable {
     }
 
     /// Run SQLite VACUUM to reclaim disk space after bulk deletions.
+    /// Must run outside a transaction — SQLite prohibits VACUUM within transactions.
     public func vacuum() throws {
-        try dbQueue.write { db in
+        try dbQueue.writeWithoutTransaction { db in
             try db.execute(sql: "VACUUM")
         }
     }
