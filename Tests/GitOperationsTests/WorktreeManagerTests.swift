@@ -578,11 +578,13 @@ private func withTempGitRepo(_ body: (String) async throws -> Void) async throws
     }
 }
 
-@Test func commitLogReturnsEmptyForNoNewCommits() async throws {
+@Test func commitLogFallsBackToRecentCommitsWhenNoBranchDivergence() async throws {
     try await withTempGitRepo { repoPath in
         let manager = WorktreeManager()
         let currentBranch = await manager.currentBranch(path: repoPath) ?? "main"
+        // No branch divergence — commitLog falls back to showing recent commits
         let log = await manager.commitLog(path: repoPath, baseBranch: currentBranch)
-        #expect(log.isEmpty)
+        #expect(!log.isEmpty)
+        #expect(log.first?.subject == "Initial commit")
     }
 }

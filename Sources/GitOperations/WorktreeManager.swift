@@ -278,26 +278,41 @@ public actor WorktreeManager {
         return "main"
     }
 
-    /// Get commit history for the current branch since it diverged from a base branch.
+    /// Get commit history for the current branch.
+    /// First tries showing only commits since divergence from the base branch.
+    /// Falls back to showing the last `limit` commits if there are no branch-specific commits
+    /// (e.g., session is on the default branch, or no merge-base exists).
     /// Returns an array of (hash, subject) tuples, most recent first.
     public func commitLog(
         path: String,
         baseBranch: String = "main",
         limit: Int = 50
     ) async -> [(hash: String, subject: String)] {
-        // Find the merge-base to only show commits on this branch
-        let base =
-            (try? await runGit(in: path, args: ["merge-base", baseBranch, "HEAD"]))
-            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) } ?? baseBranch
+        // Try branch-specific commits first (since divergence from base)
+        if let base = try? await runGit(in: path, args: ["merge-base", baseBranch, "HEAD"]) {
+            let trimmedBase = base.trimmingCharacters(in: .whitespacesAndNewlines)
+            if let output = try? await runGit(
+                in: path,
+                args: ["log", "--format=%h\t%s", "-\(limit)", "\(trimmedBase)..HEAD"]
+            ) {
+                let commits = parseCommitLog(output)
+                if !commits.isEmpty { return commits }
+            }
+        }
 
+        // Fallback: show recent commits on the current branch (no range restriction)
         guard
             let output = try? await runGit(
                 in: path,
-                args: ["log", "--oneline", "--format=%h\t%s", "-\(limit)", "\(base)..HEAD"]
+                args: ["log", "--format=%h\t%s", "-\(limit)"]
             )
         else { return [] }
 
-        return output.components(separatedBy: "\n")
+        return parseCommitLog(output)
+    }
+
+    private func parseCommitLog(_ output: String) -> [(hash: String, subject: String)] {
+        output.components(separatedBy: "\n")
             .filter { !$0.isEmpty }
             .compactMap { line in
                 let parts = line.components(separatedBy: "\t")
