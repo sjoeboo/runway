@@ -202,12 +202,12 @@ public final class RunwayStore {
             forName: NSApplication.willTerminateNotification,
             object: nil,
             queue: .main
-        ) { [hookInjector] _ in
+        ) { [hookInjector, portFile = Self.portFilePath] _ in
             for config in HookInjectionConfig.allBuiltIn {
                 try? hookInjector.remove(config: config)
             }
             // Remove persisted port file so next launch doesn't try a dead port
-            try? FileManager.default.removeItem(atPath: RunwayStore.portFilePath)
+            try? FileManager.default.removeItem(atPath: portFile)
         }
     }
 
