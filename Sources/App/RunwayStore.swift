@@ -17,26 +17,11 @@ public final class RunwayStore {
     // MARK: - State
     var sessions: [Session] = []
     var projects: [Project] = []
-    var pullRequests: [PullRequest] = []
     var sessionTemplates: [SessionTemplate] = []
     var agentProfiles: [AgentProfile] = []
     var savedPrompts: [SavedPrompt] = []
 
     var selectedSessionID: String?
-    /// Incremented on every selection change to force SwiftUI re-render
-    /// when selectedSessionID goes nil→nil (no-op for @Observable).
-    var selectedPRID: String?
-    var prDetail: PRDetail?
-    var prTab: PRTab = .mine
-    var prLastFetched: Date?
-    var isLoadingPRs: Bool = false
-    private var prPollTask: Task<Void, Never>?
-    private var sessionPRPollTask: Task<Void, Never>?
-    private var enrichPRsTask: Task<Void, Never>?
-    private var lastPRFingerprint: PRFingerprint?
-    /// Per-session PR fetch timestamps — mirrors Hangar's sessionFetched map with 60s TTL.
-    private var sessionPRFetchedAt: [String: Date] = [:]
-    private let sessionPRTTL: TimeInterval = 60
     var currentView: AppView = .sessions
     var showNewSessionDialog: Bool = false
     var showNewProjectDialog: Bool = false
@@ -56,30 +41,9 @@ public final class RunwayStore {
     var terminalRestartTrigger: Int = 0
     var sidebarSearchQuery: String = ""
     var focusSidebarSearch: Bool = false
-    var showReviewPRDialog: Bool = false
-    var showReviewPRSheet: Bool = false
-    var reviewPRCandidate: PullRequest? = nil
-    var isResolvingPR: Bool = false
 
     /// Session IDs with in-progress worktree creation (transient, not persisted)
     var provisioningWorktreeIDs: Set<String> = []
-
-    /// Maps session ID → linked PullRequest (matched by worktree branch)
-    var sessionPRs: [String: PullRequest] = [:]
-
-    /// Set of PR IDs linked to active Runway sessions — used for the Sessions filter toggle.
-    var sessionPRIDs: Set<String> {
-        Set(sessionPRs.values.map(\.id))
-    }
-
-    /// Returns PRDetail for the selected session's linked PR, if available.
-    /// Fetches the detail asynchronously if not yet loaded.
-    func prDetailForSession(_ sessionID: String) -> PRDetail? {
-        guard let pr = sessionPRs[sessionID] else { return nil }
-        // prDetail is loaded when a PR is selected; return it if it matches
-        if selectedPRID == pr.id { return prDetail }
-        return nil
-    }
 
     func profileForSession(_ session: Session) -> AgentProfile {
         if case .custom(let name) = session.tool,
@@ -127,7 +91,7 @@ public final class RunwayStore {
     var hookServer: HookServer
     let statusDetector: StatusDetector
     let worktreeManager: WorktreeManager
-    let prManager: PRManager
+    let prCoordinator: PRCoordinator
     let hookInjector: HookInjector
     let tmuxManager: TmuxSessionManager
     let issueManager: IssueManager
@@ -140,22 +104,31 @@ public final class RunwayStore {
         self.hookServer = HookServer()
         self.statusDetector = StatusDetector()
         self.worktreeManager = WorktreeManager()
-        self.prManager = PRManager()
         self.hookInjector = HookInjector()
         self.tmuxManager = TmuxSessionManager()
         self.issueManager = IssueManager()
         self.notificationManager = NotificationManager()
 
         // Open database — surface failure to user since silent nil means all writes are lost
+        var db: Database?
         do {
-            self.database = try Database()
+            db = try Database()
         } catch {
             print("[Runway] Failed to open database: \(error)")
-            self.database = nil
+            db = nil
             self.databaseFailed = true
-            // Deferred to after init completes since statusMessage triggers UI
+        }
+        self.database = db
+
+        // PRCoordinator owns all PR state — separate @Observable reduces view invalidation scope
+        self.prCoordinator = PRCoordinator(prManager: PRManager(), database: db)
+
+        // Wire back-reference after all stored properties are initialized
+        prCoordinator.store = self
+
+        if databaseFailed {
             Task { @MainActor [weak self] in
-                self?.statusMessage = .error("Database failed to open — session data will not persist. \(error.localizedDescription)")
+                self?.statusMessage = .error("Database failed to open — session data will not persist.")
             }
         }
 
@@ -175,11 +148,10 @@ public final class RunwayStore {
                     "Missing tools: \(missing.joined(separator: ", ")) — install with `brew install \(missing.joined(separator: " "))`")
             }
             await loadState()
-            await fetchPRs()
-            // Seed the fingerprint so the first poll doesn't trigger a redundant fetch
-            lastPRFingerprint = await prManager.prFingerprint(filter: .mine)
-            startPRPoll()
-            startSessionPRPoll()
+            await prCoordinator.fetchPRs()
+            await prCoordinator.seedFingerprint()
+            prCoordinator.startPRPoll()
+            prCoordinator.startSessionPRPoll()
             notificationManager.requestAuthorization()
             notificationManager.onNotificationTapped = { [weak self] sessionID in
                 self?.selectSession(sessionID)
@@ -191,7 +163,7 @@ public final class RunwayStore {
         Task { await startHookServer() }
 
         // Load cached PRs synchronously for instant display while background fetch runs
-        loadCachedPRs()
+        prCoordinator.loadCachedPRs()
 
         // Start buffer-based status detection for sessions without hook events
         startBufferDetection()
@@ -632,8 +604,7 @@ public final class RunwayStore {
         sessions.removeAll { $0.id == id }
         try? database?.deleteSession(id: id)
         TerminalSessionCache.shared.removeAll(forSessionID: id)
-        sessionPRs.removeValue(forKey: id)
-        sessionPRFetchedAt.removeValue(forKey: id)
+        prCoordinator.sessionDeleted(id: id)
         lastHookEventTime.removeValue(forKey: id)
         sessionChanges.removeValue(forKey: id)
         sessionFileTree.removeValue(forKey: id)
@@ -797,8 +768,8 @@ public final class RunwayStore {
             NSApplication.shared.activate()
 
         case .pr(let number, let repo):
-            if let pr = pullRequests.first(where: { $0.number == number && $0.repo == repo }) {
-                Task { await selectPR(pr) }
+            if let pr = prCoordinator.pullRequests.first(where: { $0.number == number && $0.repo == repo }) {
+                Task { await prCoordinator.selectPR(pr) }
             } else {
                 statusMessage = .info("PR #\(number) not found in \(repo) — try refreshing the PR list")
             }
@@ -1082,391 +1053,6 @@ public final class RunwayStore {
         }
     }
 
-    // MARK: - Pull Requests
-
-    /// Load cached PRs from database for instant display on startup.
-    func loadCachedPRs() {
-        if let cached = try? database?.cachedPRs(maxAge: 86400), !cached.isEmpty {
-            pullRequests = cached
-        }
-    }
-
-    func fetchPRs() async {
-        guard !isLoadingPRs else { return }
-        isLoadingPRs = true
-        defer { isLoadingPRs = false }
-
-        do {
-            let freshPRs = try await prManager.fetchAllPRs()
-            prLastFetched = Date()
-
-            // Merge: keep enriched data from cache/previous enrichment where available
-            let existingByID = Dictionary(pullRequests.map { ($0.id, $0) }, uniquingKeysWith: { _, new in new })
-            pullRequests = freshPRs.map { fresh in
-                guard var existing = existingByID[fresh.id] else { return fresh }
-                // Update fields that search refreshes
-                existing.title = fresh.title
-                existing.state = fresh.state
-                existing.isDraft = fresh.isDraft
-                existing.author = fresh.author
-                existing.origin = fresh.origin
-                existing.createdAt = fresh.createdAt
-                existing.updatedAt = fresh.updatedAt
-                return existing
-            }
-
-            // Cancel any in-flight enrichment to prevent stale results overwriting fresh data
-            enrichPRsTask?.cancel()
-            enrichPRsTask = Task { await enrichPRs() }
-        } catch {
-            print("[Runway] Failed to fetch PRs: \(error)")
-            statusMessage = .error("PR fetch failed: \(error.localizedDescription)")
-        }
-    }
-
-    /// Background-enrich PRs with checks and review decision only (not full detail).
-    /// Like Hangar, fetches only statusCheckRollup+reviewDecision — 1 subprocess per PR
-    /// instead of 2 (fetchDetail + REST files).
-    private func enrichPRs() async {
-        let toEnrich = pullRequests.filter { $0.needsEnrichment }
-        guard !toEnrich.isEmpty else {
-            await linkSessionPRs()
-            return
-        }
-
-        // Lightweight enrichment: checks + review decision only
-        var enriched: [String: PREnrichResult] = [:]
-        await withTaskGroup(of: (String, PREnrichResult?).self) { group in
-            var inFlight = 0
-            let maxConcurrency = 5
-
-            for pr in toEnrich {
-                if inFlight >= maxConcurrency {
-                    if let (id, result) = await group.next() {
-                        if let result { enriched[id] = result }
-                        inFlight -= 1
-                    }
-                }
-
-                let host = prManager.hostFromURL(pr.url)
-                group.addTask { [prManager] in
-                    let result = try? await prManager.enrichChecks(
-                        repo: pr.repo, number: pr.number, host: host
-                    )
-                    return (pr.id, result)
-                }
-                inFlight += 1
-            }
-
-            for await (id, result) in group {
-                if let result { enriched[id] = result }
-            }
-        }
-
-        // Bail out if this enrichment was superseded by a newer fetch cycle
-        guard !Task.isCancelled else { return }
-
-        // Merge in a single pass
-        var updated = pullRequests
-        for i in updated.indices {
-            guard let result = enriched[updated[i].id] else { continue }
-            applyEnrichment(result, to: &updated[i])
-        }
-        pullRequests = updated
-
-        try? database?.cachePRs(pullRequests)
-        try? database?.cleanPRCache()
-        try? database?.cleanIssueCache()
-
-        await linkSessionPRs()
-    }
-
-    /// Re-enrich a single PR immediately (called after user actions like approve/merge).
-    private func reEnrichPR(_ pr: PullRequest) async {
-        let host = prManager.hostFromURL(pr.url)
-        guard
-            let result = try? await prManager.enrichChecks(
-                repo: pr.repo, number: pr.number, host: host
-            )
-        else { return }
-
-        if let idx = pullRequests.firstIndex(where: { $0.id == pr.id }) {
-            applyEnrichment(result, to: &pullRequests[idx])
-            try? database?.cachePR(pullRequests[idx])
-        }
-    }
-
-    private func applyEnrichment(_ result: PREnrichResult, to pr: inout PullRequest) {
-        pr.checks = result.checks
-        pr.reviewDecision = result.reviewDecision
-        if !result.headBranch.isEmpty {
-            pr.headBranch = result.headBranch
-            pr.baseBranch = result.baseBranch
-        }
-        pr.additions = result.additions
-        pr.deletions = result.deletions
-        pr.changedFiles = result.changedFiles
-        pr.mergeable = result.mergeable
-        pr.mergeStateStatus = result.mergeStateStatus
-        pr.autoMergeEnabled = result.autoMergeEnabled
-        pr.enrichedAt = Date()
-    }
-
-    /// Link PRs to sessions — concurrent, like Hangar.
-    /// Sets TTL timestamps so the independent freshen loop doesn't immediately re-fetch.
-    private func linkSessionPRs() async {
-        let worktreeSessions = sessions.filter {
-            $0.worktreeBranch != nil && !provisioningWorktreeIDs.contains($0.id)
-        }
-        guard !worktreeSessions.isEmpty else { return }
-        let now = Date()
-
-        await withTaskGroup(of: (String, PullRequest?).self) { group in
-            for session in worktreeSessions {
-                group.addTask { [prManager] in
-                    let pr = try? await prManager.fetchPRForWorktree(path: session.path)
-                    return (session.id, pr)
-                }
-            }
-            for await (sessionID, pr) in group {
-                sessionPRFetchedAt[sessionID] = now
-                if let pr {
-                    sessionPRs[sessionID] = pr
-                } else {
-                    sessionPRs.removeValue(forKey: sessionID)
-                }
-            }
-        }
-    }
-
-    func refreshPRsIfStale() async {
-        let staleness: TimeInterval = 60
-        if let last = prLastFetched, Date().timeIntervalSince(last) < staleness { return }
-        await fetchPRs()
-    }
-
-    /// Start a lightweight background poll that checks for PR changes every 30 seconds.
-    /// Only triggers a full fetch when the fingerprint (latest updatedAt) changes.
-    func startPRPoll() {
-        prPollTask?.cancel()
-        prPollTask = Task { @MainActor [weak self] in
-            while !Task.isCancelled {
-                let jitter = Double.random(in: 0...3)
-                try? await Task.sleep(for: .seconds(30 + jitter))
-                guard !Task.isCancelled, let self else { return }
-                guard !self.isLoadingPRs else { continue }
-                let fingerprint = await self.prManager.prFingerprint(filter: .mine)
-                // Fetch if fingerprint changed OR if stale (>5 min) to catch reviewRequested changes
-                let isStale = self.prLastFetched.map { Date().timeIntervalSince($0) > 300 } ?? true
-                if let fingerprint, fingerprint != self.lastPRFingerprint {
-                    self.lastPRFingerprint = fingerprint
-                    await self.fetchPRs()
-                } else if isStale {
-                    await self.fetchPRs()
-                }
-            }
-        }
-    }
-
-    /// Independent session→PR linking loop, modeled on Hangar's UpdateSessionPR with 60s TTL.
-    /// Runs every 15 seconds but only re-fetches sessions whose cache is stale (>60s old).
-    /// This decouples session PR detection from the heavier global fetch→enrich pipeline.
-    func startSessionPRPoll() {
-        sessionPRPollTask?.cancel()
-        sessionPRPollTask = Task { @MainActor [weak self] in
-            while !Task.isCancelled {
-                let jitter = Double.random(in: 0...2)
-                try? await Task.sleep(for: .seconds(15 + jitter))
-                guard !Task.isCancelled, let self else { return }
-                await self.freshenSessionPRs()
-            }
-        }
-    }
-
-    /// Check each worktree session's PR status, respecting per-session TTL.
-    /// Only fetches for sessions whose cache has expired — lightweight when nothing is stale.
-    private func freshenSessionPRs() async {
-        let now = Date()
-        let worktreeSessions = sessions.filter {
-            $0.worktreeBranch != nil && !provisioningWorktreeIDs.contains($0.id)
-        }
-        guard !worktreeSessions.isEmpty else { return }
-
-        // Find sessions that need refreshing (stale or never fetched)
-        let stale = worktreeSessions.filter { session in
-            guard let fetchedAt = sessionPRFetchedAt[session.id] else { return true }
-            return now.timeIntervalSince(fetchedAt) >= sessionPRTTL
-        }
-        guard !stale.isEmpty else { return }
-
-        await withTaskGroup(of: (String, PullRequest?).self) { group in
-            for session in stale {
-                group.addTask { [prManager] in
-                    let pr = try? await prManager.fetchPRForWorktree(path: session.path)
-                    return (session.id, pr)
-                }
-            }
-            for await (sessionID, pr) in group {
-                sessionPRFetchedAt[sessionID] = now
-                if let pr {
-                    sessionPRs[sessionID] = pr
-                } else {
-                    sessionPRs.removeValue(forKey: sessionID)
-                }
-            }
-        }
-    }
-
-    /// In-memory detail cache with 5-minute TTL (matches Hangar).
-    private var detailCache: [String: (detail: PRDetail, fetchedAt: Date)] = [:]
-    private let detailTTL: TimeInterval = 300
-
-    func selectPR(_ pr: PullRequest?, navigate: Bool = true) async {
-        selectedPRID = pr?.id
-        prDetail = nil
-        guard let pr else { return }
-
-        if navigate {
-            currentView = .prs
-        }
-
-        // Check cache first
-        if let cached = detailCache[pr.id], Date().timeIntervalSince(cached.fetchedAt) < detailTTL {
-            prDetail = cached.detail
-            return
-        }
-
-        do {
-            let host = prManager.hostFromURL(pr.url)
-            let detail = try await prManager.fetchDetail(repo: pr.repo, number: pr.number, host: host)
-            detailCache[pr.id] = (detail, Date())
-            prDetail = detail
-        } catch {
-            print("[Runway] Failed to fetch PR detail: \(error)")
-        }
-    }
-
-    /// Unified post-action refresh: wait 1s for GitHub to propagate, then re-enrich
-    /// the PR list entry and refresh the detail view if this PR is currently selected.
-    private func refreshPRAfterAction(_ pr: PullRequest) async {
-        try? await Task.sleep(for: .seconds(1))
-        await reEnrichPR(pr)
-        if selectedPRID == pr.id {
-            let host = prManager.hostFromURL(pr.url)
-            if let detail = try? await prManager.fetchDetail(
-                repo: pr.repo, number: pr.number, host: host
-            ) {
-                detailCache[pr.id] = (detail, Date())
-                prDetail = detail
-            }
-        }
-    }
-
-    func approvePR(_ pr: PullRequest) async {
-        let host = prManager.hostFromURL(pr.url)
-        do {
-            try await prManager.approve(repo: pr.repo, number: pr.number, host: host)
-            statusMessage = .success("Approved #\(pr.number)")
-            await refreshPRAfterAction(pr)
-        } catch {
-            statusMessage = .error("Approve failed: \(error.localizedDescription)")
-        }
-    }
-
-    func commentOnPR(_ pr: PullRequest, body: String) async {
-        let host = prManager.hostFromURL(pr.url)
-        do {
-            try await prManager.comment(repo: pr.repo, number: pr.number, body: body, host: host)
-            statusMessage = .success("Commented on #\(pr.number)")
-            await refreshPRAfterAction(pr)
-        } catch {
-            statusMessage = .error("Comment failed: \(error.localizedDescription)")
-        }
-    }
-
-    func requestChangesOnPR(_ pr: PullRequest, body: String) async {
-        let host = prManager.hostFromURL(pr.url)
-        do {
-            try await prManager.requestChanges(repo: pr.repo, number: pr.number, body: body, host: host)
-            statusMessage = .success("Requested changes on #\(pr.number)")
-            await refreshPRAfterAction(pr)
-        } catch {
-            statusMessage = .error("Request changes failed: \(error.localizedDescription)")
-        }
-    }
-
-    func mergePR(_ pr: PullRequest, strategy: MergeStrategy = .squash) async {
-        let host = prManager.hostFromURL(pr.url)
-        do {
-            try await prManager.merge(repo: pr.repo, number: pr.number, strategy: strategy, host: host)
-            statusMessage = .success("Merged #\(pr.number)")
-            await refreshPRAfterAction(pr)
-        } catch {
-            statusMessage = .error("Merge failed: \(error.localizedDescription)")
-        }
-    }
-
-    func closePR(_ pr: PullRequest) async {
-        let host = prManager.hostFromURL(pr.url)
-        do {
-            try await prManager.close(repo: pr.repo, number: pr.number, host: host)
-            statusMessage = .success("Closed #\(pr.number)")
-            await refreshPRAfterAction(pr)
-        } catch {
-            statusMessage = .error("Close failed: \(error.localizedDescription)")
-        }
-    }
-
-    func updatePRBranch(_ pr: PullRequest, rebase: Bool = false) async {
-        let host = prManager.hostFromURL(pr.url)
-        do {
-            try await prManager.updateBranch(repo: pr.repo, number: pr.number, rebase: rebase, host: host)
-            statusMessage = .success("Updated #\(pr.number) with latest \(pr.baseBranch)")
-            await refreshPRAfterAction(pr)
-        } catch {
-            statusMessage = .error("Branch update failed: \(error.localizedDescription)")
-        }
-    }
-
-    func togglePRDraft(_ pr: PullRequest) async {
-        let host = prManager.hostFromURL(pr.url)
-        do {
-            try await prManager.toggleDraft(repo: pr.repo, number: pr.number, makeDraft: !pr.isDraft, host: host)
-            statusMessage = .success(pr.isDraft ? "Marked #\(pr.number) as ready" : "Converted #\(pr.number) to draft")
-            await refreshPRAfterAction(pr)
-        } catch {
-            statusMessage = .error("Draft toggle failed: \(error.localizedDescription)")
-        }
-    }
-
-    func enableAutoMerge(_ pr: PullRequest, strategy: MergeStrategy = .squash) async {
-        let host = prManager.hostFromURL(pr.url)
-        do {
-            try await prManager.enableAutoMerge(repo: pr.repo, number: pr.number, strategy: strategy, host: host)
-            statusMessage = .success("Auto-merge enabled for #\(pr.number)")
-            await refreshPRAfterAction(pr)
-        } catch {
-            statusMessage = .error("Auto-merge failed: \(error.localizedDescription)")
-        }
-    }
-
-    func disableAutoMerge(_ pr: PullRequest) async {
-        let host = prManager.hostFromURL(pr.url)
-        do {
-            try await prManager.disableAutoMerge(repo: pr.repo, number: pr.number, host: host)
-            statusMessage = .success("Auto-merge disabled for #\(pr.number)")
-            await refreshPRAfterAction(pr)
-        } catch {
-            statusMessage = .error("Disable auto-merge failed: \(error.localizedDescription)")
-        }
-    }
-
-    func openPRInBrowser(_ pr: PullRequest) {
-        if let url = URL(string: pr.url) {
-            NSWorkspace.shared.open(url)
-        }
-    }
-
     // MARK: - Issues
 
     func fetchIssues(forProject projectID: String) async {
@@ -1647,7 +1233,7 @@ public final class RunwayStore {
         }
         selectedSessionID = session.id
         currentView = .sessions
-        sessionPRs[session.id] = pr
+        prCoordinator.sessionPRs[session.id] = pr
 
         // Provision worktree in background, then start tmux
         provisioningWorktreeIDs.insert(session.id)
@@ -1683,26 +1269,13 @@ public final class RunwayStore {
 
     /// Creates a PR review session from the new session dialog — resolves the PR then creates the session.
     func handleReviewSessionRequest(_ request: ReviewSessionRequest) async throws {
-        let pr = try await prManager.resolvePR(repo: request.repo, number: request.prNumber, host: request.host)
+        let pr = try await prCoordinator.prManager.resolvePR(repo: request.repo, number: request.prNumber, host: request.host)
         await handleReviewPR(
             pr: pr,
             sessionName: request.sessionName,
             projectID: request.projectID,
             initialPrompt: request.initialPrompt
         )
-    }
-
-    func resolvePRForReview(number: Int, repo: String, host: String?) async {
-        isResolvingPR = true
-        defer { isResolvingPR = false }
-
-        do {
-            let pr = try await prManager.resolvePR(repo: repo, number: number, host: host)
-            reviewPRCandidate = pr
-            showReviewPRSheet = true
-        } catch {
-            statusMessage = .error("Failed to resolve PR #\(number): \(error.localizedDescription)")
-        }
     }
 
 }
@@ -1730,14 +1303,14 @@ extension RunwayStore: SidebarActions {
         showNewProjectDialog = true
     }
 
-    // SidebarActions conformance — delegates to the full selectPR with navigate: true
+    // SidebarActions conformance — delegates to PRCoordinator
     public func selectPR(_ pr: PullRequest?) async {
-        await selectPR(pr, navigate: true)
+        await prCoordinator.selectPR(pr, navigate: true)
     }
 
     public func reviewPR(_ pr: PullRequest) {
-        reviewPRCandidate = pr
-        showReviewPRSheet = true
+        prCoordinator.reviewPRCandidate = pr
+        prCoordinator.showReviewPRSheet = true
     }
 
     // MARK: - Changes Sidebar Actions

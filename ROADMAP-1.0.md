@@ -60,16 +60,11 @@
 
 ### High Priority
 
-#### P1: Extract PRCoordinator from RunwayStore
+#### P1: Extract PRCoordinator from RunwayStore — DONE
 **Impact:** Biggest remaining performance win — reduces @Observable view invalidation scope.
-**Scope:** ~400 LOC moved to new file, ~200 LOC of glue changes in RunwayStore + RunwayApp.
-**Risk:** Large refactor — do on clean baseline.
-**What to extract:**
-- `pullRequests`, `selectedPRID`, `prDetail`, `prTab`, `prLastFetched`, `isLoadingPRs`
-- `enrichPRsTask`, `lastPRFingerprint`, `prPollTask`, `sessionPRPollTask`
-- `detailCache`, `detailTTL`, `sessionPRs`, `sessionPRFetchedAt`
-- Methods: `fetchPRs`, `enrichPRs`, `linkSessionPRs`, `freshenSessionPRs`, `selectPR`, `startPRPoll`, `startSessionPRPoll`
-- `loadCachedPRs`, `refreshPRsIfStale`, `reEnrichPR`, `applyEnrichment`
+**Result:** 496 LOC in new `PRCoordinator.swift`, RunwayStore reduced from 1818 → 1391 LOC.
+All PR state, polling, enrichment, actions, and detail caching moved to separate @Observable class.
+RunwayStore holds `let prCoordinator: PRCoordinator` with weak back-reference for cross-cutting concerns.
 
 #### U1: VoiceOver Accessibility Pass
 **Impact:** Required for 1.0 — app is essentially unusable with VoiceOver.
@@ -140,6 +135,6 @@ Backend exists (`commitLog`, `resetToCommit` on WorktreeManager). Needs:
 | Test count | 292 | **329** | 340+ |
 | DB migrations | 14 | **17** | 17+ |
 | Features added | — | **8 new** | — |
-| RunwayStore LOC | 1708 | ~1850 | ~1200 (after P1) |
+| RunwayStore LOC | 1708 | **1391** | ~1200 (after P1) ✅ |
 | Accessibility labels | ~10 | **~25** | 200+ |
 | Force unwrap/precondition crash risks | 3 | **0** | 0 |

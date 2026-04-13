@@ -84,7 +84,7 @@ struct RunwayApp: App {
                 Button("Search Sessions") { store.focusSidebarSearch = true }
                     .keyboardShortcut("k", modifiers: .command)
 
-                Button("Review PR") { store.showReviewPRDialog = true }
+                Button("Review PR") { store.prCoordinator.showReviewPRDialog = true }
                     .keyboardShortcut("r", modifiers: [.command, .shift])
 
                 Divider()
@@ -190,11 +190,11 @@ struct ContentView: View {
             }
             .sheet(
                 isPresented: Binding(
-                    get: { store.showReviewPRSheet },
-                    set: { store.showReviewPRSheet = $0 }
+                    get: { store.prCoordinator.showReviewPRSheet },
+                    set: { store.prCoordinator.showReviewPRSheet = $0 }
                 )
             ) {
-                if let pr = store.reviewPRCandidate {
+                if let pr = store.prCoordinator.reviewPRCandidate {
                     ReviewPRSheet(
                         pr: pr,
                         projects: store.projects
@@ -207,23 +207,23 @@ struct ContentView: View {
                                 initialPrompt: initialPrompt
                             )
                         }
-                        store.reviewPRCandidate = nil
+                        store.prCoordinator.reviewPRCandidate = nil
                     }
                     .theme(theme)
                 }
             }
             .sheet(
                 isPresented: Binding(
-                    get: { store.showReviewPRDialog },
-                    set: { store.showReviewPRDialog = $0 }
+                    get: { store.prCoordinator.showReviewPRDialog },
+                    set: { store.prCoordinator.showReviewPRDialog = $0 }
                 )
             ) {
                 ReviewPRNumberDialog(
                     projects: store.projects,
-                    isResolving: store.isResolvingPR,
+                    isResolving: store.prCoordinator.isResolvingPR,
                     onResolve: { number, repo, host in
-                        Task { await store.resolvePRForReview(number: number, repo: repo, host: host) }
-                        store.showReviewPRDialog = false
+                        Task { await store.prCoordinator.resolvePRForReview(number: number, repo: repo, host: host) }
+                        store.prCoordinator.showReviewPRDialog = false
                     }
                 )
                 .theme(theme)
@@ -318,7 +318,7 @@ struct ContentView: View {
         return ProjectTreeView(
             projects: store.projects,
             sessions: store.sessions,
-            sessionPRs: store.sessionPRs,
+            sessionPRs: store.prCoordinator.sessionPRs,
             provisioningWorktreeIDs: store.provisioningWorktreeIDs,
             selectedSessionID: $store.selectedSessionID,
             searchQuery: $store.sidebarSearchQuery,
@@ -380,7 +380,7 @@ struct ContentView: View {
                 ProjectPageView(
                     project: project,
                     issues: store.projectIssues[projectID] ?? [],
-                    pullRequests: store.pullRequests.filter { $0.repo == project.ghRepo },
+                    pullRequests: store.prCoordinator.pullRequests.filter { $0.repo == project.ghRepo },
                     labels: store.projectLabels[projectID] ?? [],
                     isLoadingIssues: store.isLoadingIssues,
                     onRefreshIssues: { Task { await store.fetchIssues(forProject: projectID) } },
@@ -402,20 +402,20 @@ struct ContentView: View {
                     onStartSessionFromIssue: { issue in
                         Task { await store.startSessionFromIssue(issue, projectID: projectID) }
                     },
-                    onSelectPR: { pr in Task { await store.selectPR(pr, navigate: false) } },
-                    onRefreshPRs: { Task { await store.refreshPRsIfStale() } },
-                    selectedPRID: store.selectedPRID,
-                    prDetail: store.prDetail,
-                    onApprovePR: { pr in Task { await store.approvePR(pr) } },
-                    onCommentPR: { pr, body in Task { await store.commentOnPR(pr, body: body) } },
-                    onRequestChangesPR: { pr, body in Task { await store.requestChangesOnPR(pr, body: body) } },
-                    onMergePR: { pr, strategy in Task { await store.mergePR(pr, strategy: strategy) } },
-                    onToggleDraftPR: { pr in Task { await store.togglePRDraft(pr) } },
-                    onUpdateBranchPR: { pr, rebase in Task { await store.updatePRBranch(pr, rebase: rebase) } },
+                    onSelectPR: { pr in Task { await store.prCoordinator.selectPR(pr, navigate: false) } },
+                    onRefreshPRs: { Task { await store.prCoordinator.refreshPRsIfStale() } },
+                    selectedPRID: store.prCoordinator.selectedPRID,
+                    prDetail: store.prCoordinator.prDetail,
+                    onApprovePR: { pr in Task { await store.prCoordinator.approvePR(pr) } },
+                    onCommentPR: { pr, body in Task { await store.prCoordinator.commentOnPR(pr, body: body) } },
+                    onRequestChangesPR: { pr, body in Task { await store.prCoordinator.requestChangesOnPR(pr, body: body) } },
+                    onMergePR: { pr, strategy in Task { await store.prCoordinator.mergePR(pr, strategy: strategy) } },
+                    onToggleDraftPR: { pr in Task { await store.prCoordinator.togglePRDraft(pr) } },
+                    onUpdateBranchPR: { pr, rebase in Task { await store.prCoordinator.updatePRBranch(pr, rebase: rebase) } },
                     onReviewPR: { pr in store.reviewPR(pr) },
-                    onEnableAutoMergePR: { pr, strategy in Task { await store.enableAutoMerge(pr, strategy: strategy) } },
-                    onDisableAutoMergePR: { pr in Task { await store.disableAutoMerge(pr) } },
-                    onDeselectPR: { Task { await store.selectPR(nil, navigate: false) } },
+                    onEnableAutoMergePR: { pr, strategy in Task { await store.prCoordinator.enableAutoMerge(pr, strategy: strategy) } },
+                    onDisableAutoMergePR: { pr in Task { await store.prCoordinator.disableAutoMerge(pr) } },
+                    onDeselectPR: { Task { await store.prCoordinator.selectPR(nil, navigate: false) } },
                     onUpdateProject: { store.updateProjectSettings($0) },
                     onDetectRepo: { await store.detectGHRepo(for: project) },
                     onFetchLabels: { Task { await store.fetchLabels(forProject: projectID) } },
@@ -429,9 +429,9 @@ struct ContentView: View {
                 SessionDetailView(
                     session: session,
                     tmuxManager: store.tmuxManager,
-                    linkedPR: store.sessionPRs[sessionID],
-                    prDetail: store.prDetailForSession(sessionID),
-                    onSelectPR: { pr in Task { await store.selectPR(pr) } },
+                    linkedPR: store.prCoordinator.sessionPRs[sessionID],
+                    prDetail: store.prCoordinator.prDetailForSession(sessionID),
+                    onSelectPR: { pr in Task { await store.prCoordinator.selectPR(pr) } },
                     parentSession: {
                         guard let parentID = session.parentID else { return nil }
                         return store.sessions.first(where: { $0.id == parentID })
@@ -498,33 +498,33 @@ struct ContentView: View {
             }
         case .prs:
             PRDashboardView(
-                pullRequests: store.pullRequests,
-                selectedPRID: store.selectedPRID,
-                detail: store.prDetail,
-                isLoading: store.isLoadingPRs,
-                sessionPRIDs: store.sessionPRIDs,
+                pullRequests: store.prCoordinator.pullRequests,
+                selectedPRID: store.prCoordinator.selectedPRID,
+                detail: store.prCoordinator.prDetail,
+                isLoading: store.prCoordinator.isLoadingPRs,
+                sessionPRIDs: store.prCoordinator.sessionPRIDs,
                 selectedTab: Binding(
-                    get: { store.prTab },
-                    set: { store.prTab = $0 }
+                    get: { store.prCoordinator.prTab },
+                    set: { store.prCoordinator.prTab = $0 }
                 ),
-                onSelectPR: { pr in Task { await store.selectPR(pr) } },
-                onRefresh: { Task { await store.fetchPRs() } },
-                onApprove: { pr in Task { await store.approvePR(pr) } },
-                onComment: { pr, body in Task { await store.commentOnPR(pr, body: body) } },
-                onRequestChanges: { pr, body in Task { await store.requestChangesOnPR(pr, body: body) } },
-                onMerge: { pr, strategy in Task { await store.mergePR(pr, strategy: strategy) } },
-                onToggleDraft: { pr in Task { await store.togglePRDraft(pr) } },
-                onUpdateBranch: { pr, rebase in Task { await store.updatePRBranch(pr, rebase: rebase) } },
+                onSelectPR: { pr in Task { await store.prCoordinator.selectPR(pr) } },
+                onRefresh: { Task { await store.prCoordinator.fetchPRs() } },
+                onApprove: { pr in Task { await store.prCoordinator.approvePR(pr) } },
+                onComment: { pr, body in Task { await store.prCoordinator.commentOnPR(pr, body: body) } },
+                onRequestChanges: { pr, body in Task { await store.prCoordinator.requestChangesOnPR(pr, body: body) } },
+                onMerge: { pr, strategy in Task { await store.prCoordinator.mergePR(pr, strategy: strategy) } },
+                onToggleDraft: { pr in Task { await store.prCoordinator.togglePRDraft(pr) } },
+                onUpdateBranch: { pr, rebase in Task { await store.prCoordinator.updatePRBranch(pr, rebase: rebase) } },
                 onSendToSession: { pr, _ in
-                    if let sessionID = store.sessionPRs.first(where: { $0.value.id == pr.id })?.key {
+                    if let sessionID = store.prCoordinator.sessionPRs.first(where: { $0.value.id == pr.id })?.key {
                         store.selectSession(sessionID)
                         store.showSendBar = true
                     }
                 },
                 onReviewPR: { pr in store.reviewPR(pr) },
-                onEnableAutoMerge: { pr, strategy in Task { await store.enableAutoMerge(pr, strategy: strategy) } },
-                onDisableAutoMerge: { pr in Task { await store.disableAutoMerge(pr) } },
-                onClosePR: { pr in Task { await store.closePR(pr) } }
+                onEnableAutoMerge: { pr, strategy in Task { await store.prCoordinator.enableAutoMerge(pr, strategy: strategy) } },
+                onDisableAutoMerge: { pr in Task { await store.prCoordinator.disableAutoMerge(pr) } },
+                onClosePR: { pr in Task { await store.prCoordinator.closePR(pr) } }
             )
         }
     }
