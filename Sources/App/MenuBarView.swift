@@ -57,7 +57,7 @@ struct MenuBarView: View {
 
             // Actions
             actionButton("New Session…", icon: "plus.circle") {
-                store.showNewSessionDialog = true
+                store.activeSheet = .newSession
                 NSApplication.shared.activate()
             }
 

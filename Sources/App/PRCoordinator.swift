@@ -29,8 +29,6 @@ public final class PRCoordinator {
     }
 
     var reviewPRCandidate: PullRequest? = nil
-    var showReviewPRDialog: Bool = false
-    var showReviewPRSheet: Bool = false
     var isResolvingPR: Bool = false
 
     // MARK: - Private State
@@ -489,7 +487,7 @@ public final class PRCoordinator {
         do {
             let pr = try await prManager.resolvePR(repo: repo, number: number, host: host)
             reviewPRCandidate = pr
-            showReviewPRSheet = true
+            store?.activeSheet = .reviewPRSheet
         } catch {
             store?.statusMessage = .error(
                 "Failed to resolve PR #\(number): \(error.localizedDescription)")

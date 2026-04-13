@@ -100,11 +100,13 @@ Backend exists (`commitLog`, `resetToCommit` on WorktreeManager). Needs:
 #### U9: Unified Tab Bar Component
 4 different tab bar patterns exist (dashboard, project page, PR detail, issue detail). Extract shared `TabBarView`.
 
-#### U10: Adaptive Sheet Widths
-~10 sheets use hardcoded `frame(width:)`. Switch to `minWidth`/`idealWidth`/`maxWidth`.
+#### U10: Adaptive Sheet Widths — DONE
+Replaced hardcoded `frame(width:)` with `minWidth`/`idealWidth`/`maxWidth` on 5 sheets:
+NewSessionDialog, NewProjectDialog, ReviewPRSheet (2), ProjectSettingsSheet.
 
-#### U11: Consolidate Sheet Booleans
-4 independent sheet booleans (`showNewSessionDialog`, `showNewProjectDialog`, `showReviewPRSheet`, `showReviewPRDialog`) → single `ActiveSheet` enum.
+#### U11: Consolidate Sheet Booleans — DONE
+Replaced 4 independent booleans (`showNewSessionDialog`, `showNewProjectDialog`, `showReviewPRSheet`,
+`showReviewPRDialog`) with single `ActiveSheet` enum + `.sheet(item:)` modifier.
 
 ### Low Priority
 

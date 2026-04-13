@@ -60,11 +60,11 @@ struct RunwayApp: App {
             CommandGroup(after: .newItem) {
                 Button("New Session") {
                     store.newSessionProjectID = nil
-                    store.showNewSessionDialog = true
+                    store.activeSheet = .newSession
                 }
                 .keyboardShortcut("n", modifiers: .command)
 
-                Button("New Project") { store.showNewProjectDialog = true }
+                Button("New Project") { store.activeSheet = .newProject }
                     .keyboardShortcut("p", modifiers: [.command, .shift])
 
                 Button("Send to Session") { store.showSendBar.toggle() }
@@ -84,7 +84,7 @@ struct RunwayApp: App {
                 Button("Search Sessions") { store.focusSidebarSearch = true }
                     .keyboardShortcut("k", modifiers: .command)
 
-                Button("Review PR") { store.prCoordinator.showReviewPRDialog = true }
+                Button("Review PR") { store.activeSheet = .reviewPRDialog }
                     .keyboardShortcut("r", modifiers: [.command, .shift])
 
                 Divider()
@@ -146,87 +146,75 @@ struct ContentView: View {
                 toolbarContent
             }
             .sheet(
-                isPresented: Binding(
-                    get: { store.showNewSessionDialog },
+                item: Binding(
+                    get: { store.activeSheet },
                     set: {
-                        store.showNewSessionDialog = $0
-                        if !$0 {
+                        store.activeSheet = $0
+                        if $0 == nil {
                             store.newSessionProjectID = nil
                             store.newSessionParentID = nil
                             store.forkSourceSession = nil
                         }
                     }
                 )
-            ) {
-                NewSessionDialog(
-                    projects: store.projects,
-                    profiles: store.agentProfiles.isEmpty ? AgentProfile.builtIn : store.agentProfiles,
-                    initialProjectID: store.newSessionProjectID,
-                    parentID: store.newSessionParentID,
-                    templates: store.availableTemplates(forProjectID: store.newSessionProjectID),
-                    forkSource: store.forkSourceSession,
-                    onCreate: { request in
-                        Task { await store.handleNewSessionRequest(request) }
-                        store.newSessionProjectID = nil
-                        store.newSessionParentID = nil
-                        store.forkSourceSession = nil
-                    },
-                    onCreateReview: { request in
-                        try await store.handleReviewSessionRequest(request)
-                    }
-                )
-                .theme(theme)
-            }
-            .sheet(
-                isPresented: Binding(
-                    get: { store.showNewProjectDialog },
-                    set: { store.showNewProjectDialog = $0 }
-                )
-            ) {
-                NewProjectDialog { name, path, branch in
-                    store.createProject(name: name, path: path, defaultBranch: branch)
-                }
-                .theme(theme)
-            }
-            .sheet(
-                isPresented: Binding(
-                    get: { store.prCoordinator.showReviewPRSheet },
-                    set: { store.prCoordinator.showReviewPRSheet = $0 }
-                )
-            ) {
-                if let pr = store.prCoordinator.reviewPRCandidate {
-                    ReviewPRSheet(
-                        pr: pr,
-                        projects: store.projects
-                    ) { sessionName, projectID, initialPrompt in
-                        Task {
-                            await store.handleReviewPR(
-                                pr: pr,
-                                sessionName: sessionName,
-                                projectID: projectID,
-                                initialPrompt: initialPrompt
-                            )
+            ) { sheet in
+                switch sheet {
+                case .newSession:
+                    NewSessionDialog(
+                        projects: store.projects,
+                        profiles: store.agentProfiles.isEmpty ? AgentProfile.builtIn : store.agentProfiles,
+                        initialProjectID: store.newSessionProjectID,
+                        parentID: store.newSessionParentID,
+                        templates: store.availableTemplates(forProjectID: store.newSessionProjectID),
+                        forkSource: store.forkSourceSession,
+                        onCreate: { request in
+                            Task { await store.handleNewSessionRequest(request) }
+                            store.newSessionProjectID = nil
+                            store.newSessionParentID = nil
+                            store.forkSourceSession = nil
+                        },
+                        onCreateReview: { request in
+                            try await store.handleReviewSessionRequest(request)
                         }
-                        store.prCoordinator.reviewPRCandidate = nil
+                    )
+                    .theme(theme)
+
+                case .newProject:
+                    NewProjectDialog { name, path, branch in
+                        store.createProject(name: name, path: path, defaultBranch: branch)
                     }
                     .theme(theme)
-                }
-            }
-            .sheet(
-                isPresented: Binding(
-                    get: { store.prCoordinator.showReviewPRDialog },
-                    set: { store.prCoordinator.showReviewPRDialog = $0 }
-                )
-            ) {
-                ReviewPRNumberDialog(
-                    projects: store.projects,
-                    isResolving: store.prCoordinator.isResolvingPR,
-                    onResolve: { number, repo, host in
-                        Task { await store.prCoordinator.resolvePRForReview(number: number, repo: repo, host: host) }
-                        store.prCoordinator.showReviewPRDialog = false
+
+                case .reviewPRSheet:
+                    if let pr = store.prCoordinator.reviewPRCandidate {
+                        ReviewPRSheet(
+                            pr: pr,
+                            projects: store.projects
+                        ) { sessionName, projectID, initialPrompt in
+                            Task {
+                                await store.handleReviewPR(
+                                    pr: pr,
+                                    sessionName: sessionName,
+                                    projectID: projectID,
+                                    initialPrompt: initialPrompt
+                                )
+                            }
+                            store.prCoordinator.reviewPRCandidate = nil
+                        }
+                        .theme(theme)
                     }
-                )
-                .theme(theme)
+
+                case .reviewPRDialog:
+                    ReviewPRNumberDialog(
+                        projects: store.projects,
+                        isResolving: store.prCoordinator.isResolvingPR,
+                        onResolve: { number, repo, host in
+                            Task { await store.prCoordinator.resolvePRForReview(number: number, repo: repo, host: host) }
+                            store.activeSheet = nil
+                        }
+                    )
+                    .theme(theme)
+                }
             }
 
             // Status message toast — errors persist until dismissed, others auto-dismiss
@@ -487,7 +475,7 @@ struct ContentView: View {
                         title: "Welcome to Runway",
                         subtitle: "Add a project to get started with AI coding sessions, or jump straight in with a quick session.",
                         actionTitle: "Add Your First Project",
-                        onAction: { store.showNewProjectDialog = true }
+                        onAction: { store.activeSheet = .newProject }
                     )
                 } else {
                     EmptyStateView(
@@ -541,7 +529,7 @@ struct ContentView: View {
         ToolbarItem(placement: .primaryAction) {
             Button {
                 store.newSessionProjectID = nil
-                store.showNewSessionDialog = true
+                store.activeSheet = .newSession
             } label: {
                 Label("New Session", systemImage: "plus.rectangle")
             }

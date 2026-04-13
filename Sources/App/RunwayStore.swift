@@ -23,8 +23,7 @@ public final class RunwayStore {
 
     var selectedSessionID: String?
     var currentView: AppView = .sessions
-    var showNewSessionDialog: Bool = false
-    var showNewProjectDialog: Bool = false
+    var activeSheet: ActiveSheet?
     var newSessionProjectID: String?
     var newSessionParentID: String?
     var forkSourceSession: Session?
@@ -776,7 +775,7 @@ public final class RunwayStore {
             NSApplication.shared.activate()
 
         case .newSession:
-            showNewSessionDialog = true
+            activeSheet = .newSession
             NSApplication.shared.activate()
         }
     }
@@ -1286,7 +1285,7 @@ extension RunwayStore: SidebarActions {
     public func newSession(projectID: String?, parentID: String? = nil) {
         newSessionProjectID = projectID
         newSessionParentID = parentID
-        showNewSessionDialog = true
+        activeSheet = .newSession
     }
 
     public func forkSession(id: String) {
@@ -1296,11 +1295,11 @@ extension RunwayStore: SidebarActions {
         forkSourceSession = session
         newSessionProjectID = session.projectID
         newSessionParentID = session.id
-        showNewSessionDialog = true
+        activeSheet = .newSession
     }
 
     public func newProject() {
-        showNewProjectDialog = true
+        activeSheet = .newProject
     }
 
     // SidebarActions conformance — delegates to PRCoordinator
@@ -1310,7 +1309,7 @@ extension RunwayStore: SidebarActions {
 
     public func reviewPR(_ pr: PullRequest) {
         prCoordinator.reviewPRCandidate = pr
-        prCoordinator.showReviewPRSheet = true
+        activeSheet = .reviewPRSheet
     }
 
     // MARK: - Changes Sidebar Actions
@@ -1373,6 +1372,25 @@ extension RunwayStore: SidebarActions {
     private func stopChangesRefresh() {
         changesRefreshTask?.cancel()
         changesRefreshTask = nil
+    }
+}
+
+// MARK: - Active Sheet
+
+/// Mutually exclusive sheet presentation — replaces 4 independent booleans.
+enum ActiveSheet: Identifiable {
+    case newSession
+    case newProject
+    case reviewPRSheet
+    case reviewPRDialog
+
+    var id: String {
+        switch self {
+        case .newSession: "newSession"
+        case .newProject: "newProject"
+        case .reviewPRSheet: "reviewPRSheet"
+        case .reviewPRDialog: "reviewPRDialog"
+        }
     }
 }
 
