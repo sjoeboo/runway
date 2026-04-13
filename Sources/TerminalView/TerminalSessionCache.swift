@@ -84,10 +84,17 @@ public final class TerminalSessionCache {
     // MARK: - LRU Eviction
 
     /// Evict the least-recently-accessed entry if the cache exceeds `maxSize`.
+    /// Terminates the evicted terminal's PTY process to prevent orphaned attach processes.
+    /// The underlying tmux session persists independently — re-attaching later creates a new view.
     private func evictIfNeeded() {
         while views.count > maxSize {
             guard let lruKey = lastAccess.min(by: { $0.value < $1.value })?.key else {
                 break
+            }
+            // Terminate the attach process before removing the view reference.
+            // Without this, the `tmux attach-session` child process becomes orphaned.
+            if let terminal = views[lruKey] {
+                terminal.process?.terminate()
             }
             views.removeValue(forKey: lruKey)
             lastAccess.removeValue(forKey: lruKey)

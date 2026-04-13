@@ -70,11 +70,17 @@ public actor PRManager {
 
     /// Fetch both "mine" and "review-requested" PRs in parallel, merge and deduplicate.
     /// Each PR gets an `origin` set indicating which queries returned it.
+    /// A failure in one filter does not discard results from the other.
     public func fetchAllPRs() async throws -> [PullRequest] {
-        async let minePRs = fetchPRs(filter: .mine)
-        async let reviewPRs = fetchPRs(filter: .reviewRequested)
+        // Use separate tasks so a failure in one doesn't discard the other's results
+        async let minePRs: [PullRequest] = {
+            (try? await fetchPRs(filter: .mine)) ?? []
+        }()
+        async let reviewPRs: [PullRequest] = {
+            (try? await fetchPRs(filter: .reviewRequested)) ?? []
+        }()
 
-        let (mine, review) = try await (minePRs, reviewPRs)
+        let (mine, review) = await (minePRs, reviewPRs)
 
         // Merge: deduplicate by ID, combine origins
         var merged: [String: PullRequest] = [:]
@@ -278,6 +284,11 @@ public actor PRManager {
                 host: host
             )
             let nodeID = nodeOutput.trimmingCharacters(in: .whitespacesAndNewlines)
+            // Validate nodeID to prevent GraphQL injection (should be alphanumeric + _ + =)
+            let isValid = !nodeID.isEmpty && nodeID.allSatisfy { $0.isLetter || $0.isNumber || $0 == "_" || $0 == "=" }
+            guard isValid else {
+                throw PRActionError.invalidNodeID(nodeID)
+            }
             try await runGH(
                 args: [
                     "api", "graphql",
@@ -438,6 +449,17 @@ public enum PRResolveError: Error, LocalizedError {
             "PR #\(number) not found in \(repo)"
         case .noProject:
             "No project matches the PR repository"
+        }
+    }
+}
+
+public enum PRActionError: Error, LocalizedError {
+    case invalidNodeID(String)
+
+    public var errorDescription: String? {
+        switch self {
+        case .invalidNodeID(let id):
+            "Invalid PR node ID: \(id)"
         }
     }
 }

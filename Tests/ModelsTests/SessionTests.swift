@@ -150,3 +150,39 @@ import Testing
     let session = Session(title: "test", path: "/tmp", useHappy: true)
     #expect(session.useHappy == true)
 }
+
+@Test func sessionCostFieldsDefault() {
+    let session = Session(title: "test", path: "/tmp")
+    #expect(session.totalCostUSD == nil)
+    #expect(session.totalInputTokens == nil)
+    #expect(session.totalOutputTokens == nil)
+    #expect(session.transcriptPath == nil)
+}
+
+@Test func sessionCostFieldsPreserved() {
+    let session = Session(
+        title: "test", path: "/tmp",
+        totalCostUSD: 2.50, totalInputTokens: 100_000,
+        totalOutputTokens: 25_000, transcriptPath: "/tmp/t.jsonl"
+    )
+    #expect(session.totalCostUSD == 2.50)
+    #expect(session.totalInputTokens == 100_000)
+    #expect(session.totalOutputTokens == 25_000)
+    #expect(session.transcriptPath == "/tmp/t.jsonl")
+}
+
+@Test func sessionEquatableExcludesTransientFields() {
+    var s1 = Session(title: "test", path: "/tmp")
+    var s2 = s1
+    s2.lastActivityText = "different"
+    s2.lastError = "some error"
+    // Transient fields don't affect equality
+    #expect(s1 == s2)
+}
+
+@Test func sessionEquatableDetectsRealChanges() {
+    let s1 = Session(title: "test", path: "/tmp")
+    var s2 = s1
+    s2.status = .running
+    #expect(s1 != s2)
+}

@@ -17,6 +17,11 @@ public struct HookEvent: Codable, Sendable {
     public var source: String?
     public var notificationType: String?
 
+    // Cost/token fields (populated in Stop events by Claude Code)
+    public var totalCostUSD: Double?
+    public var totalInputTokens: Int?
+    public var totalOutputTokens: Int?
+
     enum CodingKeys: String, CodingKey {
         case sessionID = "session_id"
         case event = "hook_event_name"
@@ -27,6 +32,9 @@ public struct HookEvent: Codable, Sendable {
         case prompt
         case source
         case notificationType = "notification_type"
+        case totalCostUSD = "total_cost_usd"
+        case totalInputTokens = "total_input_tokens"
+        case totalOutputTokens = "total_output_tokens"
     }
 
     public init(
@@ -34,7 +42,10 @@ public struct HookEvent: Codable, Sendable {
         cwd: String? = nil, transcriptPath: String? = nil,
         toolName: String? = nil, message: String? = nil,
         prompt: String? = nil, source: String? = nil,
-        notificationType: String? = nil
+        notificationType: String? = nil,
+        totalCostUSD: Double? = nil,
+        totalInputTokens: Int? = nil,
+        totalOutputTokens: Int? = nil
     ) {
         self.sessionID = sessionID
         self.event = event
@@ -45,6 +56,9 @@ public struct HookEvent: Codable, Sendable {
         self.prompt = prompt
         self.source = source
         self.notificationType = notificationType
+        self.totalCostUSD = totalCostUSD
+        self.totalInputTokens = totalInputTokens
+        self.totalOutputTokens = totalOutputTokens
     }
 }
 

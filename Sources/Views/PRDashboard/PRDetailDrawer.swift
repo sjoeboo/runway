@@ -94,6 +94,7 @@ public struct PRDetailDrawer: View {
                         .foregroundStyle(.secondary)
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel("Close detail panel")
             }
 
             Text(pr.title)

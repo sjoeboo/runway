@@ -164,27 +164,35 @@ public final class PTYProcess: @unchecked Sendable {
         // Cancel dispatch sources before deallocation — deallocating a resumed,
         // non-cancelled DispatchSource is undefined behavior and will crash.
         handleExit()
+        // Reap the zombie if the child already exited but the processSource
+        // event handler was pre-empted by source cancellation.
+        var status: Int32 = 0
+        waitpid(pid, &status, WNOHANG)
     }
 
     /// Write data to the PTY master (sends to child's stdin).
     public func write(_ data: Data) {
-        guard isAlive else { return }
+        // Hold the lock through the entire write to prevent a race where
+        // handleExit() closes masterFD between the isAlive check and the write.
+        let fd = lock.withLock { _isAlive ? masterFD : -1 }
+        guard fd >= 0 else { return }
         data.withUnsafeBytes { buffer in
             guard let ptr = buffer.baseAddress else { return }
-            _ = Darwin.write(masterFD, ptr, buffer.count)
+            _ = Darwin.write(fd, ptr, buffer.count)
         }
     }
 
     /// Resize the PTY.
     public func resize(cols: Int, rows: Int) {
-        guard isAlive else { return }
+        let fd = lock.withLock { _isAlive ? masterFD : -1 }
+        guard fd >= 0 else { return }
         var winSize = winsize(
             ws_row: UInt16(rows),
             ws_col: UInt16(cols),
             ws_xpixel: 0,
             ws_ypixel: 0
         )
-        _ = ioctl(masterFD, TIOCSWINSZ, &winSize)
+        _ = ioctl(fd, TIOCSWINSZ, &winSize)
     }
 
     /// Send SIGTERM to the child process, then SIGKILL after a timeout.

@@ -20,6 +20,7 @@ public final class RunwayStore {
     var pullRequests: [PullRequest] = []
     var sessionTemplates: [SessionTemplate] = []
     var agentProfiles: [AgentProfile] = []
+    var savedPrompts: [SavedPrompt] = []
 
     var selectedSessionID: String?
     /// Incremented on every selection change to force SwiftUI re-render
@@ -44,6 +45,7 @@ public final class RunwayStore {
     var forkSourceSession: Session?
     var statusMessage: StatusMessage?
     var tmuxAvailable: Bool = false
+    var ghAvailable: Bool = false
     var showSendBar: Bool = false
     var showTerminalSearch: Bool = false
     /// Incremented to trigger a horizontal split in the active terminal tab.
@@ -91,9 +93,7 @@ public final class RunwayStore {
     // MARK: - Changes Sidebar
     var changesVisible: Bool = false
     var changesMode: ChangesMode = .branch
-    var sessionChanges: [String: [FileChange]] = [:] {
-        didSet { rebuildFileTree() }
-    }
+    var sessionChanges: [String: [FileChange]] = [:]
     var sessionFileTree: [String: [FileTreeNode]] = [:]
     var viewingDiffFile: FileChange? = nil
     var viewingDiffPatch: String? = nil
@@ -101,10 +101,11 @@ public final class RunwayStore {
     var activeDiffPath: String? = nil
     private var changesRefreshTask: Task<Void, Never>?
 
-    private func rebuildFileTree() {
-        for (sessionID, changes) in sessionChanges {
-            sessionFileTree[sessionID] = buildFileTree(changes)
-        }
+    /// Update changes for a single session and rebuild only that session's file tree.
+    /// Avoids the previous `didSet` pattern that rebuilt ALL sessions on any change.
+    func updateChanges(for sessionID: String, changes: [FileChange]) {
+        sessionChanges[sessionID] = changes
+        sessionFileTree[sessionID] = buildFileTree(changes)
     }
 
     var selectedProjectID: String?
@@ -115,6 +116,10 @@ public final class RunwayStore {
     var selectedIssueID: String?
     var issueDetail: IssueDetail?
     var isLoadingIssueDetail: Bool = false
+
+    /// True when the database failed to open — shown as a persistent warning in the UI.
+    /// All session/project data will be lost on restart when this is true.
+    var databaseFailed: Bool = false
 
     // MARK: - Managers
     let themeManager: ThemeManager
@@ -147,6 +152,7 @@ public final class RunwayStore {
         } catch {
             print("[Runway] Failed to open database: \(error)")
             self.database = nil
+            self.databaseFailed = true
             // Deferred to after init completes since statusMessage triggers UI
             Task { @MainActor [weak self] in
                 self?.statusMessage = .error("Database failed to open — session data will not persist. \(error.localizedDescription)")
@@ -157,7 +163,17 @@ public final class RunwayStore {
         // has sessions available for PR-session linking)
         Task {
             tmuxAvailable = await tmuxManager.isAvailable()
-            print("[Runway] tmux available: \(tmuxAvailable)")
+            ghAvailable = (try? await ShellRunner.run(executable: "/usr/bin/env", args: ["gh", "--version"])) != nil
+            print("[Runway] tmux available: \(tmuxAvailable), gh available: \(ghAvailable)")
+
+            // Surface missing prerequisites as persistent warning
+            var missing: [String] = []
+            if !tmuxAvailable { missing.append("tmux") }
+            if !ghAvailable { missing.append("gh") }
+            if !missing.isEmpty {
+                statusMessage = .error(
+                    "Missing tools: \(missing.joined(separator: ", ")) — install with `brew install \(missing.joined(separator: " "))`")
+            }
             await loadState()
             await fetchPRs()
             // Seed the fingerprint so the first poll doesn't trigger a redundant fetch
@@ -180,15 +196,18 @@ public final class RunwayStore {
         // Start buffer-based status detection for sessions without hook events
         startBufferDetection()
 
-        // Remove injected hooks on app termination so agents don't block on a dead port
+        // Remove injected hooks and clean up port file on app termination
+        // so agents don't block on a dead port after quit.
         NotificationCenter.default.addObserver(
             forName: NSApplication.willTerminateNotification,
             object: nil,
             queue: .main
-        ) { [hookInjector] _ in
+        ) { [hookInjector, portFile = Self.portFilePath] _ in
             for config in HookInjectionConfig.allBuiltIn {
                 try? hookInjector.remove(config: config)
             }
+            // Remove persisted port file so next launch doesn't try a dead port
+            try? FileManager.default.removeItem(atPath: portFile)
         }
     }
 
@@ -200,6 +219,7 @@ public final class RunwayStore {
             projects = try db.allProjects()
             sessions = try db.allSessions()
             sessionTemplates = (try? db.allTemplates()) ?? []
+            savedPrompts = (try? db.allPrompts()) ?? []
             agentProfiles = AgentProfile.builtIn + AgentProfile.loadUserProfiles()
 
             // Auto-detect default branches only for projects that still have the placeholder "main".
@@ -436,6 +456,9 @@ public final class RunwayStore {
                 } catch {
                     print("[Runway] Worktree creation failed: \(error)")
                     provisioningWorktreeIDs.remove(session.id)
+                    if let idx = sessions.firstIndex(where: { $0.id == session.id }) {
+                        sessions[idx].lastError = error.localizedDescription
+                    }
                     updateSessionStatus(id: session.id, status: .error)
                     statusMessage = .error("Worktree failed — session cannot start without branch isolation: \(error.localizedDescription)")
                     return
@@ -611,6 +634,9 @@ public final class RunwayStore {
         TerminalSessionCache.shared.removeAll(forSessionID: id)
         sessionPRs.removeValue(forKey: id)
         sessionPRFetchedAt.removeValue(forKey: id)
+        lastHookEventTime.removeValue(forKey: id)
+        sessionChanges.removeValue(forKey: id)
+        sessionFileTree.removeValue(forKey: id)
         if selectedSessionID == id {
             selectedSessionID = nextSelection
         }
@@ -631,12 +657,44 @@ public final class RunwayStore {
             {
                 do {
                     try await worktreeManager.removeWorktree(
-                        repoPath: repoPath, worktreePath: wtPath, deleteBranch: true
+                        repoPath: repoPath, worktreePath: wtPath,
+                        deleteBranch: true, branchName: worktreeBranch
                     )
                 } catch {
                     statusMessage = .error("Worktree cleanup failed: \(error.localizedDescription)")
                 }
             }
+        }
+    }
+
+    // MARK: - Batch Session Actions
+
+    /// Restart all sessions with the given IDs.
+    func restartSessions(_ ids: [String]) async {
+        for id in ids {
+            await restartSession(id: id)
+        }
+    }
+
+    /// Delete all stopped sessions, optionally cleaning up worktrees for merged branches.
+    public func deleteStoppedSessions(deleteWorktrees: Bool = false) {
+        let stopped = sessions.filter { $0.status == .stopped }
+        for session in stopped {
+            deleteSession(id: session.id, deleteWorktree: deleteWorktrees)
+        }
+        if !stopped.isEmpty {
+            statusMessage = .info("Deleted \(stopped.count) stopped session\(stopped.count == 1 ? "" : "s")")
+        }
+    }
+
+    /// Stop all running/waiting/idle sessions.
+    public func stopAllSessions() async {
+        let active = sessions.filter { [.running, .waiting, .idle].contains($0.status) }
+        for session in active {
+            if tmuxAvailable {
+                try? await tmuxManager.killSession(name: "runway-\(session.id)")
+            }
+            updateSessionStatus(id: session.id, status: .stopped)
         }
     }
 
@@ -731,12 +789,18 @@ public final class RunwayStore {
 
         switch destination {
         case .session(let id):
-            selectSession(id)
+            if sessions.contains(where: { $0.id == id }) {
+                selectSession(id)
+            } else {
+                statusMessage = .info("Session not found — it may have been deleted")
+            }
             NSApplication.shared.activate()
 
         case .pr(let number, let repo):
             if let pr = pullRequests.first(where: { $0.number == number && $0.repo == repo }) {
                 Task { await selectPR(pr) }
+            } else {
+                statusMessage = .info("PR #\(number) not found in \(repo) — try refreshing the PR list")
             }
             NSApplication.shared.activate()
 
@@ -802,12 +866,29 @@ public final class RunwayStore {
     private static let portFilePath = "\(FileManager.default.homeDirectoryForCurrentUser.path)/.runway/hook_port"
 
     private func startHookServer() async {
+        // Shared event handler — registered BEFORE start() so no events are missed.
+        let registerHandler: (HookServer) async -> Void = { [weak self] server in
+            await server.onEvent { [weak self] event in
+                Task { @MainActor in
+                    self?.handleHookEvent(event)
+                }
+            }
+            // Auto-restart on runtime failure
+            await server.setOnFailure { [weak self] in
+                Task { @MainActor in
+                    print("[Runway] Hook server failed at runtime, attempting restart")
+                    await self?.startHookServer()
+                }
+            }
+        }
+
         do {
             // Determine which port to try first, then create the definitive server.
             let previousPort = Self.loadPersistedPort()
 
             if let previousPort {
                 hookServer = HookServer(port: previousPort)
+                await registerHandler(hookServer)
                 do {
                     try await hookServer.start()
                 } catch {
@@ -815,18 +896,13 @@ public final class RunwayStore {
                     print("[Runway] Previous port \(previousPort) unavailable, using ephemeral")
                     await hookServer.stop()
                     hookServer = HookServer()
+                    await registerHandler(hookServer)
                     try await hookServer.start()
                 }
             } else {
                 // No saved port — use ephemeral
+                await registerHandler(hookServer)
                 try await hookServer.start()
-            }
-
-            // Register the event handler exactly once on the final, started server.
-            await hookServer.onEvent { [weak self] event in
-                Task { @MainActor in
-                    self?.handleHookEvent(event)
-                }
             }
 
             if let port = await hookServer.actualPort {
@@ -879,13 +955,39 @@ public final class RunwayStore {
             try? database?.saveEvent(sessionEvent)
         }
 
+        // Capture transcript path from any event (it's a constant field set on every hook)
+        if let path = event.transcriptPath, !path.isEmpty,
+            let idx = sessions.firstIndex(where: { $0.id == event.sessionID }),
+            sessions[idx].transcriptPath == nil
+        {
+            sessions[idx].transcriptPath = path
+            try? database?.saveSession(sessions[idx])
+        }
+
         switch event.event {
         case .sessionStart:
             updateSessionStatus(id: event.sessionID, status: .running)
         case .sessionEnd:
             updateSessionStatus(id: event.sessionID, status: .stopped)
+            // Also capture cost data from SessionEnd (some agents send it here)
+            if event.totalCostUSD != nil || event.totalInputTokens != nil {
+                if let idx = sessions.firstIndex(where: { $0.id == event.sessionID }) {
+                    if let cost = event.totalCostUSD { sessions[idx].totalCostUSD = cost }
+                    if let input = event.totalInputTokens { sessions[idx].totalInputTokens = input }
+                    if let output = event.totalOutputTokens { sessions[idx].totalOutputTokens = output }
+                    try? database?.saveSession(sessions[idx])
+                }
+            }
         case .stop:
             updateSessionStatus(id: event.sessionID, status: .idle)
+            // Capture cost/token data from Stop events
+            if let idx = sessions.firstIndex(where: { $0.id == event.sessionID }) {
+                if let cost = event.totalCostUSD { sessions[idx].totalCostUSD = cost }
+                if let input = event.totalInputTokens { sessions[idx].totalInputTokens = input }
+                if let output = event.totalOutputTokens { sessions[idx].totalOutputTokens = output }
+                if let path = event.transcriptPath { sessions[idx].transcriptPath = path }
+                try? database?.saveSession(sessions[idx])
+            }
         case .userPromptSubmit:
             updateSessionStatus(id: event.sessionID, status: .running)
         case .permissionRequest:
@@ -927,13 +1029,16 @@ public final class RunwayStore {
     private var bufferDetectionTask: Task<Void, Never>?
 
     /// Polls terminal buffers to detect session status for sessions without hook events.
-    /// Runs every 3 seconds and updates status based on terminal content analysis.
+    /// Runs every 3 seconds. Terminal buffer reads and pattern matching happen on-main
+    /// (required by SwiftTerm), but only for sessions that need polling.
     func startBufferDetection() {
         bufferDetectionTask?.cancel()
-        bufferDetectionTask = Task { @MainActor in
+        bufferDetectionTask = Task { @MainActor [weak self] in
             while !Task.isCancelled {
-                try? await Task.sleep(for: .seconds(3))
-                guard !sessions.isEmpty else { continue }
+                // Add jitter to prevent alignment with other polling timers (PR 30s, session 15s, changes 10s)
+                let jitter = Double.random(in: 0...1)
+                try? await Task.sleep(for: .seconds(3 + jitter))
+                guard let self, !sessions.isEmpty else { continue }
                 pollTerminalBuffers()
             }
         }
@@ -1058,6 +1163,9 @@ public final class RunwayStore {
             }
         }
 
+        // Bail out if this enrichment was superseded by a newer fetch cycle
+        guard !Task.isCancelled else { return }
+
         // Merge in a single pass
         var updated = pullRequests
         for i in updated.indices {
@@ -1141,9 +1249,10 @@ public final class RunwayStore {
     /// Only triggers a full fetch when the fingerprint (latest updatedAt) changes.
     func startPRPoll() {
         prPollTask?.cancel()
-        prPollTask = Task { [weak self] in
+        prPollTask = Task { @MainActor [weak self] in
             while !Task.isCancelled {
-                try? await Task.sleep(for: .seconds(30))
+                let jitter = Double.random(in: 0...3)
+                try? await Task.sleep(for: .seconds(30 + jitter))
                 guard !Task.isCancelled, let self else { return }
                 guard !self.isLoadingPRs else { continue }
                 let fingerprint = await self.prManager.prFingerprint(filter: .mine)
@@ -1164,9 +1273,10 @@ public final class RunwayStore {
     /// This decouples session PR detection from the heavier global fetch→enrich pipeline.
     func startSessionPRPoll() {
         sessionPRPollTask?.cancel()
-        sessionPRPollTask = Task { [weak self] in
+        sessionPRPollTask = Task { @MainActor [weak self] in
             while !Task.isCancelled {
-                try? await Task.sleep(for: .seconds(15))
+                let jitter = Double.random(in: 0...2)
+                try? await Task.sleep(for: .seconds(15 + jitter))
                 guard !Task.isCancelled, let self else { return }
                 await self.freshenSessionPRs()
             }
@@ -1671,7 +1781,7 @@ extension RunwayStore: SidebarActions {
                 path: session.path,
                 mode: changesMode
             )
-            sessionChanges[sessionID] = changes
+            updateChanges(for: sessionID, changes: changes)
         }
     }
 

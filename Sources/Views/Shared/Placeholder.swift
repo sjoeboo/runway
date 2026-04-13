@@ -42,6 +42,6 @@ public struct EmptyStateView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(.windowBackground)
+        .background(theme.chrome.background)
     }
 }

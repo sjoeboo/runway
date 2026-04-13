@@ -14,6 +14,7 @@ struct TerminalTab: Identifiable {
     enum Content {
         case terminal(TerminalConfig)
         case diff(filePath: String, patch: String)
+        case transcript(path: String)
     }
 
     let content: Content
@@ -37,6 +38,13 @@ struct TerminalTab: Identifiable {
         self.isMain = false
         self.content = .diff(filePath: filePath, patch: patch)
     }
+
+    init(id: String, title: String, transcriptPath: String) {
+        self.id = id
+        self.title = title
+        self.isMain = false
+        self.content = .transcript(path: transcriptPath)
+    }
 }
 
 /// Tab bar + terminal pane container for multiple terminals per session.
@@ -51,6 +59,7 @@ public struct TerminalTabView: View {
     let pendingDiffPatch: String?
     let diffOpenTrigger: Int
     var onActiveDiffPathChanged: ((String?) -> Void)?
+    var onRestart: (() -> Void)?
     @State private var tabs: [TerminalTab] = []
     @State private var selectedTabID: String?
     @State private var shellCounter: Int = 0
@@ -68,7 +77,8 @@ public struct TerminalTabView: View {
         pendingDiffPath: String? = nil,
         pendingDiffPatch: String? = nil,
         diffOpenTrigger: Int = 0,
-        onActiveDiffPathChanged: ((String?) -> Void)? = nil
+        onActiveDiffPathChanged: ((String?) -> Void)? = nil,
+        onRestart: (() -> Void)? = nil
     ) {
         self.session = session
         self.tmuxManager = tmuxManager
@@ -80,6 +90,7 @@ public struct TerminalTabView: View {
         self.pendingDiffPatch = pendingDiffPatch
         self.diffOpenTrigger = diffOpenTrigger
         self.onActiveDiffPathChanged = onActiveDiffPathChanged
+        self.onRestart = onRestart
     }
 
     public var body: some View {
@@ -90,13 +101,28 @@ public struct TerminalTabView: View {
             // Terminal for selected tab
             if tabs.isEmpty, session.status == .error || session.status == .stopped {
                 Spacer()
-                VStack(spacing: 8) {
-                    Image(systemName: "exclamationmark.triangle")
+                VStack(spacing: 12) {
+                    Image(systemName: session.status == .error ? "exclamationmark.triangle" : "stop.circle")
                         .font(.title2)
-                        .foregroundColor(theme.chrome.textDim)
+                        .foregroundColor(session.status == .error ? theme.chrome.orange : theme.chrome.textDim)
                     Text(session.status == .error ? "Session failed to start" : "Session stopped")
-                        .font(.caption)
+                        .font(.callout)
                         .foregroundColor(theme.chrome.textDim)
+                    if let error = session.lastError, session.status == .error {
+                        Text(error)
+                            .font(.caption)
+                            .foregroundColor(theme.chrome.red)
+                            .multilineTextAlignment(.center)
+                            .frame(maxWidth: 400)
+                    }
+                    if let onRestart {
+                        Button(action: onRestart) {
+                            Label("Restart Session", systemImage: "arrow.clockwise")
+                                .font(.callout)
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .controlSize(.regular)
+                    }
                 }
                 Spacer()
             } else if tabs.isEmpty {
@@ -142,6 +168,8 @@ public struct TerminalTabView: View {
                     }
                 case .diff(_, let patch):
                     DiffView(patch: patch)
+                case .transcript(let path):
+                    TranscriptView(transcriptPath: path)
                 }
             }
         }
@@ -202,6 +230,21 @@ public struct TerminalTabView: View {
             .buttonStyle(.plain)
             .help("New shell tab")
             .accessibilityLabel("New shell tab")
+
+            // Transcript tab button (if session has a transcript)
+            if let path = session.transcriptPath {
+                Button {
+                    openTranscriptTab(path: path)
+                } label: {
+                    Image(systemName: "doc.text")
+                        .font(.caption)
+                        .foregroundColor(theme.chrome.textDim)
+                        .frame(width: 28, height: 28)
+                }
+                .buttonStyle(.plain)
+                .help("View session transcript")
+                .accessibilityLabel("View transcript")
+            }
 
             Spacer()
 
@@ -458,6 +501,17 @@ public struct TerminalTabView: View {
         }
     }
 
+    private func openTranscriptTab(path: String) {
+        let tabID = "transcript"
+        if tabs.contains(where: { $0.id == tabID }) {
+            selectedTabID = tabID
+        } else {
+            let tab = TerminalTab(id: tabID, title: "Transcript", transcriptPath: path)
+            tabs.append(tab)
+            selectedTabID = tabID
+        }
+    }
+
     private func notifyActiveDiffPath() {
         if let tab = selectedTab, case .diff(let path, _) = tab.content {
             onActiveDiffPathChanged?(path)
@@ -474,18 +528,23 @@ public struct TerminalTabView: View {
     }
 
     /// Count occurrences of a search term in the terminal buffer text.
+    /// Iterates row-by-row instead of loading the entire scrollback buffer into memory,
+    /// avoiding ~6MB allocation spikes per keystroke on large terminals.
     private func countMatches(_ term: String, in terminalView: LocalProcessTerminalView) -> Int {
-        let data = terminalView.getTerminal().getBufferAsData()
-        guard let text = String(data: data, encoding: .utf8) else { return 0 }
-
-        // Case-insensitive count to match SwiftTerm's default SearchOptions
+        let terminal = terminalView.getTerminal()
         let searchTerm = term.lowercased()
-        let searchIn = text.lowercased()
+        guard !searchTerm.isEmpty else { return 0 }
+
         var count = 0
-        var searchRange = searchIn.startIndex..<searchIn.endIndex
-        while let range = searchIn.range(of: searchTerm, range: searchRange) {
-            count += 1
-            searchRange = range.upperBound..<searchIn.endIndex
+        let totalRows = terminal.rows
+        for row in 0..<totalRows {
+            guard let line = terminal.getLine(row: row) else { continue }
+            let text = line.translateToString(trimRight: true).lowercased()
+            var searchRange = text.startIndex..<text.endIndex
+            while let range = text.range(of: searchTerm, range: searchRange) {
+                count += 1
+                searchRange = range.upperBound..<text.endIndex
+            }
         }
         return count
     }

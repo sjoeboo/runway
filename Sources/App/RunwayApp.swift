@@ -86,6 +86,11 @@ struct RunwayApp: App {
 
                 Button("Review PR") { store.showReviewPRDialog = true }
                     .keyboardShortcut("r", modifiers: [.command, .shift])
+
+                Divider()
+
+                Button("Stop All Sessions") { Task { await store.stopAllSessions() } }
+                Button("Delete Stopped Sessions") { store.deleteStoppedSessions(deleteWorktrees: false) }
             }
         }
 
@@ -471,15 +476,25 @@ struct ContentView: View {
                     pendingDiffPatch: store.viewingDiffPatch,
                     diffOpenTrigger: store.diffOpenTrigger,
                     onActiveDiffPathChanged: { path in store.activeDiffPath = path },
-                    onToggleChanges: { store.toggleChangesSidebar() }
+                    onToggleChanges: { store.toggleChangesSidebar() },
+                    onRestart: { Task { await store.restartSession(id: sessionID) } },
+                    savedPrompts: store.savedPrompts
                 )
             } else {
-                EmptyStateView(
-                    title: "No Session Selected",
-                    subtitle: "Select a session from the sidebar or press ⌘N to create one",
-                    actionTitle: store.projects.isEmpty ? "Add Your First Project" : nil,
-                    onAction: store.projects.isEmpty ? { store.showNewProjectDialog = true } : nil
-                )
+                if store.projects.isEmpty && store.sessions.isEmpty {
+                    // First-run empty state with clear guidance
+                    EmptyStateView(
+                        title: "Welcome to Runway",
+                        subtitle: "Add a project to get started with AI coding sessions, or jump straight in with a quick session.",
+                        actionTitle: "Add Your First Project",
+                        onAction: { store.showNewProjectDialog = true }
+                    )
+                } else {
+                    EmptyStateView(
+                        title: "No Session Selected",
+                        subtitle: "Select a session from the sidebar or press \u{2318}N to create one"
+                    )
+                }
             }
         case .prs:
             PRDashboardView(

@@ -75,11 +75,19 @@ public struct TerminalPalette: Sendable {
     public let ansi: [Color]
 
     public init(foreground: Color, background: Color, cursor: Color, selection: Color, ansi: [Color]) {
-        precondition(ansi.count == 16, "ANSI palette must have exactly 16 colors")
         self.foreground = foreground
         self.background = background
         self.cursor = cursor
         self.selection = selection
-        self.ansi = ansi
+        // Pad or truncate to exactly 16 entries to prevent crash on malformed theme JSON
+        if ansi.count == 16 {
+            self.ansi = ansi
+        } else if ansi.count > 16 {
+            self.ansi = Array(ansi.prefix(16))
+        } else {
+            var padded = ansi
+            while padded.count < 16 { padded.append(.gray) }
+            self.ansi = padded
+        }
     }
 }

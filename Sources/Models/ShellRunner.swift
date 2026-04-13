@@ -84,14 +84,18 @@ public enum ShellRunner {
     ///   - args: Command-line arguments
     ///   - cwd: Optional working directory
     ///   - env: Optional environment variables (merged with inherited environment)
+    ///   - timeout: Maximum time to wait for the process to complete (default: 30s).
+    ///     A hung subprocess blocks the entire calling actor, so this prevents permanent stalls.
     /// - Returns: The stdout output as a String
-    /// - Throws: `ShellError.commandFailed` if the process exits with non-zero status
+    /// - Throws: `ShellError.commandFailed` if the process exits with non-zero status,
+    ///   or `ShellError.timeout` if the process exceeds the timeout
     @discardableResult
     public static func run(
         executable: String,
         args: [String],
         cwd: String? = nil,
-        env: [String: String]? = nil
+        env: [String: String]? = nil,
+        timeout: Duration = .seconds(30)
     ) async throws -> String {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: executable)
@@ -128,9 +132,28 @@ public enum ShellRunner {
             process.terminationHandler = { proc in
                 continuation.resume(returning: proc.terminationStatus)
             }
+
+            // Schedule a timeout that kills the process if it hasn't exited.
+            // A hung subprocess (e.g., git waiting for credentials, gh DNS stall)
+            // would block the entire calling actor indefinitely without this.
+            let timeoutWork = DispatchWorkItem { [weak process] in
+                guard let process, process.isRunning else { return }
+                process.terminate()
+                // Give it a moment, then force-kill
+                DispatchQueue.global().asyncAfter(deadline: .now() + 2) { [weak process] in
+                    guard let process, process.isRunning else { return }
+                    process.interrupt()
+                }
+            }
+            DispatchQueue.global().asyncAfter(
+                deadline: .now() + Double(timeout.components.seconds),
+                execute: timeoutWork
+            )
+
             do {
                 try process.run()
             } catch {
+                timeoutWork.cancel()
                 process.terminationHandler = nil
                 continuation.resume(throwing: error)
             }
@@ -142,6 +165,10 @@ public enum ShellRunner {
 
         if terminationStatus != 0 {
             let errOutput = String(data: stderr, encoding: .utf8) ?? ""
+            // Distinguish timeout kills (SIGTERM = 15) from normal failures
+            if terminationStatus == 15 || terminationStatus == 2 {
+                throw ShellError.timeout(executable: executable, args: args)
+            }
             throw ShellError.commandFailed(
                 executable: executable,
                 args: args,
@@ -200,12 +227,16 @@ public enum ShellRunner {
 /// Unified error type for shell command failures.
 public enum ShellError: Error, LocalizedError {
     case commandFailed(executable: String, args: [String], exitCode: Int32, stderr: String)
+    case timeout(executable: String, args: [String])
 
     public var errorDescription: String? {
         switch self {
         case .commandFailed(let executable, let args, let exitCode, let stderr):
             let cmd = URL(fileURLWithPath: executable).lastPathComponent
             return "\(cmd) \(args.joined(separator: " ")) failed (exit \(exitCode)): \(stderr)"
+        case .timeout(let executable, let args):
+            let cmd = URL(fileURLWithPath: executable).lastPathComponent
+            return "\(cmd) \(args.joined(separator: " ")) timed out"
         }
     }
 }

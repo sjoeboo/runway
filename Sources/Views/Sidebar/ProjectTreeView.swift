@@ -23,6 +23,8 @@ public protocol SidebarActions {
     func selectSession(_ id: String?)
     func selectPR(_ pr: PullRequest?) async
     func reviewPR(_ pr: PullRequest)
+    func deleteStoppedSessions(deleteWorktrees: Bool)
+    func stopAllSessions() async
 }
 
 /// Sidebar view showing the hierarchical project tree with sessions.
@@ -135,6 +137,7 @@ public struct ProjectTreeView: View {
                     .textFieldStyle(.plain)
                     .font(.callout)
                     .focused($isSearchFocused)
+                    .accessibilityLabel("Search sessions")
                 if !searchQuery.isEmpty {
                     Button {
                         searchQuery = ""
@@ -144,6 +147,7 @@ public struct ProjectTreeView: View {
                             .foregroundColor(theme.chrome.textDim)
                     }
                     .buttonStyle(.plain)
+                    .accessibilityLabel("Clear search")
                 }
             }
             .padding(.horizontal, 12)
@@ -167,6 +171,31 @@ public struct ProjectTreeView: View {
                 }
                 .buttonStyle(.plain)
                 Spacer()
+
+                Menu {
+                    Button {
+                        Task { await actions.stopAllSessions() }
+                    } label: {
+                        Label("Stop All Sessions", systemImage: "stop.circle")
+                    }
+                    Button {
+                        actions.deleteStoppedSessions(deleteWorktrees: false)
+                    } label: {
+                        Label("Delete Stopped Sessions", systemImage: "trash")
+                    }
+                    Button {
+                        actions.deleteStoppedSessions(deleteWorktrees: true)
+                    } label: {
+                        Label("Delete Stopped + Worktrees", systemImage: "trash.circle")
+                    }
+                } label: {
+                    Image(systemName: "ellipsis.circle")
+                        .font(.callout)
+                        .foregroundColor(theme.chrome.textDim)
+                }
+                .menuStyle(.button)
+                .buttonStyle(.plain)
+                .accessibilityLabel("Batch session actions")
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 10)
@@ -462,6 +491,7 @@ struct SessionRowView: View {
                 }
                 .buttonStyle(.plain)
                 .help("Restart session")
+                .accessibilityLabel("Restart session")
 
                 Button {
                     showDeleteConfirmation = true
@@ -473,9 +503,10 @@ struct SessionRowView: View {
                 }
                 .buttonStyle(.plain)
                 .help("Delete session")
+                .accessibilityLabel("Delete session")
             }
             .opacity(isHovered ? 1 : 0)
-            .accessibilityElement(children: .contain)
+            .accessibilityHidden(!isHovered)
 
             if !isHovered {
                 HStack(spacing: 4) {

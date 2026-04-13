@@ -19,34 +19,31 @@ public actor WorktreeManager {
         branchName: String,
         baseBranch: String = "main"
     ) async throws -> (path: String, branch: String) {
-        let sanitized = sanitizeBranchName(branchName)
-        let worktreePath = "\(repoPath)/.worktrees/\(sanitized)"
+        // Use the real branch name for git (preserves feature/ prefixes)
+        // but sanitize for the filesystem directory path
+        let gitBranch = sanitizeBranchName(branchName)
+        let dirName = sanitizeForDirectory(branchName)
+        let worktreePath = "\(repoPath)/.worktrees/\(dirName)"
 
         // Try to update base branch from remote (non-fatal if no remote)
         let hasRemote =
             (try? await runGit(in: repoPath, args: ["remote"])).map { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty } ?? false
 
-        // Also sanitize baseBranch in case it came from a stored worktreeBranch
-        // that wasn't sanitized (pre-existing sessions)
-        let sanitizedBase = sanitizeBranchName(baseBranch)
-
         if hasRemote {
             // Try fetching the original baseBranch name from origin first
             let fetched = (try? await runGit(in: repoPath, args: ["fetch", "origin", baseBranch])) != nil
             if fetched {
-                try await runGit(in: repoPath, args: ["worktree", "add", "-b", sanitized, worktreePath, "origin/\(baseBranch)"])
+                try await runGit(in: repoPath, args: ["worktree", "add", "-b", gitBranch, worktreePath, "origin/\(baseBranch)"])
             } else {
-                // baseBranch doesn't exist on origin — try local (sanitized form first, then raw)
-                let localRef = try? await runGit(in: repoPath, args: ["rev-parse", "--verify", sanitizedBase])
-                let refToUse = localRef != nil ? sanitizedBase : baseBranch
-                try await runGit(in: repoPath, args: ["worktree", "add", "-b", sanitized, worktreePath, refToUse])
+                // baseBranch doesn't exist on origin — try local
+                try await runGit(in: repoPath, args: ["worktree", "add", "-b", gitBranch, worktreePath, baseBranch])
             }
         } else {
             // No remote — branch from local base branch
-            try await runGit(in: repoPath, args: ["worktree", "add", "-b", sanitized, worktreePath, baseBranch])
+            try await runGit(in: repoPath, args: ["worktree", "add", "-b", gitBranch, worktreePath, baseBranch])
         }
 
-        return (path: worktreePath, branch: sanitized)
+        return (path: worktreePath, branch: gitBranch)
     }
 
     /// Create a worktree for an existing branch (e.g., a PR's remote branch).
@@ -65,8 +62,8 @@ public actor WorktreeManager {
         prNumber: Int? = nil,
         ghHost: String? = nil
     ) async throws -> String {
-        let sanitized = sanitizeBranchName(branch)
-        let worktreePath = "\(repoPath)/.worktrees/\(sanitized)"
+        let dirName = sanitizeForDirectory(branch)
+        let worktreePath = "\(repoPath)/.worktrees/\(dirName)"
 
         // Strategy 1: git-native fetch + tracking worktree
         // Try fetching the branch by name with explicit refspec.
@@ -81,7 +78,7 @@ public actor WorktreeManager {
             try await runGit(
                 in: repoPath,
                 args: [
-                    "worktree", "add", "--track", "-b", sanitized, worktreePath, "origin/\(branch)",
+                    "worktree", "add", "--track", "-b", branch, worktreePath, "origin/\(branch)",
                 ])
             return worktreePath
         } catch {
@@ -91,18 +88,16 @@ public actor WorktreeManager {
             }
         }
 
-        // Strategy 2: existing local branch (try original name then sanitized)
-        for candidate in (branch != sanitized ? [branch, sanitized] : [sanitized]) {
-            do {
-                try await runGit(
-                    in: repoPath,
-                    args: ["worktree", "add", worktreePath, candidate])
-                return worktreePath
-            } catch {
-                if FileManager.default.fileExists(atPath: worktreePath) {
-                    try? FileManager.default.removeItem(atPath: worktreePath)
-                    _ = try? await runGit(in: repoPath, args: ["worktree", "prune"])
-                }
+        // Strategy 2: existing local branch
+        do {
+            try await runGit(
+                in: repoPath,
+                args: ["worktree", "add", worktreePath, branch])
+            return worktreePath
+        } catch {
+            if FileManager.default.fileExists(atPath: worktreePath) {
+                try? FileManager.default.removeItem(atPath: worktreePath)
+                _ = try? await runGit(in: repoPath, args: ["worktree", "prune"])
             }
         }
 
@@ -160,20 +155,31 @@ public actor WorktreeManager {
     }
 
     /// Remove a worktree and optionally delete its branch.
+    ///
+    /// - Parameters:
+    ///   - repoPath: Path to the main repository
+    ///   - worktreePath: Path to the worktree directory to remove
+    ///   - deleteBranch: If true, also delete the branch (safe delete — protects unmerged work)
+    ///   - branchName: Explicit branch name to delete. If nil, resolves from the worktree's HEAD.
     public func removeWorktree(
         repoPath: String,
         worktreePath: String,
-        deleteBranch: Bool = false
+        deleteBranch: Bool = false,
+        branchName: String? = nil
     ) async throws {
+        // Resolve the actual branch name before removing the worktree (which destroys the HEAD ref)
+        var resolvedBranch = branchName
+        if deleteBranch && resolvedBranch == nil {
+            resolvedBranch = await currentBranch(path: worktreePath)
+        }
+
         try await runGit(in: repoPath, args: ["worktree", "remove", worktreePath, "--force"])
 
-        if deleteBranch {
-            // Extract branch name from worktree path
-            let branchName = URL(fileURLWithPath: worktreePath).lastPathComponent
+        if deleteBranch, let branch = resolvedBranch {
             // Use -d (safe delete) instead of -D (force) to protect unmerged work.
             // If the branch has unmerged commits, git will refuse and the branch
             // is preserved — the user can recover their work later.
-            _ = try? await runGit(in: repoPath, args: ["branch", "-d", branchName])
+            _ = try? await runGit(in: repoPath, args: ["branch", "-d", branch])
         }
     }
 
@@ -266,6 +272,39 @@ public actor WorktreeManager {
         return "main"
     }
 
+    /// Get commit history for the current branch since it diverged from a base branch.
+    /// Returns an array of (hash, subject) tuples, most recent first.
+    public func commitLog(
+        path: String,
+        baseBranch: String = "main",
+        limit: Int = 50
+    ) async -> [(hash: String, subject: String)] {
+        // Find the merge-base to only show commits on this branch
+        let base =
+            (try? await runGit(in: path, args: ["merge-base", baseBranch, "HEAD"]))
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) } ?? baseBranch
+
+        guard
+            let output = try? await runGit(
+                in: path,
+                args: ["log", "--oneline", "--format=%h\t%s", "-\(limit)", "\(base)..HEAD"]
+            )
+        else { return [] }
+
+        return output.components(separatedBy: "\n")
+            .filter { !$0.isEmpty }
+            .compactMap { line in
+                let parts = line.components(separatedBy: "\t")
+                guard parts.count >= 2 else { return nil }
+                return (hash: parts[0], subject: parts.dropFirst().joined(separator: "\t"))
+            }
+    }
+
+    /// Reset the working tree to a specific commit (destructive).
+    public func resetToCommit(path: String, hash: String) async throws {
+        try await runGit(in: path, args: ["reset", "--hard", hash])
+    }
+
     // MARK: - Private
 
     @discardableResult
@@ -273,7 +312,10 @@ public actor WorktreeManager {
         try await ShellRunner.runGit(in: directory, args: args)
     }
 
-    private func sanitizeBranchName(_ name: String) -> String {
+    /// Sanitize a branch name for use as a **directory name** on the filesystem.
+    /// Replaces `/` and other git-invalid characters so the worktree directory is safe.
+    /// The actual git branch uses the original name (preserving `/` separators).
+    func sanitizeForDirectory(_ name: String) -> String {
         var result =
             name
             .lowercased()
@@ -288,6 +330,27 @@ public actor WorktreeManager {
         // Remove leading dots/hyphens and trailing .lock
         result = result.trimmingCharacters(in: CharacterSet(charactersIn: ".-"))
         if result.hasSuffix(".lock") { result = String(result.dropLast(5)) }
+        return result.isEmpty ? "session" : result
+    }
+
+    /// Sanitize a branch name for use as a **git branch**.
+    /// Preserves `/` separators (common in `feature/`, `fix/`, `user/` patterns)
+    /// but removes characters that are invalid in git branch names.
+    private func sanitizeBranchName(_ name: String) -> String {
+        var result =
+            name
+            .replacingOccurrences(of: " ", with: "-")
+        // Remove git-invalid characters: ~ ^ : ? * [ ] \ @ { }
+        let invalidChars = CharacterSet(charactersIn: "~^:?*[]\\@{}")
+        result = result.components(separatedBy: invalidChars).joined()
+        // Collapse consecutive dots (.. is invalid) and hyphens
+        while result.contains("..") { result = result.replacingOccurrences(of: "..", with: ".") }
+        while result.contains("--") { result = result.replacingOccurrences(of: "--", with: "-") }
+        // Remove leading dots/hyphens/slashes and trailing .lock
+        result = result.trimmingCharacters(in: CharacterSet(charactersIn: ".-/"))
+        if result.hasSuffix(".lock") { result = String(result.dropLast(5)) }
+        // Collapse consecutive slashes
+        while result.contains("//") { result = result.replacingOccurrences(of: "//", with: "/") }
         return result.isEmpty ? "session" : result
     }
 

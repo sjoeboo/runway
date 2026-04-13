@@ -28,6 +28,8 @@ public struct SessionDetailView: View {
     var diffOpenTrigger: Int = 0
     var onActiveDiffPathChanged: ((String?) -> Void)?
     var onToggleChanges: (() -> Void)?
+    var onRestart: (() -> Void)?
+    var savedPrompts: [SavedPrompt] = []
     @AppStorage("changesSidebarWidth") private var sidebarWidth: Double = 260
     @Environment(\.theme) private var theme
 
@@ -54,7 +56,9 @@ public struct SessionDetailView: View {
         pendingDiffPatch: String? = nil,
         diffOpenTrigger: Int = 0,
         onActiveDiffPathChanged: ((String?) -> Void)? = nil,
-        onToggleChanges: (() -> Void)? = nil
+        onToggleChanges: (() -> Void)? = nil,
+        onRestart: (() -> Void)? = nil,
+        savedPrompts: [SavedPrompt] = []
     ) {
         self.session = session
         self.tmuxManager = tmuxManager
@@ -79,6 +83,8 @@ public struct SessionDetailView: View {
         self.diffOpenTrigger = diffOpenTrigger
         self.onActiveDiffPathChanged = onActiveDiffPathChanged
         self.onToggleChanges = onToggleChanges
+        self.onRestart = onRestart
+        self.savedPrompts = savedPrompts
     }
 
     public var body: some View {
@@ -112,7 +118,7 @@ public struct SessionDetailView: View {
                 }
             }
             .animation(.easeOut(duration: 0.2), value: changesVisible)
-            SendTextBar(isVisible: $showSendBar) { text in
+            SendTextBar(isVisible: $showSendBar, tool: session.tool, savedPrompts: savedPrompts) { text in
                 if let terminal = TerminalSessionCache.shared.mainTerminal(forSessionID: session.id) {
                     terminal.send(txt: text + "\r")
                 }
@@ -134,7 +140,8 @@ public struct SessionDetailView: View {
             pendingDiffPath: pendingDiffPath,
             pendingDiffPatch: pendingDiffPatch,
             diffOpenTrigger: diffOpenTrigger,
-            onActiveDiffPathChanged: onActiveDiffPathChanged
+            onActiveDiffPathChanged: onActiveDiffPathChanged,
+            onRestart: onRestart
         )
         .id("terminal-\(session.id)-\(terminalRestartTrigger)")
     }

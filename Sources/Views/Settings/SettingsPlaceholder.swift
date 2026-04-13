@@ -1,4 +1,5 @@
 import Models
+import Persistence
 import Sparkle
 import SwiftUI
 import Theme
@@ -32,8 +33,11 @@ public struct SettingsView: View {
 
             generalSettings
                 .tabItem { Label("General", systemImage: "gear") }
+
+            maintenanceSettings
+                .tabItem { Label("Maintenance", systemImage: "wrench.and.screwdriver") }
         }
-        .frame(minWidth: 500, minHeight: 360)
+        .frame(minWidth: 500, minHeight: 400)
         .onAppear {
             if cachedFonts == nil { cachedFonts = groupedFonts() }
         }
@@ -224,7 +228,7 @@ public struct SettingsView: View {
                 if defaultPermissionMode == .bypassAll {
                     Text("New sessions will skip all permission prompts by default")
                         .font(.caption)
-                        .foregroundColor(.orange)
+                        .foregroundColor(themeManager.currentTheme.chrome.orange)
                 }
             }
 
@@ -245,7 +249,7 @@ public struct SettingsView: View {
                 }
                 LabeledContent("Status") {
                     Text(hookServerPort == "—" ? "Not running" : "Running")
-                        .foregroundColor(hookServerPort == "—" ? .secondary : .green)
+                        .foregroundColor(hookServerPort == "—" ? .secondary : themeManager.currentTheme.chrome.green)
                 }
             }
 
@@ -282,6 +286,78 @@ public struct SettingsView: View {
         }
         .formStyle(.grouped)
         .padding()
+    }
+
+    // MARK: - Maintenance Settings
+
+    @State private var cleanupMessage: String?
+    @State private var dbSize: String = "—"
+
+    private var maintenanceSettings: some View {
+        Form {
+            Section("Session Cleanup") {
+                Button("Delete Stopped Sessions (>7 days old)") {
+                    do {
+                        let db = try Persistence.Database()
+                        let count = try db.cleanStoppedSessions(maxAge: 7 * 86400)
+                        cleanupMessage = count > 0 ? "Deleted \(count) old session\(count == 1 ? "" : "s")" : "No old sessions to clean up"
+                    } catch {
+                        cleanupMessage = "Failed: \(error.localizedDescription)"
+                    }
+                }
+
+                Button("Clean Old Events (>7 days)") {
+                    do {
+                        let db = try Persistence.Database()
+                        let count = try db.cleanOldEvents(maxAge: 7 * 86400)
+                        cleanupMessage = count > 0 ? "Deleted \(count) old event\(count == 1 ? "" : "s")" : "No old events to clean up"
+                    } catch {
+                        cleanupMessage = "Failed: \(error.localizedDescription)"
+                    }
+                }
+
+                if let message = cleanupMessage {
+                    Text(message)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+            }
+
+            Section("Database") {
+                LabeledContent("File Size") {
+                    Text(dbSize)
+                        .foregroundColor(.secondary)
+                }
+
+                Button("Compact Database (VACUUM)") {
+                    do {
+                        let db = try Persistence.Database()
+                        try db.vacuum()
+                        updateDBSize()
+                        cleanupMessage = "Database compacted"
+                    } catch {
+                        cleanupMessage = "VACUUM failed: \(error.localizedDescription)"
+                    }
+                }
+
+                LabeledContent("Location") {
+                    Text("~/.runway/state.db")
+                        .foregroundColor(.secondary)
+                }
+            }
+        }
+        .formStyle(.grouped)
+        .padding()
+        .onAppear { updateDBSize() }
+    }
+
+    private func updateDBSize() {
+        let db = try? Persistence.Database()
+        if let bytes = db?.fileSize() {
+            let formatter = ByteCountFormatter()
+            formatter.countStyle = .file
+            dbSize = formatter.string(fromByteCount: bytes)
+        }
     }
 
     // MARK: - Version Helpers

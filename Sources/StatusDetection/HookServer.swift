@@ -20,8 +20,17 @@ public actor HookServer {
     /// The actual port the server is listening on (available after `start()` returns).
     public private(set) var actualPort: UInt16?
 
+    /// Called when the listener enters `.failed` state after initial startup.
+    /// The caller can use this to trigger a restart.
+    public var onFailure: (@Sendable () -> Void)?
+
     public init(port: UInt16 = 0) {
         self.requestedPort = port
+    }
+
+    /// Set the failure callback (actor-isolated setter for cross-actor access).
+    public func setOnFailure(_ handler: @escaping @Sendable () -> Void) {
+        self.onFailure = handler
     }
 
     /// Register a handler for incoming hook events.
@@ -80,6 +89,15 @@ public actor HookServer {
 
         // Set actualPort on the actor before returning to caller — no race
         self.actualPort = resolvedPort
+
+        // Monitor for runtime failures after successful startup.
+        // If the listener enters .failed state, notify the caller so they can restart.
+        let failureCallback = onFailure
+        listener.stateUpdateHandler = { state in
+            if case .failed = state {
+                failureCallback?()
+            }
+        }
     }
 
     /// Stop the hook server.
@@ -91,9 +109,19 @@ public actor HookServer {
 
     // MARK: - Private
 
+    /// Maximum time (seconds) to wait for a complete HTTP request before dropping the connection.
+    private static let connectionTimeout: TimeInterval = 30
+
     private func handleConnection(_ connection: NWConnection) {
         connection.start(queue: connectionQueue)
-        accumulateRequest(connection: connection, buffer: Data())
+
+        // Schedule a timeout to prevent slow/idle connections from leaking resources
+        let timeout = DispatchWorkItem { [weak connection] in
+            connection?.cancel()
+        }
+        connectionQueue.asyncAfter(deadline: .now() + Self.connectionTimeout, execute: timeout)
+
+        accumulateRequest(connection: connection, buffer: Data(), timeout: timeout)
     }
 
     /// Maximum allowed request size (1 MB) to prevent unbounded memory growth.
@@ -101,14 +129,16 @@ public actor HookServer {
 
     /// Accumulate HTTP request data until we have the full body (Content-Length aware).
     /// Calls processRequest once the full payload is received.
-    nonisolated private func accumulateRequest(connection: NWConnection, buffer: Data) {
+    nonisolated private func accumulateRequest(connection: NWConnection, buffer: Data, timeout: DispatchWorkItem) {
         connection.receive(minimumIncompleteLength: 1, maximumLength: 65536) { [weak self] data, _, _, error in
             guard let self else {
                 // Server was deallocated — clean up the connection to prevent FD leak
+                timeout.cancel()
                 connection.cancel()
                 return
             }
             guard let data, error == nil else {
+                timeout.cancel()
                 connection.cancel()
                 return
             }
@@ -118,6 +148,7 @@ public actor HookServer {
 
             // Prevent unbounded memory growth from slow/malicious clients
             if accumulated.count > HookServer.maxRequestSize {
+                timeout.cancel()
                 connection.cancel()
                 return
             }
@@ -137,14 +168,15 @@ public actor HookServer {
                 let bodyStart = headerEnd.upperBound
                 let receivedBody = accumulated.count - bodyStart
                 if receivedBody >= contentLength {
-                    // Full request received
+                    // Full request received — cancel the connection timeout
+                    timeout.cancel()
                     Task { await self.processRequest(data: accumulated, connection: connection) }
                     return
                 }
             }
 
             // Need more data — keep reading
-            self.accumulateRequest(connection: connection, buffer: accumulated)
+            self.accumulateRequest(connection: connection, buffer: accumulated, timeout: timeout)
         }
     }
 

@@ -241,6 +241,33 @@ public final class Database: Sendable {
             }
         }
 
+        // Drop unused legacy tables from v1 that are no longer referenced by any code.
+        migrator.registerMigration("v15_drop_unused_tables") { db in
+            try db.drop(table: "todos")
+            try db.drop(table: "groups")
+            try db.drop(table: "metadata")
+        }
+
+        migrator.registerMigration("v16_saved_prompts") { db in
+            try db.create(table: "saved_prompts") { t in
+                t.column("id", .text).primaryKey()
+                t.column("name", .text).notNull()
+                t.column("text", .text).notNull()
+                t.column("projectID", .text)
+                t.column("sortOrder", .integer).notNull().defaults(to: 0)
+                t.column("createdAt", .datetime).notNull()
+            }
+        }
+
+        migrator.registerMigration("v17_session_cost_tracking") { db in
+            try db.alter(table: "sessions") { t in
+                t.add(column: "totalCostUSD", .double)
+                t.add(column: "totalInputTokens", .integer)
+                t.add(column: "totalOutputTokens", .integer)
+                t.add(column: "transcriptPath", .text)
+            }
+        }
+
         try migrator.migrate(dbQueue)
     }
 
@@ -330,23 +357,19 @@ public final class Database: Sendable {
             var record = SessionEventRecord(event)
             try record.insert(db)
 
-            // Cap at 1000 events per session
-            let count =
-                try SessionEventRecord
-                .filter(Column("sessionID") == event.sessionID)
-                .fetchCount(db)
-            if count > 1000 {
-                let excess = count - 1000
-                let oldest =
-                    try SessionEventRecord
-                    .filter(Column("sessionID") == event.sessionID)
-                    .order(Column("createdAt"))
-                    .limit(excess)
-                    .fetchAll(db)
-                for old in oldest {
-                    try old.delete(db)
-                }
-            }
+            // Cap at 1000 events per session using a single SQL DELETE
+            // instead of fetching and deleting row-by-row (O(n) → O(1)).
+            try db.execute(
+                sql: """
+                    DELETE FROM session_events WHERE id IN (
+                        SELECT id FROM session_events
+                        WHERE sessionID = ?
+                        ORDER BY createdAt
+                        LIMIT max(0, (SELECT count(*) FROM session_events WHERE sessionID = ?) - 1000)
+                    )
+                    """,
+                arguments: [event.sessionID, event.sessionID]
+            )
         }
     }
 
@@ -531,6 +554,85 @@ public final class Database: Sendable {
         try dbQueue.write { db in
             _ = try SessionTemplateRecord.deleteOne(db, key: id)
         }
+    }
+
+    // MARK: - Saved Prompt CRUD
+
+    public func allPrompts() throws -> [SavedPrompt] {
+        try dbQueue.read { db in
+            try SavedPromptRecord
+                .order(Column("sortOrder"), Column("createdAt"))
+                .fetchAll(db)
+                .map { $0.toPrompt() }
+        }
+    }
+
+    public func prompts(forProjectID projectID: String?) throws -> [SavedPrompt] {
+        try dbQueue.read { db in
+            try SavedPromptRecord
+                .filter(Column("projectID") == projectID)
+                .order(Column("sortOrder"), Column("createdAt"))
+                .fetchAll(db)
+                .map { $0.toPrompt() }
+        }
+    }
+
+    public func savePrompt(_ prompt: SavedPrompt) throws {
+        try dbQueue.write { db in
+            var record = SavedPromptRecord(prompt)
+            try record.save(db)
+        }
+    }
+
+    public func deletePrompt(id: String) throws {
+        try dbQueue.write { db in
+            _ = try SavedPromptRecord.deleteOne(db, key: id)
+        }
+    }
+
+    // MARK: - Housekeeping
+
+    /// Delete stopped sessions older than the given age.
+    /// Returns the number of sessions deleted.
+    @discardableResult
+    public func cleanStoppedSessions(maxAge: TimeInterval = 7 * 86400) throws -> Int {
+        let cutoff = Date().addingTimeInterval(-maxAge)
+        return try dbQueue.write { db in
+            try db.execute(
+                sql: "DELETE FROM sessions WHERE status = 'stopped' AND lastAccessedAt < ?",
+                arguments: [cutoff]
+            )
+            return db.changesCount
+        }
+    }
+
+    /// Delete old session events across all sessions.
+    /// Returns the number of events deleted.
+    @discardableResult
+    public func cleanOldEvents(maxAge: TimeInterval = 7 * 86400) throws -> Int {
+        let cutoff = Date().addingTimeInterval(-maxAge)
+        return try dbQueue.write { db in
+            try db.execute(
+                sql: "DELETE FROM session_events WHERE createdAt < ?",
+                arguments: [cutoff]
+            )
+            return db.changesCount
+        }
+    }
+
+    /// Run SQLite VACUUM to reclaim disk space after bulk deletions.
+    /// Must run outside a transaction — SQLite prohibits VACUUM within transactions.
+    public func vacuum() throws {
+        try dbQueue.writeWithoutTransaction { db in
+            try db.execute(sql: "VACUUM")
+        }
+    }
+
+    /// Get the database file size in bytes.
+    public func fileSize() -> Int64? {
+        let path = Database.defaultPath()
+        guard let attrs = try? FileManager.default.attributesOfItem(atPath: path) else { return nil }
+        return attrs[.size] as? Int64
     }
 
 }
