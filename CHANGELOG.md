@@ -5,6 +5,14 @@ All notable changes to Runway are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.9.3] — 2026-04-14
+
+### Added
+
+- **Sidebar comment indicators** — session rows show an accent-colored badge with the count of new PR comments from others since your last push, giving an at-a-glance "action needed" signal ([#304](https://github.com/sjoeboo/runway/pull/304))
+
+[0.9.3]: https://github.com/sjoeboo/runway/compare/v0.9.2...v0.9.3
+
 ## [0.9.2] — 2026-04-14
 
 ### Added

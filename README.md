@@ -129,6 +129,7 @@ Built-in PR management powered by `gh` CLI:
 - **Actions**: approve, request changes, comment, merge (squash/merge/rebase), close, toggle draft, toggle automerge
 - **CI checks tab** — view GitHub Actions / CI check results per PR
 - **Visual status**: check results (passed/failed/pending), review decision badges, diff stats (+/-)
+- **Sidebar comment indicators**: session rows show a badge when reviewers leave new comments since your last push
 - **Session linking**: PRs are matched to sessions by worktree branch
 - **Send to Session**: navigate to the linked session with the send bar open
 - **Inline comment grouping**: comments grouped by file with count badges and send-to-session action
@@ -251,7 +252,7 @@ Runway auto-injects hooks into `~/.claude/settings.json` on every launch, subscr
 
 ## CI & Testing
 
-- **329 tests** across 8 test targets
+- **331 tests** across 8 test targets
 - **GitHub Actions CI** on every PR: build, test, SwiftLint, swift-format
 - **Branch protection** on `master` — CI must pass before merging
 - **Pre-commit hooks** run lint + format checks locally
