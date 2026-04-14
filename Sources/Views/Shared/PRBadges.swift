@@ -159,6 +159,31 @@ public struct ReviewDecisionBadge: View {
     }
 }
 
+// MARK: - CommentCountBadge
+
+/// Accent-colored badge showing the count of PR comments from others since the last commit.
+///
+/// Hidden when count is zero. Used in sidebar session rows as an "action needed" signal.
+public struct CommentCountBadge: View {
+    let count: Int
+    @Environment(\.theme) private var theme
+
+    public init(count: Int) {
+        self.count = count
+    }
+
+    public var body: some View {
+        if count > 0 {  // swiftlint:disable:this empty_count
+            HStack(spacing: 2) {
+                Image(systemName: "bubble.left.fill")
+                Text("\(count)")
+            }
+            .font(.caption2)
+            .foregroundColor(theme.chrome.accent)
+        }
+    }
+}
+
 // MARK: - MergeStatusBadge
 
 /// Capsule badge showing PR merge status (Clean, Conflicts, Behind, Blocked, etc.).
