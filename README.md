@@ -23,7 +23,7 @@
 | **📋** | **GitHub PR dashboard** | Review, approve, merge, request changes, toggle automerge, and view CI checks — all without leaving the app |
 | **📌** | **GitHub Issues** | View, create, and manage issues per project |
 | **🔔** | **Notifications** | Native macOS notifications for permission requests and session completion, with enable/disable toggle in Settings |
-| **🎨** | **Theme system** | 18 built-in themes + user-installable custom themes from `~/.runway/themes/` |
+| **🎨** | **Theme system** | 23 built-in themes + user-installable custom themes from `~/.runway/themes/` |
 | **📂** | **Project organization** | Group sessions by project with per-project settings for theme, permissions, and branch prefix |
 | **⌨️** | **Keyboard-driven** | 15 shortcuts — `Cmd+K` search, `Cmd+N` new session, `Cmd+D` split pane, `Cmd+3` changes, and more |
 
@@ -157,23 +157,24 @@ Per-project configuration from the sidebar context menu:
 
 ### Theme System
 
-18 hand-crafted themes with paired light/dark variants:
+23 hand-crafted themes with paired light/dark variants:
 
 | Theme | Style |
 |-------|-------|
-| Tokyo Night Storm | Dark, purple/blue |
+| Tokyo Night Storm / Moon / Night / Day | Dark storm / Dark purple / Dark base / Light |
 | Ayu Mirage | Dark, warm amber |
 | Catppuccin Mocha / Latte | Dark pastel / Light pastel |
 | Dracula / Alucard | Dark purple / Light purple |
 | Everforest Dark / Light | Nature green |
 | Gruvbox Dark / Light | Warm retro |
 | Kanagawa | Dark, wave blue |
+| Noctis Azureus / Lux | Dark ocean blue / Warm light |
 | Nord | Dark, arctic blue |
 | Oasis Lagoon Dark / Light | Ocean blue |
 | Rosé Pine / Dawn | Dark muted / Light rosé |
 | Solarized Dark / Light | Precision color |
 
-Themes apply to both the app chrome (sidebar, toolbar, status bar) and the terminal (ANSI colors, cursor, selection). System appearance auto-switching is supported with 7 paired theme sets.
+Themes apply to both the app chrome (sidebar, toolbar, status bar) and the terminal (ANSI colors, cursor, selection). System appearance auto-switching is supported with 11 paired theme sets.
 
 **Custom themes**: Drop a JSON theme file into `~/.runway/themes/` and it appears in the theme picker automatically.
 

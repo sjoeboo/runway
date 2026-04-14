@@ -5,6 +5,15 @@ All notable changes to Runway are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.9.2] — 2026-04-14
+
+### Added
+
+- **Noctis themes** — Noctis Azureus (dark ocean blue) and Noctis Lux (warm light) with auto light/dark pairing ([#303](https://github.com/sjoeboo/runway/pull/303))
+- **Tokyo Night variants** — Tokyo Night (base dark), Tokyo Night Day (light), and Tokyo Night Moon (dark purple) join the existing Storm variant, with 3 dark-to-light auto-switching pairs ([#303](https://github.com/sjoeboo/runway/pull/303))
+
+[0.9.2]: https://github.com/sjoeboo/runway/compare/v0.9.1...v0.9.2
+
 ## [0.9.1] — 2026-04-13
 
 ### Fixed
