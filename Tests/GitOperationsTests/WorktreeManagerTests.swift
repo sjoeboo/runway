@@ -314,7 +314,7 @@ private func withTempGitRepo(_ body: (String) async throws -> Void) async throws
     #expect(await manager.sanitizeForDirectory("--leading") == "leading")
 }
 
-@Test func createWorktreePreservesSlashInBranchName() async throws {
+@Test func createWorktreeReplacesSlashInBranchName() async throws {
     try await withTempGitRepo { repoPath in
         let manager = WorktreeManager()
         let currentBranch = await manager.currentBranch(path: repoPath) ?? "main"
@@ -330,15 +330,15 @@ private func withTempGitRepo(_ body: (String) async throws -> Void) async throws
             baseBranch: currentBranch
         )
 
-        // The directory should use sanitized name (no slashes)
-        #expect(worktreePath.hasSuffix("feature-my-work"))
+        // The directory should use runway- prefix + sanitized name (no slashes)
+        #expect(worktreePath.hasSuffix("runway-feature-my-work"))
 
-        // The actual git branch should preserve the slash
-        #expect(actualBranch == "feature/my-work")
+        // The git branch should also replace / with -
+        #expect(actualBranch == "feature-my-work")
 
-        // Verify the worktree is on the branch with the slash
+        // Verify the worktree is on the flat branch name
         let branch = await manager.currentBranch(path: worktreePath)
-        #expect(branch == "feature/my-work")
+        #expect(branch == "feature-my-work")
     }
 }
 
