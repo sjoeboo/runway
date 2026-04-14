@@ -133,3 +133,11 @@ import Testing
     pr.enrichedAt = Date().addingTimeInterval(-60)  // 1 minute ago
     #expect(pr.needsEnrichment == false)
 }
+
+@Test func pullRequestCommentFieldDefaults() {
+    let pr = PullRequest(
+        number: 1, title: "Test", state: .open, headBranch: "f",
+        baseBranch: "main", author: "me", repo: "r")
+    #expect(pr.commentsSinceLastCommit == 0)
+    #expect(pr.lastCommitDate == nil)
+}

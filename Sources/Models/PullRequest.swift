@@ -24,6 +24,8 @@ public struct PullRequest: Identifiable, Codable, Sendable, Equatable {
     public var mergeable: MergeableState?
     public var mergeStateStatus: MergeStateStatus?
     public var autoMergeEnabled: Bool
+    public var commentsSinceLastCommit: Int
+    public var lastCommitDate: Date?
 
     public init(
         number: Int,
@@ -46,7 +48,9 @@ public struct PullRequest: Identifiable, Codable, Sendable, Equatable {
         origin: Set<PROrigin> = [],
         mergeable: MergeableState? = nil,
         mergeStateStatus: MergeStateStatus? = nil,
-        autoMergeEnabled: Bool = false
+        autoMergeEnabled: Bool = false,
+        commentsSinceLastCommit: Int = 0,
+        lastCommitDate: Date? = nil
     ) {
         self.id = "\(repo)#\(number)"
         self.number = number
@@ -70,6 +74,8 @@ public struct PullRequest: Identifiable, Codable, Sendable, Equatable {
         self.mergeable = mergeable
         self.mergeStateStatus = mergeStateStatus
         self.autoMergeEnabled = autoMergeEnabled
+        self.commentsSinceLastCommit = commentsSinceLastCommit
+        self.lastCommitDate = lastCommitDate
     }
 
     public var needsEnrichment: Bool {
