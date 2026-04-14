@@ -6,7 +6,7 @@ import Testing
 // MARK: - Built-in Themes
 
 @Test func builtInThemeCount() {
-    #expect(AppTheme.builtIn.count == 18)
+    #expect(AppTheme.builtIn.count == 23)
 }
 
 @Test func builtInThemeIDsAreUnique() {
@@ -27,9 +27,10 @@ import Testing
 
 @Test func darkThemesHaveDarkAppearance() {
     let darkThemes: [AppTheme] = [
-        .tokyoNightStorm, .ayuMirage, .catppuccinMocha, .dracula,
-        .everforestDark, .gruvboxDark, .kanagawa, .nord,
-        .oasisLagoonDark, .rosePine, .solarizedDark,
+        .tokyoNightStorm, .tokyoNight, .tokyoNightMoon,
+        .ayuMirage, .catppuccinMocha, .dracula,
+        .everforestDark, .gruvboxDark, .kanagawa, .noctisAzureus,
+        .nord, .oasisLagoonDark, .rosePine, .solarizedDark,
     ]
     for theme in darkThemes {
         #expect(theme.appearance == .dark, "\(theme.name) should be dark")
@@ -39,7 +40,8 @@ import Testing
 @Test func lightThemesHaveLightAppearance() {
     let lightThemes: [AppTheme] = [
         .catppuccinLatte, .draculaAlucard, .everforestLight,
-        .gruvboxLight, .oasisLagoonLight, .rosePineDawn, .solarizedLight,
+        .gruvboxLight, .noctisLux, .oasisLagoonLight, .rosePineDawn,
+        .solarizedLight, .tokyoNightDay,
     ]
     for theme in lightThemes {
         #expect(theme.appearance == .light, "\(theme.name) should be light")
@@ -49,7 +51,7 @@ import Testing
 // MARK: - Paired Themes
 
 @Test func pairedThemesExist() {
-    #expect(AppTheme.pairedThemes.count == 7)
+    #expect(AppTheme.pairedThemes.count == 11)
 }
 
 @Test func pairedThemesReferenceValidIDs() {
@@ -104,14 +106,14 @@ import Testing
     let manager = ThemeManager()
     let darkThemes = manager.darkThemes
     #expect(darkThemes.allSatisfy { $0.appearance == .dark })
-    #expect(darkThemes.count == 11)
+    #expect(darkThemes.count == 14)
 }
 
 @Test @MainActor func themeManagerLightThemesFilter() {
     let manager = ThemeManager()
     let lightThemes = manager.lightThemes
     #expect(lightThemes.allSatisfy { $0.appearance == .light })
-    #expect(lightThemes.count == 7)
+    #expect(lightThemes.count == 9)
 }
 
 @Test @MainActor func themeManagerAllThemesCountMatchesBuiltIn() {

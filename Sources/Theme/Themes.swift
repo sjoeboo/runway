@@ -473,6 +473,100 @@ extension AppTheme {
         )
     )
 
+    /// Noctis Azureus — deep navy dark theme from the Noctis family by Liviu Schera.
+    public static let noctisAzureus = AppTheme(
+        id: "noctis-azureus",
+        name: "Noctis Azureus",
+        appearance: .dark,
+        chrome: ChromePalette(
+            background: Color(hex: 0x07273B),
+            surface: Color(hex: 0x062132),
+            surfaceHover: Color(hex: 0x0C3F5F),
+            border: Color(hex: 0x09334E),
+            text: Color(hex: 0xBECFDA),
+            textDim: Color(hex: 0x4D6C80),
+            accent: Color(hex: 0x49ACE9),
+            green: Color(hex: 0x49E9A6),
+            yellow: Color(hex: 0xE4B781),
+            red: Color(hex: 0xE66533),
+            orange: Color(hex: 0xE69533),
+            purple: Color(hex: 0xDF769B),
+            cyan: Color(hex: 0x49D6E9),
+            comment: Color(hex: 0x4D6C80)
+        ),
+        terminal: TerminalPalette(
+            foreground: Color(hex: 0xBECFDA),
+            background: Color(hex: 0x051B29),
+            cursor: Color(hex: 0xBECFDA),
+            selection: Color(hex: 0x1679B6),
+            ansi: [
+                Color(hex: 0x28353E),  // black
+                Color(hex: 0xE66533),  // red
+                Color(hex: 0x49E9A6),  // green
+                Color(hex: 0xE4B781),  // yellow
+                Color(hex: 0x49ACE9),  // blue
+                Color(hex: 0xDF769B),  // magenta
+                Color(hex: 0x49D6E9),  // cyan
+                Color(hex: 0xAEC3D0),  // white
+                Color(hex: 0x475E6C),  // bright black
+                Color(hex: 0xE97749),  // bright red
+                Color(hex: 0x60EBB1),  // bright green
+                Color(hex: 0xE69533),  // bright yellow
+                Color(hex: 0x60B6EB),  // bright blue
+                Color(hex: 0xE798B3),  // bright magenta
+                Color(hex: 0x60DBEB),  // bright cyan
+                Color(hex: 0xBECFDA),  // bright white
+            ]
+        )
+    )
+
+    /// Noctis Lux — warm parchment light theme from the Noctis family by Liviu Schera.
+    public static let noctisLux = AppTheme(
+        id: "noctis-lux",
+        name: "Noctis Lux",
+        appearance: .light,
+        chrome: ChromePalette(
+            background: Color(hex: 0xFEF8EC),
+            surface: Color(hex: 0xF9F1E1),
+            surfaceHover: Color(hex: 0xF0E9D6),
+            border: Color(hex: 0xF2EDDE),
+            text: Color(hex: 0x005661),
+            textDim: Color(hex: 0xA0ABAC),
+            accent: Color(hex: 0x0099AD),
+            green: Color(hex: 0x00B368),
+            yellow: Color(hex: 0xF49725),
+            red: Color(hex: 0xE34E1C),
+            orange: Color(hex: 0xFF8C00),
+            purple: Color(hex: 0xFF5792),
+            cyan: Color(hex: 0x00BDD6),
+            comment: Color(hex: 0xA0ABAC)
+        ),
+        terminal: TerminalPalette(
+            foreground: Color(hex: 0x005661),
+            background: Color(hex: 0xF6EDDA),
+            cursor: Color(hex: 0x005661),
+            selection: Color(hex: 0xADE2EB),
+            ansi: [
+                Color(hex: 0x003B42),  // black
+                Color(hex: 0xE34E1C),  // red
+                Color(hex: 0x00B368),  // green
+                Color(hex: 0xF49725),  // yellow
+                Color(hex: 0x0094F0),  // blue
+                Color(hex: 0xFF5792),  // magenta
+                Color(hex: 0x00BDD6),  // cyan
+                Color(hex: 0x8CA6A6),  // white
+                Color(hex: 0x004D57),  // bright black
+                Color(hex: 0xFF4000),  // bright red
+                Color(hex: 0x00D17A),  // bright green
+                Color(hex: 0xFF8C00),  // bright yellow
+                Color(hex: 0x0FA3FF),  // bright blue
+                Color(hex: 0xFF6B9F),  // bright magenta
+                Color(hex: 0x00CBE6),  // bright cyan
+                Color(hex: 0xBBC3C4),  // bright white
+            ]
+        )
+    )
+
     /// Nord — arctic blue dark theme inspired by the polar night.
     public static let nord = AppTheme(
         id: "nord",
@@ -802,6 +896,147 @@ extension AppTheme {
         )
     )
 
+    /// Tokyo Night — the original dark variant by enkia, deepest blue-black background.
+    public static let tokyoNight = AppTheme(
+        id: "tokyo-night",
+        name: "Tokyo Night",
+        appearance: .dark,
+        chrome: ChromePalette(
+            background: Color(hex: 0x1A1B26),
+            surface: Color(hex: 0x16161E),
+            surfaceHover: Color(hex: 0x292E42),
+            border: Color(hex: 0x101014),
+            text: Color(hex: 0xC0CAF5),
+            textDim: Color(hex: 0x565F89),
+            accent: Color(hex: 0x7AA2F7),
+            green: Color(hex: 0x9ECE6A),
+            yellow: Color(hex: 0xE0AF68),
+            red: Color(hex: 0xF7768E),
+            orange: Color(hex: 0xFF9E64),
+            purple: Color(hex: 0xBB9AF7),
+            cyan: Color(hex: 0x7DCFFF),
+            comment: Color(hex: 0x565F89)
+        ),
+        terminal: TerminalPalette(
+            foreground: Color(hex: 0xC0CAF5),
+            background: Color(hex: 0x16161E),
+            cursor: Color(hex: 0xC0CAF5),
+            selection: Color(hex: 0x283457),
+            ansi: [
+                Color(hex: 0x15161E),  // black
+                Color(hex: 0xF7768E),  // red
+                Color(hex: 0x9ECE6A),  // green
+                Color(hex: 0xE0AF68),  // yellow
+                Color(hex: 0x7AA2F7),  // blue
+                Color(hex: 0xBB9AF7),  // magenta
+                Color(hex: 0x7DCFFF),  // cyan
+                Color(hex: 0xA9B1D6),  // white
+                Color(hex: 0x414868),  // bright black
+                Color(hex: 0xF7768E),  // bright red
+                Color(hex: 0x9ECE6A),  // bright green
+                Color(hex: 0xE0AF68),  // bright yellow
+                Color(hex: 0x7AA2F7),  // bright blue
+                Color(hex: 0xBB9AF7),  // bright magenta
+                Color(hex: 0x7DCFFF),  // bright cyan
+                Color(hex: 0xC0CAF5),  // bright white
+            ]
+        )
+    )
+
+    /// Tokyo Night Day — light companion to the Tokyo Night family by enkia.
+    public static let tokyoNightDay = AppTheme(
+        id: "tokyo-night-day",
+        name: "Tokyo Night Day",
+        appearance: .light,
+        chrome: ChromePalette(
+            background: Color(hex: 0xE6E7ED),
+            surface: Color(hex: 0xD6D8DF),
+            surfaceHover: Color(hex: 0xDCDEE3),
+            border: Color(hex: 0xC1C2C7),
+            text: Color(hex: 0x343B59),
+            textDim: Color(hex: 0x707280),
+            accent: Color(hex: 0x2959AA),
+            green: Color(hex: 0x385F0D),
+            yellow: Color(hex: 0x8F5E15),
+            red: Color(hex: 0x8C4351),
+            orange: Color(hex: 0x965027),
+            purple: Color(hex: 0x7B43BA),
+            cyan: Color(hex: 0x006C86),
+            comment: Color(hex: 0x888B94)
+        ),
+        terminal: TerminalPalette(
+            foreground: Color(hex: 0x343B58),
+            background: Color(hex: 0xD6D8DF),
+            cursor: Color(hex: 0x363C4D),
+            selection: Color(hex: 0xACB0BF),
+            ansi: [
+                Color(hex: 0x343B58),  // black
+                Color(hex: 0x8C4351),  // red
+                Color(hex: 0x33635C),  // green
+                Color(hex: 0x8F5E15),  // yellow
+                Color(hex: 0x2959AA),  // blue
+                Color(hex: 0x7B43BA),  // magenta
+                Color(hex: 0x006C86),  // cyan
+                Color(hex: 0x707280),  // white
+                Color(hex: 0x9DA0AB),  // bright black
+                Color(hex: 0x8C4351),  // bright red
+                Color(hex: 0x33635C),  // bright green
+                Color(hex: 0x8F5E15),  // bright yellow
+                Color(hex: 0x2959AA),  // bright blue
+                Color(hex: 0x7B43BA),  // bright magenta
+                Color(hex: 0x006C86),  // bright cyan
+                Color(hex: 0x343B58),  // bright white
+            ]
+        )
+    )
+
+    /// Tokyo Night Moon — blue-indigo tinted dark variant from folke's tokyonight.nvim.
+    public static let tokyoNightMoon = AppTheme(
+        id: "tokyo-night-moon",
+        name: "Tokyo Night Moon",
+        appearance: .dark,
+        chrome: ChromePalette(
+            background: Color(hex: 0x222436),
+            surface: Color(hex: 0x1E2030),
+            surfaceHover: Color(hex: 0x2F334D),
+            border: Color(hex: 0x3B4261),
+            text: Color(hex: 0xC8D3F5),
+            textDim: Color(hex: 0x636DA6),
+            accent: Color(hex: 0x82AAFF),
+            green: Color(hex: 0xC3E88D),
+            yellow: Color(hex: 0xFFC777),
+            red: Color(hex: 0xFF757F),
+            orange: Color(hex: 0xFF966C),
+            purple: Color(hex: 0xC099FF),
+            cyan: Color(hex: 0x86E1FC),
+            comment: Color(hex: 0x636DA6)
+        ),
+        terminal: TerminalPalette(
+            foreground: Color(hex: 0xC8D3F5),
+            background: Color(hex: 0x1E2030),
+            cursor: Color(hex: 0xC8D3F5),
+            selection: Color(hex: 0x2D3F76),
+            ansi: [
+                Color(hex: 0x1B1D2B),  // black
+                Color(hex: 0xFF757F),  // red
+                Color(hex: 0xC3E88D),  // green
+                Color(hex: 0xFFC777),  // yellow
+                Color(hex: 0x82AAFF),  // blue
+                Color(hex: 0xC099FF),  // magenta
+                Color(hex: 0x86E1FC),  // cyan
+                Color(hex: 0x828BB8),  // white
+                Color(hex: 0x444A73),  // bright black
+                Color(hex: 0xFF757F),  // bright red
+                Color(hex: 0xC3E88D),  // bright green
+                Color(hex: 0xFFC777),  // bright yellow
+                Color(hex: 0x82AAFF),  // bright blue
+                Color(hex: 0xFCA7EA),  // bright magenta
+                Color(hex: 0x86E1FC),  // bright cyan
+                Color(hex: 0xC8D3F5),  // bright white
+            ]
+        )
+    )
+
     /// Tokyo Night Storm — dark theme inspired by the VS Code Tokyo Night extension.
     public static let tokyoNightStorm = AppTheme(
         id: "tokyo-night-storm",
@@ -862,6 +1097,8 @@ extension AppTheme {
         .gruvboxDark,
         .gruvboxLight,
         .kanagawa,
+        .noctisAzureus,
+        .noctisLux,
         .nord,
         .oasisLagoonDark,
         .oasisLagoonLight,
@@ -869,6 +1106,9 @@ extension AppTheme {
         .rosePineDawn,
         .solarizedDark,
         .solarizedLight,
+        .tokyoNight,
+        .tokyoNightDay,
+        .tokyoNightMoon,
     ]
 
     /// Paired themes for auto light/dark switching.
@@ -877,9 +1117,13 @@ extension AppTheme {
         ("dracula", "dracula-alucard"),
         ("everforest-dark", "everforest-light"),
         ("gruvbox-dark", "gruvbox-light"),
+        ("noctis-azureus", "noctis-lux"),
         ("oasis-lagoon-dark", "oasis-lagoon-light"),
         ("rose-pine", "rose-pine-dawn"),
         ("solarized-dark", "solarized-light"),
+        ("tokyo-night", "tokyo-night-day"),
+        ("tokyo-night-moon", "tokyo-night-day"),
+        ("tokyo-night-storm", "tokyo-night-day"),
     ]
 }
 
