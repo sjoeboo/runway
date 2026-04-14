@@ -205,12 +205,14 @@ public enum ShellRunner {
     @discardableResult
     public static func runGit(
         in directory: String,
-        args: [String]
+        args: [String],
+        timeout: Duration = .seconds(30)
     ) async throws -> String {
         try await run(
             executable: "/usr/bin/git",
             args: args,
-            cwd: directory
+            cwd: directory,
+            timeout: timeout
         )
     }
 

@@ -22,8 +22,11 @@ public actor WorktreeManager {
         // Use the real branch name for git (preserves feature/ prefixes)
         // but sanitize for the filesystem directory path
         let gitBranch = sanitizeBranchName(branchName)
-        let dirName = sanitizeForDirectory(branchName)
+        let dirName = "runway-" + sanitizeForDirectory(branchName)
         let worktreePath = "\(repoPath)/.worktrees/\(dirName)"
+
+        // Large repos (monorepos) can take minutes for fetch/checkout — use generous timeouts.
+        let longTimeout: Duration = .seconds(120)
 
         // Try to update base branch from remote (non-fatal if no remote)
         let hasRemote =
@@ -31,16 +34,17 @@ public actor WorktreeManager {
 
         if hasRemote {
             // Try fetching the original baseBranch name from origin first
-            let fetched = (try? await runGit(in: repoPath, args: ["fetch", "origin", baseBranch])) != nil
+            let fetched = (try? await runGit(in: repoPath, args: ["fetch", "origin", baseBranch], timeout: longTimeout)) != nil
             if fetched {
-                try await runGit(in: repoPath, args: ["worktree", "add", "-b", gitBranch, worktreePath, "origin/\(baseBranch)"])
+                try await runGit(
+                    in: repoPath, args: ["worktree", "add", "-b", gitBranch, worktreePath, "origin/\(baseBranch)"], timeout: longTimeout)
             } else {
                 // baseBranch doesn't exist on origin — try local
-                try await runGit(in: repoPath, args: ["worktree", "add", "-b", gitBranch, worktreePath, baseBranch])
+                try await runGit(in: repoPath, args: ["worktree", "add", "-b", gitBranch, worktreePath, baseBranch], timeout: longTimeout)
             }
         } else {
             // No remote — branch from local base branch
-            try await runGit(in: repoPath, args: ["worktree", "add", "-b", gitBranch, worktreePath, baseBranch])
+            try await runGit(in: repoPath, args: ["worktree", "add", "-b", gitBranch, worktreePath, baseBranch], timeout: longTimeout)
         }
 
         return (path: worktreePath, branch: gitBranch)
@@ -62,8 +66,11 @@ public actor WorktreeManager {
         prNumber: Int? = nil,
         ghHost: String? = nil
     ) async throws -> String {
-        let dirName = sanitizeForDirectory(branch)
+        let dirName = "runway-" + sanitizeForDirectory(branch)
         let worktreePath = "\(repoPath)/.worktrees/\(dirName)"
+
+        // Large repos (monorepos) can take minutes for fetch/checkout — use generous timeouts.
+        let longTimeout: Duration = .seconds(120)
 
         // Strategy 1: git-native fetch + tracking worktree
         // Try fetching the branch by name with explicit refspec.
@@ -72,14 +79,16 @@ public actor WorktreeManager {
             args: [
                 "fetch", "origin",
                 "+refs/heads/\(branch):refs/remotes/origin/\(branch)",
-            ])
+            ],
+            timeout: longTimeout)
 
         do {
             try await runGit(
                 in: repoPath,
                 args: [
                     "worktree", "add", "--track", "-b", branch, worktreePath, "origin/\(branch)",
-                ])
+                ],
+                timeout: longTimeout)
             return worktreePath
         } catch {
             if FileManager.default.fileExists(atPath: worktreePath) {
@@ -92,7 +101,8 @@ public actor WorktreeManager {
         do {
             try await runGit(
                 in: repoPath,
-                args: ["worktree", "add", worktreePath, branch])
+                args: ["worktree", "add", worktreePath, branch],
+                timeout: longTimeout)
             return worktreePath
         } catch {
             if FileManager.default.fileExists(atPath: worktreePath) {
@@ -106,7 +116,7 @@ public actor WorktreeManager {
         // Use --detach to avoid "cannot set up tracking" errors when the remote
         // ref isn't a regular branch, then create a local branch from the result.
         if let prNumber {
-            try await runGit(in: repoPath, args: ["worktree", "add", "--detach", worktreePath])
+            try await runGit(in: repoPath, args: ["worktree", "add", "--detach", worktreePath], timeout: longTimeout)
             do {
                 try await ShellRunner.runGH(
                     args: ["pr", "checkout", "\(prNumber)", "--detach", "--force"],
@@ -329,8 +339,8 @@ public actor WorktreeManager {
     // MARK: - Private
 
     @discardableResult
-    private func runGit(in directory: String, args: [String]) async throws -> String {
-        try await ShellRunner.runGit(in: directory, args: args)
+    private func runGit(in directory: String, args: [String], timeout: Duration = .seconds(30)) async throws -> String {
+        try await ShellRunner.runGit(in: directory, args: args, timeout: timeout)
     }
 
     /// Sanitize a branch name for use as a **directory name** on the filesystem.
@@ -355,23 +365,21 @@ public actor WorktreeManager {
     }
 
     /// Sanitize a branch name for use as a **git branch**.
-    /// Preserves `/` separators (common in `feature/`, `fix/`, `user/` patterns)
-    /// but removes characters that are invalid in git branch names.
+    /// Replaces `/` with `-` so branches are flat (e.g. `feature-my-work` not `feature/my-work`).
     private func sanitizeBranchName(_ name: String) -> String {
         var result =
             name
             .replacingOccurrences(of: " ", with: "-")
+            .replacingOccurrences(of: "/", with: "-")
         // Remove git-invalid characters: ~ ^ : ? * [ ] \ @ { }
         let invalidChars = CharacterSet(charactersIn: "~^:?*[]\\@{}")
         result = result.components(separatedBy: invalidChars).joined()
         // Collapse consecutive dots (.. is invalid) and hyphens
         while result.contains("..") { result = result.replacingOccurrences(of: "..", with: ".") }
         while result.contains("--") { result = result.replacingOccurrences(of: "--", with: "-") }
-        // Remove leading dots/hyphens/slashes and trailing .lock
-        result = result.trimmingCharacters(in: CharacterSet(charactersIn: ".-/"))
+        // Remove leading dots/hyphens and trailing .lock
+        result = result.trimmingCharacters(in: CharacterSet(charactersIn: ".-"))
         if result.hasSuffix(".lock") { result = String(result.dropLast(5)) }
-        // Collapse consecutive slashes
-        while result.contains("//") { result = result.replacingOccurrences(of: "//", with: "/") }
         return result.isEmpty ? "session" : result
     }
 
