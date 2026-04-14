@@ -657,7 +657,12 @@ private struct GHPRDetailResponse: Decodable {
             PRReview(id: r.id ?? "0", author: r.author?.login ?? "", state: r.state ?? "", body: r.body ?? "")
         }
         let mappedComments: [PRComment] = (comments ?? []).map { comment in
-            PRComment(id: comment.id ?? "0", author: comment.author?.login ?? "", body: comment.body ?? "")
+            PRComment(
+                id: comment.id ?? "0",
+                author: comment.author?.login ?? "",
+                body: comment.body ?? "",
+                createdAt: comment.createdAt ?? Date()
+            )
         }
         let mappedFiles: [PRFileChange] = (files ?? []).map { file in
             PRFileChange(path: file.path ?? "", additions: file.additions ?? 0, deletions: file.deletions ?? 0, patch: file.patch)
@@ -728,23 +733,29 @@ private struct GHReview: Decodable {
 private struct GHComment: Decodable {
     let author: GHAuthor?
     let body: String?
+    let createdAt: Date?
 
     let id: String?
 
     enum CodingKeys: String, CodingKey {
-        case id, author, body
+        case id, author, body, createdAt
     }
 
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         author = try container.decodeIfPresent(GHAuthor.self, forKey: .author)
         body = try container.decodeIfPresent(String.self, forKey: .body)
+        createdAt = try container.decodeIfPresent(Date.self, forKey: .createdAt)
         if let intID = try? container.decodeIfPresent(Int.self, forKey: .id) {
             id = "\(intID)"
         } else {
             id = try container.decodeIfPresent(String.self, forKey: .id)
         }
     }
+}
+
+private struct GHCommit: Decodable {
+    let committedDate: Date?
 }
 
 /// Lightweight response for enrichChecks — only the fields needed for list display.
