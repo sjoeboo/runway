@@ -5,6 +5,16 @@ All notable changes to Runway are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.9.1] — 2026-04-13
+
+### Fixed
+
+- **Worktree directory naming** — worktree directories now use a `runway-` prefix for clear ownership and to avoid collisions with other tools ([#302](https://github.com/sjoeboo/runway/pull/302))
+- **Branch name simplification** — `/` in branch names is replaced with `-` for simpler flat refs, avoiding nested ref path issues ([#302](https://github.com/sjoeboo/runway/pull/302))
+- **Monorepo timeout** — increased git fetch and worktree add timeout from 30s to 120s to support large monorepo checkouts ([#302](https://github.com/sjoeboo/runway/pull/302))
+
+[0.9.1]: https://github.com/sjoeboo/runway/compare/v0.9.0...v0.9.1
+
 ## [0.9.0] — 2026-04-13
 
 ### Added
