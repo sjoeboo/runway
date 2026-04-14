@@ -461,6 +461,7 @@ struct SessionRowView: View {
                         .help("View PR #\(pr.number) details")
                         CheckSummaryBadge(checks: pr.checks)
                         ReviewDecisionBadge(decision: pr.reviewDecision, style: .iconOnly)
+                        CommentCountBadge(count: pr.commentsSinceLastCommit)
                         if pr.additions > 0 || pr.deletions > 0 {
                             HStack(spacing: 1) {
                                 Text("+\(pr.additions)")
