@@ -13,13 +13,17 @@ public struct PREnrichResult: Sendable {
     public var mergeable: MergeableState?
     public var mergeStateStatus: MergeStateStatus?
     public var autoMergeEnabled: Bool
+    public var commentsSinceLastCommit: Int
+    public var lastCommitDate: Date?
 
     public init(
         checks: CheckSummary = CheckSummary(), reviewDecision: ReviewDecision = .none,
         headBranch: String = "", baseBranch: String = "",
         additions: Int = 0, deletions: Int = 0, changedFiles: Int = 0,
         mergeable: MergeableState? = nil, mergeStateStatus: MergeStateStatus? = nil,
-        autoMergeEnabled: Bool = false
+        autoMergeEnabled: Bool = false,
+        commentsSinceLastCommit: Int = 0,
+        lastCommitDate: Date? = nil
     ) {
         self.checks = checks
         self.reviewDecision = reviewDecision
@@ -31,6 +35,8 @@ public struct PREnrichResult: Sendable {
         self.mergeable = mergeable
         self.mergeStateStatus = mergeStateStatus
         self.autoMergeEnabled = autoMergeEnabled
+        self.commentsSinceLastCommit = commentsSinceLastCommit
+        self.lastCommitDate = lastCommitDate
     }
 }
 
@@ -119,19 +125,19 @@ public actor PRManager {
 
     /// Lightweight enrichment — fetch only checks and review decision for list display.
     /// Single subprocess per PR (vs fetchDetail's 2).
-    public func enrichChecks(repo: String, number: Int, host: String? = nil) async throws -> PREnrichResult {
+    public func enrichChecks(repo: String, number: Int, author: String? = nil, host: String? = nil) async throws -> PREnrichResult {
         let output = try await runGH(
             args: [
                 "pr", "view", "\(number)",
                 "--repo", repo,
                 "--json",
-                "statusCheckRollup,reviewDecision,headRefName,baseRefName,additions,deletions,changedFiles,mergeable,mergeStateStatus,autoMergeRequest",
+                "statusCheckRollup,reviewDecision,headRefName,baseRefName,additions,deletions,changedFiles,mergeable,mergeStateStatus,autoMergeRequest,comments,commits",
             ], host: host)
         guard let data = output.data(using: .utf8) else {
             return PREnrichResult()
         }
         let resp = try JSONDecoder.gh.decode(GHEnrichResponse.self, from: data)
-        return resp.toEnrichResult()
+        return resp.toEnrichResult(excludeAuthor: author)
     }
 
     /// Fetch detailed PR information including per-file diffs.
@@ -770,8 +776,10 @@ private struct GHEnrichResponse: Decodable {
     let mergeable: String?
     let mergeStateStatus: String?
     let autoMergeRequest: GHAutoMergeRequest?
+    let comments: [GHComment]?
+    let commits: [GHCommit]?
 
-    func toEnrichResult() -> PREnrichResult {
+    func toEnrichResult(excludeAuthor: String? = nil) -> PREnrichResult {
         let checks = parseChecks(statusCheckRollup ?? [])
         let review: ReviewDecision
         switch reviewDecision?.uppercased() {
@@ -780,14 +788,36 @@ private struct GHEnrichResponse: Decodable {
         case "REVIEW_REQUIRED": review = .pending
         default: review = .none
         }
+
+        let lastCommitDate = commits?.last?.committedDate
+        let commentsSinceLastCommit = Self.countCommentsSinceCommit(
+            comments: comments, lastCommitDate: lastCommitDate, excludeAuthor: excludeAuthor
+        )
+
         return PREnrichResult(
             checks: checks, reviewDecision: review,
             headBranch: headRefName ?? "", baseBranch: baseRefName ?? "",
             additions: additions ?? 0, deletions: deletions ?? 0, changedFiles: changedFiles ?? 0,
             mergeable: MergeableState(rawValue: mergeable ?? ""),
             mergeStateStatus: MergeStateStatus(rawValue: mergeStateStatus ?? ""),
-            autoMergeEnabled: autoMergeRequest != nil
+            autoMergeEnabled: autoMergeRequest != nil,
+            commentsSinceLastCommit: commentsSinceLastCommit,
+            lastCommitDate: lastCommitDate
         )
+    }
+
+    private static func countCommentsSinceCommit(
+        comments: [GHComment]?,
+        lastCommitDate: Date?,
+        excludeAuthor: String?
+    ) -> Int {
+        guard let comments, let commitDate = lastCommitDate else { return 0 }
+        return comments.filter { comment in
+            guard let createdAt = comment.createdAt else { return false }
+            if createdAt <= commitDate { return false }
+            if let exclude = excludeAuthor, comment.author?.login == exclude { return false }
+            return true
+        }.count
     }
 }
 

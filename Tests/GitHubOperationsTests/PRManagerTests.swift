@@ -91,6 +91,14 @@ import Testing
     _ = manager
 }
 
+// MARK: - PREnrichResult
+
+@Test func prEnrichResultCommentDefaults() {
+    let result = PREnrichResult()
+    #expect(result.commentsSinceLastCommit == 0)
+    #expect(result.lastCommitDate == nil)
+}
+
 // MARK: - PROrigin Integration
 
 @Test func prOriginSetOperations() {
