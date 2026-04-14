@@ -149,7 +149,7 @@ public final class PRCoordinator {
                 let host = prManager.hostFromURL(pr.url)
                 group.addTask { [prManager] in
                     let result = try? await prManager.enrichChecks(
-                        repo: pr.repo, number: pr.number, host: host
+                        repo: pr.repo, number: pr.number, author: pr.author, host: host
                     )
                     return (pr.id, result)
                 }
@@ -182,7 +182,7 @@ public final class PRCoordinator {
         let host = prManager.hostFromURL(pr.url)
         guard
             let result = try? await prManager.enrichChecks(
-                repo: pr.repo, number: pr.number, host: host
+                repo: pr.repo, number: pr.number, author: pr.author, host: host
             )
         else { return }
 
@@ -205,6 +205,8 @@ public final class PRCoordinator {
         pr.mergeable = result.mergeable
         pr.mergeStateStatus = result.mergeStateStatus
         pr.autoMergeEnabled = result.autoMergeEnabled
+        pr.commentsSinceLastCommit = result.commentsSinceLastCommit
+        pr.lastCommitDate = result.lastCommitDate
         pr.enrichedAt = Date()
     }
 
