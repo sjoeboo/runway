@@ -557,8 +557,9 @@ public final class RunwayStore {
             try? await tmuxManager.killSession(name: tmuxName)
         }
 
-        // Clear cached terminal view so TerminalPane creates a fresh one
+        // Clear cached terminal view and tab state so TerminalPane creates a fresh one
         TerminalSessionCache.shared.removeAll(forSessionID: id)
+        TerminalTabStateCache.shared.remove(sessionID: id)
 
         // Recreate tmux session
         if tmuxAvailable {
@@ -610,6 +611,7 @@ public final class RunwayStore {
         sessions.removeAll { $0.id == id }
         try? database?.deleteSession(id: id)
         TerminalSessionCache.shared.removeAll(forSessionID: id)
+        TerminalTabStateCache.shared.remove(sessionID: id)
         prCoordinator.sessionDeleted(id: id)
         provisioningTasks[id]?.cancel()
         provisioningTasks.removeValue(forKey: id)

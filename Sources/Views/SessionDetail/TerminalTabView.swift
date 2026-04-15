@@ -63,6 +63,7 @@ public struct TerminalTabView: View {
     @State private var tabs: [TerminalTab] = []
     @State private var selectedTabID: String?
     @State private var shellCounter: Int = 0
+    private let tabStateCache = TerminalTabStateCache.shared
     @Environment(\.theme) private var theme
     @AppStorage("terminalFontFamily") private var fontFamily: String = "MesloLGS Nerd Font"
     @AppStorage("terminalFontSize") private var fontSize: Double = 13
@@ -173,21 +174,28 @@ public struct TerminalTabView: View {
                 }
             }
         }
-        .onAppear { initializeTabsIfReady() }
-        .onChange(of: session.id) { _, _ in
-            // Reset tabs when switching to a different session — without this,
-            // @State persists the old session's tabs and the wrong terminal shows.
+        .onAppear { restoreOrInitializeTabs() }
+        .onDisappear { saveTabState() }
+        .onChange(of: session.id) { oldID, _ in
+            // Save outgoing session's tab state, then reset for the new session.
+            tabStateCache.save(
+                .init(tabs: tabs, selectedTabID: selectedTabID, shellCounter: shellCounter),
+                for: oldID
+            )
             tabs = []
             selectedTabID = nil
-            initializeTabsIfReady()
+            shellCounter = 0
+            restoreOrInitializeTabs()
         }
         .onChange(of: splitHorizontalTrigger) { _, _ in splitDown() }
         .onChange(of: splitVerticalTrigger) { _, _ in splitRight() }
         .onChange(of: terminalRestartTrigger) { _, _ in
             // Force reinitialize tabs after restart — the status onChange may not
             // fire if SwiftUI coalesces .running → .starting → .running into no-op.
+            tabStateCache.remove(sessionID: session.id)
             tabs = []
             selectedTabID = nil
+            shellCounter = 0
             initializeTabsIfReady()
         }
         .onChange(of: session.status) { _, newStatus in
@@ -200,7 +208,7 @@ public struct TerminalTabView: View {
             // to force full view recreation, and stale hook events from a killed
             // session could otherwise destroy the freshly created terminal.
             if tabs.isEmpty, newStatus.tmuxSessionExpected {
-                initializeTabs()
+                restoreOrInitializeTabs()
             }
         }
         .onChange(of: diffOpenTrigger) { _, _ in
@@ -209,7 +217,9 @@ public struct TerminalTabView: View {
         }
         .onChange(of: selectedTabID) { _, _ in
             notifyActiveDiffPath()
+            saveTabState()
         }
+        .onChange(of: tabs.count) { _, _ in saveTabState() }
     }
 
     // MARK: - Tab Bar
@@ -316,6 +326,26 @@ public struct TerminalTabView: View {
 
     private var selectedTab: TerminalTab? {
         tabs.first(where: { $0.id == selectedTabID }) ?? tabs.first
+    }
+
+    /// Restore tab state from cache if available, otherwise initialize from scratch.
+    private func restoreOrInitializeTabs() {
+        if let cached = tabStateCache.state(for: session.id) {
+            tabs = cached.tabs
+            selectedTabID = cached.selectedTabID
+            shellCounter = cached.shellCounter
+            return
+        }
+        initializeTabsIfReady()
+    }
+
+    /// Persist current tab state so it survives navigation away and back.
+    private func saveTabState() {
+        guard !tabs.isEmpty else { return }
+        tabStateCache.save(
+            .init(tabs: tabs, selectedTabID: selectedTabID, shellCounter: shellCounter),
+            for: session.id
+        )
     }
 
     /// Only initialize tabs once the tmux session exists.
