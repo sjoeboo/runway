@@ -5,6 +5,14 @@ All notable changes to Runway are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.9.4] — 2026-04-15
+
+### Fixed
+
+- **Terminal tab preservation** — extra shell tabs no longer disappear when navigating away from a session and back; tab state is now cached outside the SwiftUI view lifecycle for instant restoration ([#305](https://github.com/sjoeboo/runway/pull/305))
+
+[0.9.4]: https://github.com/sjoeboo/runway/compare/v0.9.3...v0.9.4
+
 ## [0.9.3] — 2026-04-14
 
 ### Added
