@@ -155,3 +155,24 @@ import Testing
     let decoded = try JSONDecoder().decode(Set<PROrigin>.self, from: data)
     #expect(decoded == origins)
 }
+
+// MARK: - PullRequest.assignees
+
+@Test func pullRequestAssigneesDefault() {
+    let pr = PullRequest(
+        number: 1, title: "t", state: .open,
+        headBranch: "h", baseBranch: "m", author: "a", repo: "r"
+    )
+    #expect(pr.assignees.isEmpty)
+}
+
+@Test func pullRequestAssigneesCodableRoundtrip() throws {
+    var pr = PullRequest(
+        number: 1, title: "t", state: .open,
+        headBranch: "h", baseBranch: "m", author: "a", repo: "r"
+    )
+    pr.assignees = ["alice", "bob-chen"]
+    let data = try JSONEncoder().encode(pr)
+    let decoded = try JSONDecoder().decode(PullRequest.self, from: data)
+    #expect(decoded.assignees == ["alice", "bob-chen"])
+}
