@@ -160,3 +160,26 @@ import Testing
     #expect(collab.login == "bob")
     #expect(collab.name == nil)
 }
+
+// MARK: - whoami
+
+@Test func whoamiReturnsSeededValue() async {
+    let manager = PRManager()
+    await manager.seedWhoamiForTest(host: "github.com", login: "alice")
+    let result = await manager.cachedWhoami(host: "github.com")
+    #expect(result == "alice")
+}
+
+@Test func whoamiReturnsNilForUnseededHost() async {
+    let manager = PRManager()
+    let result = await manager.cachedWhoami(host: "github.com")
+    #expect(result == nil)
+}
+
+@Test func whoamiDistinctAcrossHosts() async {
+    let manager = PRManager()
+    await manager.seedWhoamiForTest(host: "github.com", login: "alice")
+    await manager.seedWhoamiForTest(host: "ghe.spotify.net", login: "alice-s")
+    #expect(await manager.cachedWhoami(host: "github.com") == "alice")
+    #expect(await manager.cachedWhoami(host: "ghe.spotify.net") == "alice-s")
+}

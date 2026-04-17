@@ -45,6 +45,7 @@ public actor PRManager {
     /// Cached hosts from `gh auth status` — rarely changes at runtime
     private var cachedHosts: [String]?
     private var hostsCacheTime: Date?
+    private var cachedWhoamiByHost: [String: String] = [:]
 
     public init() {}
 
@@ -353,6 +354,30 @@ public actor PRManager {
         }
         return allPRs
     }
+
+    /// Returns the current user's login for the given host, fetching and caching on first call.
+    /// Per-host because the same user may have different logins on different GHE instances.
+    public func whoami(host: String? = nil) async throws -> String {
+        let key = host ?? ""
+        if let cached = cachedWhoamiByHost[key] { return cached }
+        let output = try await runGH(args: ["api", "user", "-q", ".login"], host: host)
+        let login = output.trimmingCharacters(in: .whitespacesAndNewlines)
+        cachedWhoamiByHost[key] = login
+        return login
+    }
+
+    /// Returns the cached whoami for a host without triggering a fetch. Used by UI
+    /// that needs synchronous access and can tolerate `nil` until the cache warms.
+    public func cachedWhoami(host: String?) -> String? {
+        cachedWhoamiByHost[host ?? ""]
+    }
+
+    #if DEBUG
+        /// Test-only: seed the whoami cache to bypass the gh shellout.
+        public func seedWhoamiForTest(host: String?, login: String) {
+            cachedWhoamiByHost[host ?? ""] = login
+        }
+    #endif
 
     // MARK: - Private
 
