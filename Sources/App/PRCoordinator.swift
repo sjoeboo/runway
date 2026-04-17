@@ -31,6 +31,10 @@ public final class PRCoordinator {
     var reviewPRCandidate: PullRequest? = nil
     var isResolvingPR: Bool = false
 
+    /// Mirror of PRManager whoami cache, observable to drive UI highlighting.
+    /// Populated lazily on first `warmWhoami(host:)` call per host.
+    var whoamiByHost: [String: String] = [:]
+
     // MARK: - Private State
 
     private var prPollTask: Task<Void, Never>?
@@ -121,6 +125,25 @@ public final class PRCoordinator {
         let staleness: TimeInterval = 60
         if let last = prLastFetched, Date().timeIntervalSince(last) < staleness { return }
         await fetchPRs()
+    }
+
+    // MARK: - Whoami
+
+    /// Synchronous accessor for the current user's login on a given host.
+    /// Returns nil until the first `warmWhoami(host:)` call resolves.
+    func myLogin(forHost host: String?) -> String? {
+        whoamiByHost[host ?? ""]
+    }
+
+    /// Populate the whoami mirror for a host if not already present. Safe to call repeatedly.
+    func warmWhoami(host: String?) {
+        let key = host ?? ""
+        guard whoamiByHost[key] == nil else { return }
+        Task { @MainActor in
+            if let login = try? await prManager.whoami(host: host) {
+                whoamiByHost[key] = login
+            }
+        }
     }
 
     // MARK: - PR Enrichment
