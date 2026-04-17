@@ -575,9 +575,26 @@ struct ContentView: View {
             }
         }
 
-        // Status counts — always visible when there are active sessions
-        ToolbarItem(placement: .automatic) {
-            toolbarSessionCounts
+        // Title + status counts in the principal (centered) position
+        ToolbarItem(placement: .principal) {
+            principalTitleWithCounts
+        }
+    }
+
+    @ViewBuilder
+    private var principalTitleWithCounts: some View {
+        let counts = store.sessions.statusCounts
+        HStack(spacing: 10) {
+            Text(windowTitle)
+                .font(.headline)
+                .foregroundStyle(theme.chrome.text)
+                .lineLimit(1)
+                .truncationMode(.tail)
+            if counts.hasAny {
+                Divider()
+                    .frame(height: 14)
+                toolbarSessionCounts
+            }
         }
     }
 
