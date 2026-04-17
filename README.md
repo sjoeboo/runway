@@ -104,7 +104,7 @@ Runway knows what your agent is doing. Two detection paths work together:
 
 Hook injection is automatic — Runway writes to `~/.claude/settings.json` on every launch with the current ephemeral port.
 
-Status shows in the sidebar as colored indicators: green (running), yellow (waiting for permission), hollow (idle), spinner (starting), red (error), dim (stopped).
+Status shows in the sidebar as colored indicators: green (running), yellow (waiting for permission), hollow (idle), spinner (starting), red (error), dim (stopped). The toolbar also surfaces live per-status counts across all sessions for at-a-glance monitoring.
 
 ### Terminal
 
@@ -252,7 +252,7 @@ Runway auto-injects hooks into `~/.claude/settings.json` on every launch, subscr
 
 ## CI & Testing
 
-- **331 tests** across 8 test targets
+- **338 tests** across 8 test targets
 - **GitHub Actions CI** on every PR: build, test, SwiftLint, swift-format
 - **Branch protection** on `master` — CI must pass before merging
 - **Pre-commit hooks** run lint + format checks locally

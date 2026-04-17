@@ -5,11 +5,16 @@ All notable changes to Runway are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
-## [0.9.5] — 2026-04-16
+## [0.9.5] — 2026-04-17
 
 ### Added
 
-- **Restart session dialog** — clicking the hover-row or stopped-session restart button now opens a confirmation dialog with a "Launch with Happy" toggle, letting you flip Happy on/off at restart time regardless of the session's original launch configuration
+- **Restart session dialog** — clicking the hover-row or stopped-session restart button now opens a confirmation dialog with a "Launch with Happy" toggle, letting you flip Happy on/off at restart time regardless of the session's original launch configuration ([#308](https://github.com/sjoeboo/runway/pull/308))
+- **Session status counts in toolbar** — toolbar shows live per-status counts (running, waiting, idle, error) for at-a-glance monitoring across all sessions ([#307](https://github.com/sjoeboo/runway/pull/307))
+
+### Fixed
+
+- **Diff merge-base with stale local refs** — diff now prefers `origin/<branch>` when computing the merge-base, avoiding incorrect diffs when the local ref has drifted from the remote ([#306](https://github.com/sjoeboo/runway/pull/306))
 
 [0.9.5]: https://github.com/sjoeboo/runway/compare/v0.9.4...v0.9.5
 
