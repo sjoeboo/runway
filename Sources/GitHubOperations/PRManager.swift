@@ -80,9 +80,9 @@ public actor PRManager {
         }
     }
 
-    /// Fetch both "mine" and "review-requested" PRs in parallel, merge and deduplicate.
+    /// Fetch "mine", "review-requested", and "assigned" PRs in parallel, merge and deduplicate.
     /// Each PR gets an `origin` set indicating which queries returned it.
-    /// A failure in one filter does not discard results from the other.
+    /// A failure in one filter does not discard results from the others.
     public func fetchAllPRs() async throws -> [PullRequest] {
         // Pre-resolve hosts on the actor so the parallel fetches don't re-enter.
         // Without this, async let + actor-isolated fetchPRs serializes instead of parallelizing.
@@ -90,16 +90,25 @@ public actor PRManager {
 
         async let minePRs: [PullRequest] = Self.fetchPRsNonisolated(hosts: hosts, filter: .mine)
         async let reviewPRs: [PullRequest] = Self.fetchPRsNonisolated(hosts: hosts, filter: .reviewRequested)
+        async let assignedPRs: [PullRequest] = Self.fetchPRsNonisolated(hosts: hosts, filter: .assigned)
 
-        let (mine, review) = await (minePRs, reviewPRs)
+        let (mine, review, assigned) = await (minePRs, reviewPRs, assignedPRs)
+        return Self.mergePRsByOrigin(mine: mine, reviewRequested: review, assigned: assigned)
+    }
 
-        // Merge: deduplicate by ID, combine origins
+    /// Merge three origin-tagged PR lists by id, combining origins into a single Set per PR.
+    /// Nonisolated + static so it is trivially testable without spinning up the actor.
+    nonisolated static func mergePRsByOrigin(
+        mine: [PullRequest],
+        reviewRequested: [PullRequest],
+        assigned: [PullRequest]
+    ) -> [PullRequest] {
         var merged: [String: PullRequest] = [:]
         for var pr in mine {
             pr.origin = [.mine]
             merged[pr.id] = pr
         }
-        for var pr in review {
+        for var pr in reviewRequested {
             pr.origin = [.reviewRequested]
             if var existing = merged[pr.id] {
                 existing.origin.insert(.reviewRequested)
@@ -108,7 +117,15 @@ public actor PRManager {
                 merged[pr.id] = pr
             }
         }
-
+        for var pr in assigned {
+            pr.origin = [.assigned]
+            if var existing = merged[pr.id] {
+                existing.origin.insert(.assigned)
+                merged[pr.id] = existing
+            } else {
+                merged[pr.id] = pr
+            }
+        }
         return Array(merged.values)
     }
 

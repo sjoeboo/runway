@@ -263,3 +263,48 @@ import Testing
     #expect(args.last == "me")
     #expect(args.contains("--add-assignee"))
 }
+
+// MARK: - fetchAllPRs merge
+
+@Test func mergeOriginsSingleList() throws {
+    let pr = PullRequest(
+        number: 1, title: "t", state: .open,
+        headBranch: "h", baseBranch: "m", author: "a", repo: "r"
+    )
+    let merged = PRManager.mergePRsByOrigin(
+        mine: [pr],
+        reviewRequested: [],
+        assigned: []
+    )
+    let out = try #require(merged.first)
+    #expect(out.origin == [.mine])
+}
+
+@Test func mergeOriginsAcrossAllThree() throws {
+    let pr = PullRequest(
+        number: 1, title: "t", state: .open,
+        headBranch: "h", baseBranch: "m", author: "a", repo: "r"
+    )
+    let merged = PRManager.mergePRsByOrigin(
+        mine: [pr],
+        reviewRequested: [pr],
+        assigned: [pr]
+    )
+    #expect(merged.count == 1)
+    let out = try #require(merged.first)
+    #expect(out.origin == [.mine, .reviewRequested, .assigned])
+}
+
+@Test func mergeOriginsAssignedOnly() throws {
+    let pr = PullRequest(
+        number: 2, title: "t", state: .open,
+        headBranch: "h", baseBranch: "m", author: "a", repo: "r"
+    )
+    let merged = PRManager.mergePRsByOrigin(
+        mine: [],
+        reviewRequested: [],
+        assigned: [pr]
+    )
+    let out = try #require(merged.first)
+    #expect(out.origin == [.assigned])
+}
