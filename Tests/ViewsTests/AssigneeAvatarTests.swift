@@ -1,4 +1,5 @@
 import Foundation
+import GitHubOperations
 import Testing
 
 @testable import Views
@@ -49,4 +50,40 @@ import Testing
     let input = "mnicholson"
     let expected = input.utf8.reduce(0) { ($0 &* 31 &+ Int($1)) & Int.max }
     #expect(AssigneeAvatar.colorIndex(for: input, paletteCount: 8) == expected % 8)
+}
+
+// MARK: - AssigneePicker filter
+
+@Test func pickerFilterMatchesLogin() {
+    let collabs = [
+        Collaborator(login: "alice-bailey", name: "Alice B"),
+        Collaborator(login: "bob-chen", name: "Bob C"),
+    ]
+    let filtered = AssigneePickerView.filter(collaborators: collabs, query: "alice")
+    #expect(filtered.count == 1)
+    #expect(filtered.first?.login == "alice-bailey")
+}
+
+@Test func pickerFilterMatchesName() {
+    let collabs = [
+        Collaborator(login: "ab", name: "Alice B"),
+        Collaborator(login: "bc", name: "Bob C"),
+    ]
+    let filtered = AssigneePickerView.filter(collaborators: collabs, query: "bob")
+    #expect(filtered.first?.login == "bc")
+}
+
+@Test func pickerFilterEmptyQueryReturnsAll() {
+    let collabs = [
+        Collaborator(login: "a1", name: nil),
+        Collaborator(login: "b1", name: nil),
+    ]
+    let filtered = AssigneePickerView.filter(collaborators: collabs, query: "")
+    #expect(filtered.count == 2)
+}
+
+@Test func pickerFilterCaseInsensitive() {
+    let collabs = [Collaborator(login: "Alice", name: "Alice")]
+    let filtered = AssigneePickerView.filter(collaborators: collabs, query: "ALICE")
+    #expect(filtered.count == 1)
 }
