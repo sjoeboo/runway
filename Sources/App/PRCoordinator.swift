@@ -529,6 +529,72 @@ public final class PRCoordinator {
         }
     }
 
+    // MARK: - Assignee Actions
+
+    /// Assign the current user to the PR. Optimistic UI: mutates pr.assignees before refresh.
+    func assignPRToMe(_ pr: PullRequest) async {
+        let host = prManager.hostFromURL(pr.url)
+        guard let login = try? await prManager.whoami(host: host) else {
+            store?.statusMessage = .error("Couldn't resolve your GitHub login")
+            return
+        }
+        whoamiByHost[host ?? ""] = login
+        await updateAssignees(pr, adding: [login], removing: [])
+    }
+
+    /// Unassign the current user from the PR.
+    func unassignMeFromPR(_ pr: PullRequest) async {
+        let host = prManager.hostFromURL(pr.url)
+        guard let login = try? await prManager.whoami(host: host) else {
+            store?.statusMessage = .error("Couldn't resolve your GitHub login")
+            return
+        }
+        whoamiByHost[host ?? ""] = login
+        await updateAssignees(pr, adding: [], removing: [login])
+    }
+
+    /// Apply a set of assignee changes to a PR. Optimistic on success, reverts via re-enrichment
+    /// on failure. Skips the gh subprocess when both lists are empty.
+    func updateAssignees(_ pr: PullRequest, adding: [String], removing: [String]) async {
+        guard !adding.isEmpty || !removing.isEmpty else { return }
+
+        // Optimistic update
+        let originalAssignees: [String]?
+        if let idx = pullRequests.firstIndex(where: { $0.id == pr.id }) {
+            originalAssignees = pullRequests[idx].assignees
+            var current = pullRequests[idx].assignees
+            for login in adding where !current.contains(login) { current.append(login) }
+            current.removeAll { removing.contains($0) }
+            pullRequests[idx].assignees = current
+        } else {
+            originalAssignees = nil
+        }
+
+        let host = prManager.hostFromURL(pr.url)
+        do {
+            if !adding.isEmpty {
+                try await prManager.assign(repo: pr.repo, number: pr.number, logins: adding, host: host)
+            }
+            if !removing.isEmpty {
+                try await prManager.unassign(repo: pr.repo, number: pr.number, logins: removing, host: host)
+            }
+            let parts: [String] = [
+                adding.isEmpty ? nil : "+\(adding.joined(separator: ","))",
+                removing.isEmpty ? nil : "-\(removing.joined(separator: ","))",
+            ].compactMap { $0 }
+            store?.statusMessage = .success("Updated assignees on #\(pr.number): \(parts.joined(separator: " "))")
+            await refreshPRAfterAction(pr)
+        } catch {
+            // Revert optimistic update
+            if let original = originalAssignees,
+                let idx = pullRequests.firstIndex(where: { $0.id == pr.id })
+            {
+                pullRequests[idx].assignees = original
+            }
+            store?.statusMessage = .error("Assign failed: \(error.localizedDescription)")
+        }
+    }
+
     // MARK: - PR Review Resolution
 
     func resolvePRForReview(number: Int, repo: String, host: String?) async {
