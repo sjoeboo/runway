@@ -575,26 +575,11 @@ struct ContentView: View {
             }
         }
 
-        // Title + status counts in the principal (centered) position
+        // Status counts — centered in the toolbar's principal slot. The window
+        // title renders in its native leading slot via .navigationTitle, so we
+        // don't duplicate it here.
         ToolbarItem(placement: .principal) {
-            principalTitleWithCounts
-        }
-    }
-
-    @ViewBuilder
-    private var principalTitleWithCounts: some View {
-        let counts = store.sessions.statusCounts
-        HStack(spacing: 10) {
-            Text(windowTitle)
-                .font(.headline)
-                .foregroundStyle(theme.chrome.text)
-                .lineLimit(1)
-                .truncationMode(.tail)
-            if counts.hasAny {
-                Divider()
-                    .frame(height: 14)
-                toolbarSessionCounts
-            }
+            toolbarSessionCounts
         }
     }
 
@@ -602,7 +587,7 @@ struct ContentView: View {
     private var toolbarSessionCounts: some View {
         let counts = store.sessions.statusCounts
         if counts.hasAny {
-            HStack(spacing: 8) {
+            HStack(spacing: 14) {
                 if counts.running > 0 {
                     statusChip(status: .running, count: counts.running, label: "running")
                 }
@@ -616,15 +601,18 @@ struct ContentView: View {
                     statusChip(status: .error, count: counts.error, label: "error")
                 }
             }
+            .padding(.horizontal, 4)
             .help(toolbarCountsHelpText(counts))
         }
     }
 
     private func statusChip(status: SessionStatus, count: Int, label: String) -> some View {
-        HStack(spacing: 3) {
-            SessionStatusIndicator(status: status, size: 7)
+        HStack(spacing: 5) {
+            SessionStatusIndicator(status: status, size: 9)
             Text("\(count)")
-                .font(.caption)
+                .font(.subheadline)
+                .fontWeight(.medium)
+                .monospacedDigit()
                 .foregroundStyle(theme.chrome.text)
         }
         .accessibilityElement(children: .combine)
