@@ -239,3 +239,27 @@ import Testing
     let result = try PRManager.parseEnrichResponseForTest(data: data, excludeAuthor: nil)
     #expect(result.assignees.isEmpty)
 }
+
+// MARK: - assign / unassign args
+
+@Test func buildAssignArgsAdd() {
+    let args = PRManager.buildAssignArgs(
+        repo: "owner/repo", number: 42, logins: ["alice", "bob"], add: true
+    )
+    #expect(args == ["pr", "edit", "42", "--repo", "owner/repo", "--add-assignee", "alice,bob"])
+}
+
+@Test func buildAssignArgsRemove() {
+    let args = PRManager.buildAssignArgs(
+        repo: "owner/repo", number: 42, logins: ["alice"], add: false
+    )
+    #expect(args == ["pr", "edit", "42", "--repo", "owner/repo", "--remove-assignee", "alice"])
+}
+
+@Test func buildAssignArgsSingle() {
+    let args = PRManager.buildAssignArgs(
+        repo: "o/r", number: 1, logins: ["me"], add: true
+    )
+    #expect(args.last == "me")
+    #expect(args.contains("--add-assignee"))
+}

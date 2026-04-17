@@ -278,6 +278,25 @@ public actor PRManager {
         )
     }
 
+    /// Assign the given logins to a PR. Single subprocess (gh accepts comma-joined list).
+    public func assign(repo: String, number: Int, logins: [String], host: String? = nil) async throws {
+        guard !logins.isEmpty else { return }
+        let args = Self.buildAssignArgs(repo: repo, number: number, logins: logins, add: true)
+        try await runGH(args: args, host: host)
+    }
+
+    /// Remove assignees from a PR. No-op if logins is empty.
+    public func unassign(repo: String, number: Int, logins: [String], host: String? = nil) async throws {
+        guard !logins.isEmpty else { return }
+        let args = Self.buildAssignArgs(repo: repo, number: number, logins: logins, add: false)
+        try await runGH(args: args, host: host)
+    }
+
+    nonisolated static func buildAssignArgs(repo: String, number: Int, logins: [String], add: Bool) -> [String] {
+        let flag = add ? "--add-assignee" : "--remove-assignee"
+        return ["pr", "edit", "\(number)", "--repo", repo, flag, logins.joined(separator: ",")]
+    }
+
     /// Update a PR branch with the latest base branch (merge or rebase).
     public func updateBranch(repo: String, number: Int, rebase: Bool = false, host: String? = nil) async throws {
         var args = ["pr", "update-branch", "\(number)", "--repo", repo]
