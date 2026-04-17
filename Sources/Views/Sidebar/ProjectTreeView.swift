@@ -10,6 +10,7 @@ import Theme
 @MainActor
 public protocol SidebarActions {
     func restartSession(id: String) async
+    func presentRestartDialog(id: String)
     func forkSession(id: String)
     func deleteSession(id: String, deleteWorktree: Bool)
     func newSession(projectID: String?, parentID: String?)
@@ -483,7 +484,7 @@ struct SessionRowView: View {
 
             HStack(spacing: 4) {
                 Button {
-                    Task { await actions.restartSession(id: session.id) }
+                    actions.presentRestartDialog(id: session.id)
                 } label: {
                     Image(systemName: "arrow.counterclockwise")
                         .font(.callout)
@@ -491,7 +492,7 @@ struct SessionRowView: View {
                         .frame(width: 26, height: 26)
                 }
                 .buttonStyle(.plain)
-                .help("Restart session")
+                .help("Restart session\u{2026}")
                 .accessibilityLabel("Restart session")
 
                 Button {

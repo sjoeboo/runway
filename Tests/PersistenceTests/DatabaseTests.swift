@@ -212,6 +212,18 @@ import Testing
     #expect(fetched?.useHappy == false)
 }
 
+@Test func updateSessionUseHappyFlipsFlag() throws {
+    let db = try Database(inMemory: true)
+    let session = Session(title: "toggle-happy", path: "/tmp", useHappy: false)
+    try db.saveSession(session)
+
+    try db.updateSessionUseHappy(id: session.id, useHappy: true)
+    #expect(try db.session(id: session.id)?.useHappy == true)
+
+    try db.updateSessionUseHappy(id: session.id, useHappy: false)
+    #expect(try db.session(id: session.id)?.useHappy == false)
+}
+
 @Test func sessionToolGeminiPersistence() throws {
     let db = try Database(inMemory: true)
     let session = Session(title: "gemini-test", path: "/tmp", tool: .gemini)

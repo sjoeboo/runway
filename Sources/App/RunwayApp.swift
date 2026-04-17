@@ -214,6 +214,15 @@ struct ContentView: View {
                         }
                     )
                     .theme(theme)
+
+                case .restartSession(let sessionID):
+                    if let session = store.sessions.first(where: { $0.id == sessionID }) {
+                        RestartSessionDialog(session: session) { useHappy in
+                            Task { await store.restartSession(id: sessionID, withHappy: useHappy) }
+                            store.activeSheet = nil
+                        }
+                        .theme(theme)
+                    }
                 }
             }
 
@@ -465,7 +474,7 @@ struct ContentView: View {
                     diffOpenTrigger: store.diffOpenTrigger,
                     onActiveDiffPathChanged: { path in store.activeDiffPath = path },
                     onToggleChanges: { store.toggleChangesSidebar() },
-                    onRestart: { Task { await store.restartSession(id: sessionID) } },
+                    onRestart: { store.presentRestartDialog(id: sessionID) },
                     worktreeManager: session.worktreeBranch != nil ? store.worktreeManager : nil,
                     defaultBranch: store.projects.first(where: { $0.id == session.projectID })?.defaultBranch ?? "main",
                     onRollback: { hash in
