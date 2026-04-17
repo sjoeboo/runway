@@ -54,7 +54,7 @@ public actor PRManager {
     /// When `repo` is provided, uses `gh pr list` scoped to that repo.
     public func fetchPRs(repo: String? = nil, filter: PRFilter = .mine) async throws -> [PullRequest] {
         if let repo {
-            let args = buildListArgs(repo: repo, filter: filter)
+            let args = Self.buildListArgs(repo: repo, filter: filter)
             let output = try await runGH(args: args)
             return try parsePRList(output)
         } else {
@@ -63,7 +63,7 @@ public actor PRManager {
             var allPRs: [PullRequest] = []
 
             for host in hosts {
-                let args = buildSearchArgs(filter: filter)
+                let args = Self.buildSearchArgs(filter: filter)
                 if let output = try? await runGH(args: args, host: host) {
                     let prs = (try? parseSearchResults(output)) ?? []
                     allPRs.append(contentsOf: prs)
@@ -327,6 +327,7 @@ public actor PRManager {
         switch filter {
         case .mine: args += ["--author", "@me"]
         case .reviewRequested: args += ["--review-requested", "@me"]
+        case .assigned: args += ["--assignee", "@me"]
         case .all: break
         }
         // gh search --json returns an array; also print total via --jq is fragile,
@@ -341,18 +342,7 @@ public actor PRManager {
     /// Nonisolated helper for parallel PR fetching — avoids actor re-entrance serialization.
     /// Hosts are pre-resolved on the actor; shell calls and parsing run off-actor.
     nonisolated private static func fetchPRsNonisolated(hosts: [String], filter: PRFilter) async -> [PullRequest] {
-        var args = [
-            "search", "prs",
-            "--state", "open",
-            "--archived=false",
-            "--json", "number,title,state,repository,url,isDraft,createdAt,updatedAt,author",
-            "--limit", "50",
-        ]
-        switch filter {
-        case .mine: args += ["--author", "@me"]
-        case .reviewRequested: args += ["--review-requested", "@me"]
-        case .all: break
-        }
+        let args = Self.buildSearchArgs(filter: filter)
 
         var allPRs: [PullRequest] = []
         for host in hosts {
@@ -385,7 +375,7 @@ public actor PRManager {
         return hosts.isEmpty ? ["github.com"] : hosts
     }
 
-    private func buildSearchArgs(filter: PRFilter) -> [String] {
+    nonisolated static func buildSearchArgs(filter: PRFilter) -> [String] {
         var args = [
             "search", "prs",
             "--state", "open",
@@ -399,14 +389,16 @@ public actor PRManager {
             args += ["--author", "@me"]
         case .reviewRequested:
             args += ["--review-requested", "@me"]
+        case .assigned:
+            args += ["--assignee", "@me"]
         case .all:
-            break  // No author filter — show all open PRs
+            break
         }
 
         return args
     }
 
-    private func buildListArgs(repo: String, filter: PRFilter) -> [String] {
+    nonisolated static func buildListArgs(repo: String, filter: PRFilter) -> [String] {
         var args = [
             "pr", "list", "--json",
             "number,title,state,headRefName,baseRefName,author,url,isDraft,additions,deletions,changedFiles,createdAt,updatedAt,reviewDecision",
@@ -418,6 +410,8 @@ public actor PRManager {
             args += ["--author", "@me"]
         case .reviewRequested:
             args += ["--search", "review-requested:@me"]
+        case .assigned:
+            args += ["--assignee", "@me"]
         case .all:
             break
         }
@@ -476,6 +470,7 @@ public struct Collaborator: Identifiable, Sendable, Hashable, Codable {
 public enum PRFilter: Sendable {
     case mine
     case reviewRequested
+    case assigned
     case all
 }
 

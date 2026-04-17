@@ -13,12 +13,31 @@ import Testing
     #expect(error.errorDescription?.contains("not logged in") == true)
 }
 
-// MARK: - PRFilter
+// MARK: - PRFilter.assigned
 
-@Test func prFilterCases() {
-    // Verify all filter cases exist and are distinct
-    let filters: [PRFilter] = [.mine, .reviewRequested, .all]
-    #expect(filters.count == 3)
+@Test func prFilterAssignedCase() {
+    let filters: [PRFilter] = [.mine, .reviewRequested, .assigned, .all]
+    #expect(filters.count == 4)
+}
+
+@Test func buildSearchArgsForAssigned() {
+    let args = PRManager.buildSearchArgs(filter: .assigned)
+    #expect(args.contains("--assignee"))
+    #expect(args.contains("@me"))
+}
+
+@Test func buildSearchArgsForMine() {
+    let args = PRManager.buildSearchArgs(filter: .mine)
+    #expect(args.contains("--author"))
+    #expect(args.contains("@me"))
+    #expect(!args.contains("--assignee"))
+}
+
+@Test func buildListArgsForAssigned() {
+    let args = PRManager.buildListArgs(repo: "owner/repo", filter: .assigned)
+    #expect(args.contains("owner/repo"))
+    #expect(args.contains("--assignee"))
+    #expect(args.contains("@me"))
 }
 
 // MARK: - PRDetail
