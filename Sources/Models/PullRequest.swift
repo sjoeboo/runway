@@ -89,6 +89,7 @@ public struct PullRequest: Identifiable, Codable, Sendable, Equatable {
 public enum PROrigin: String, Codable, Sendable, Hashable {
     case mine
     case reviewRequested
+    case assigned
 }
 
 // MARK: - PR State

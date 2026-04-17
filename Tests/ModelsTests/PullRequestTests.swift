@@ -141,3 +141,17 @@ import Testing
     #expect(pr.commentsSinceLastCommit == 0)
     #expect(pr.lastCommitDate == nil)
 }
+
+// MARK: - PROrigin.assigned
+
+@Test func prOriginAssignedCase() {
+    let origin: PROrigin = .assigned
+    #expect(origin.rawValue == "assigned")
+}
+
+@Test func prOriginAssignedEncodable() throws {
+    let origins: Set<PROrigin> = [.mine, .assigned]
+    let data = try JSONEncoder().encode(origins)
+    let decoded = try JSONDecoder().decode(Set<PROrigin>.self, from: data)
+    #expect(decoded == origins)
+}
