@@ -22,3 +22,6 @@ Frameworks/GhosttyKit.xcframework/
 # Hangar config
 .hangar/
 .worktrees/
+
+# Superpowers brainstorming artifacts
+.superpowers/
