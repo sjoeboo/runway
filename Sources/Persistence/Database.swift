@@ -343,6 +343,15 @@ public final class Database: Sendable {
         }
     }
 
+    public func updateSessionUseHappy(id: String, useHappy: Bool) throws {
+        try db.write { db in
+            try db.execute(
+                sql: "UPDATE sessions SET useHappy = ? WHERE id = ?",
+                arguments: [useHappy, id]
+            )
+        }
+    }
+
     public func updateProjectSortOrder(id: String, sortOrder: Int) throws {
         try db.write { db in
             try db.execute(

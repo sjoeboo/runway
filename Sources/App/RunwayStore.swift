@@ -542,6 +542,27 @@ public final class RunwayStore {
     }
 
     public func restartSession(id: String) async {
+        await restartSession(id: id, withHappy: nil)
+    }
+
+    /// Restart a session, optionally flipping the Happy wrapper.
+    /// Pass `nil` to preserve the session's current `useHappy` value.
+    public func restartSession(id: String, withHappy: Bool?) async {
+        guard sessions.contains(where: { $0.id == id }) else { return }
+
+        // Persist the new Happy preference before restart so buildAgentCommand picks it up.
+        if let withHappy, let idx = sessions.firstIndex(where: { $0.id == id }),
+            withHappy != sessions[idx].useHappy
+        {
+            sessions[idx].useHappy = withHappy
+            do {
+                try database?.updateSessionUseHappy(id: id, useHappy: withHappy)
+            } catch {
+                print("[Runway] Failed to persist useHappy change: \(error)")
+            }
+        }
+
+        // Re-read session *after* the potential mutation so buildAgentCommand sees the new flag.
         guard let session = sessions.first(where: { $0.id == id }) else { return }
 
         // Transition to .starting so TerminalTabView clears its tabs
@@ -1311,6 +1332,11 @@ extension RunwayStore: SidebarActions {
         activeSheet = .newSession
     }
 
+    public func presentRestartDialog(id: String) {
+        guard sessions.contains(where: { $0.id == id }) else { return }
+        activeSheet = .restartSession(sessionID: id)
+    }
+
     public func newProject() {
         activeSheet = .newProject
     }
@@ -1396,6 +1422,7 @@ enum ActiveSheet: Identifiable {
     case newProject
     case reviewPRSheet
     case reviewPRDialog
+    case restartSession(sessionID: String)
 
     var id: String {
         switch self {
@@ -1403,6 +1430,7 @@ enum ActiveSheet: Identifiable {
         case .newProject: "newProject"
         case .reviewPRSheet: "reviewPRSheet"
         case .reviewPRDialog: "reviewPRDialog"
+        case .restartSession(let sid): "restartSession:\(sid)"
         }
     }
 }

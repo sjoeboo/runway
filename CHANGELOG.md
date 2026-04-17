@@ -5,6 +5,14 @@ All notable changes to Runway are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.9.5] — 2026-04-16
+
+### Added
+
+- **Restart session dialog** — clicking the hover-row or stopped-session restart button now opens a confirmation dialog with a "Launch with Happy" toggle, letting you flip Happy on/off at restart time regardless of the session's original launch configuration
+
+[0.9.5]: https://github.com/sjoeboo/runway/compare/v0.9.4...v0.9.5
+
 ## [0.9.4] — 2026-04-15
 
 ### Fixed
