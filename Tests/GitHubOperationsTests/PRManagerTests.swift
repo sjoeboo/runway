@@ -117,12 +117,15 @@ import Testing
     #expect(collab.id == "alice")
 }
 
-@Test func collaboratorHashableByLogin() {
+@Test func collaboratorEqualityUsesAllFields() {
+    // Same login + same name — equal and same hash
     let a1 = Collaborator(login: "alice", name: "Alice")
-    let a2 = Collaborator(login: "alice", name: nil)
-    #expect(a1 == a1)
-    // Different names yield different structs — hashable by all fields is fine
-    #expect(a1 != a2)
+    let a2 = Collaborator(login: "alice", name: "Alice")
+    #expect(a1 == a2)
+    #expect(a1.hashValue == a2.hashValue)
+    // Same login, different name — not equal (synthesized Hashable uses all fields)
+    let a3 = Collaborator(login: "alice", name: nil)
+    #expect(a1 != a3)
 }
 
 @Test func collaboratorDecodable() throws {
