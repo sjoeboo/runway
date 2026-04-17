@@ -232,8 +232,9 @@ public actor WorktreeManager {
                 base = "HEAD"
             case .branch:
                 let defaultBranch = await detectDefaultBranch(repoPath: path)
+                let baseRef = await preferredMergeBaseRef(repoPath: path, branch: defaultBranch)
                 base =
-                    (try? await runGit(in: path, args: ["merge-base", defaultBranch, "HEAD"]))
+                    (try? await runGit(in: path, args: ["merge-base", baseRef, "HEAD"]))
                     .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) } ?? "HEAD"
             }
 
@@ -257,8 +258,9 @@ public actor WorktreeManager {
             base = "HEAD"
         case .branch:
             let defaultBranch = await detectDefaultBranch(repoPath: path)
+            let baseRef = await preferredMergeBaseRef(repoPath: path, branch: defaultBranch)
             base =
-                (try? await runGit(in: path, args: ["merge-base", defaultBranch, "HEAD"]))
+                (try? await runGit(in: path, args: ["merge-base", baseRef, "HEAD"]))
                 .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) } ?? "HEAD"
         }
 
@@ -288,6 +290,24 @@ public actor WorktreeManager {
         return "main"
     }
 
+    /// Returns the best ref to use when computing `merge-base` against `HEAD`.
+    ///
+    /// Prefers the remote-tracking ref `origin/<branch>` (updated by `git fetch`) over the
+    /// local branch ref, which can drift far behind origin in worktree-heavy workflows where
+    /// the default branch is rarely checked out. A stale local ref makes `merge-base` return
+    /// an older commit, which causes `git diff` to report unrelated upstream changes as if
+    /// they belonged to the user's branch.
+    ///
+    /// Falls back to the local branch name when origin isn't configured or the branch hasn't
+    /// been pushed.
+    func preferredMergeBaseRef(repoPath: String, branch: String) async -> String {
+        let remoteRef = "origin/\(branch)"
+        if (try? await runGit(in: repoPath, args: ["rev-parse", "--verify", remoteRef])) != nil {
+            return remoteRef
+        }
+        return branch
+    }
+
     /// Get commit history for the current branch.
     /// First tries showing only commits since divergence from the base branch.
     /// Falls back to showing the last `limit` commits if there are no branch-specific commits
@@ -299,7 +319,8 @@ public actor WorktreeManager {
         limit: Int = 50
     ) async -> [(hash: String, subject: String)] {
         // Try branch-specific commits first (since divergence from base)
-        if let base = try? await runGit(in: path, args: ["merge-base", baseBranch, "HEAD"]) {
+        let baseRef = await preferredMergeBaseRef(repoPath: path, branch: baseBranch)
+        if let base = try? await runGit(in: path, args: ["merge-base", baseRef, "HEAD"]) {
             let trimmedBase = base.trimmingCharacters(in: .whitespacesAndNewlines)
             if let output = try? await runGit(
                 in: path,
