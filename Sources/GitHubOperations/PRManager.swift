@@ -15,6 +15,7 @@ public struct PREnrichResult: Sendable {
     public var autoMergeEnabled: Bool
     public var commentsSinceLastCommit: Int
     public var lastCommitDate: Date?
+    public var assignees: [String]
 
     public init(
         checks: CheckSummary = CheckSummary(), reviewDecision: ReviewDecision = .none,
@@ -23,7 +24,8 @@ public struct PREnrichResult: Sendable {
         mergeable: MergeableState? = nil, mergeStateStatus: MergeStateStatus? = nil,
         autoMergeEnabled: Bool = false,
         commentsSinceLastCommit: Int = 0,
-        lastCommitDate: Date? = nil
+        lastCommitDate: Date? = nil,
+        assignees: [String] = []
     ) {
         self.checks = checks
         self.reviewDecision = reviewDecision
@@ -37,6 +39,7 @@ public struct PREnrichResult: Sendable {
         self.autoMergeEnabled = autoMergeEnabled
         self.commentsSinceLastCommit = commentsSinceLastCommit
         self.lastCommitDate = lastCommitDate
+        self.assignees = assignees
     }
 }
 
@@ -134,7 +137,7 @@ public actor PRManager {
                 "pr", "view", "\(number)",
                 "--repo", repo,
                 "--json",
-                "statusCheckRollup,reviewDecision,headRefName,baseRefName,additions,deletions,changedFiles,mergeable,mergeStateStatus,autoMergeRequest,comments,commits",
+                "statusCheckRollup,reviewDecision,headRefName,baseRefName,additions,deletions,changedFiles,mergeable,mergeStateStatus,autoMergeRequest,comments,commits,assignees",
             ], host: host)
         guard let data = output.data(using: .utf8) else {
             return PREnrichResult()
@@ -150,7 +153,7 @@ public actor PRManager {
                 "pr", "view", "\(number)",
                 "--repo", repo,
                 "--json",
-                "body,reviews,comments,files,statusCheckRollup,reviewDecision,headRefName,baseRefName,additions,deletions,changedFiles,mergeable,mergeStateStatus,autoMergeRequest",
+                "body,reviews,comments,files,statusCheckRollup,reviewDecision,headRefName,baseRefName,additions,deletions,changedFiles,mergeable,mergeStateStatus,autoMergeRequest,assignees",
             ], host: host)
         var detail = try parsePRDetail(output)
 
@@ -409,6 +412,16 @@ public actor PRManager {
         /// Test-only seeder for the collaborators cache.
         public func seedCollaboratorsForTest(repo: String, collabs: [Collaborator]) {
             cachedCollaboratorsByRepo[repo] = (collabs, Date())
+        }
+    #endif
+
+    #if DEBUG
+        /// Test-only: parse an enrich response from raw JSON data.
+        nonisolated static func parseEnrichResponseForTest(data: Data, excludeAuthor: String?) throws -> PREnrichResult {
+            let decoder = JSONDecoder()
+            decoder.dateDecodingStrategy = .iso8601
+            let resp = try decoder.decode(GHEnrichResponse.self, from: data)
+            return resp.toEnrichResult(excludeAuthor: excludeAuthor)
         }
     #endif
 
@@ -725,6 +738,7 @@ private struct GHPRDetailResponse: Decodable {
     let mergeable: String?
     let mergeStateStatus: String?
     let autoMergeRequest: GHAutoMergeRequest?
+    let assignees: [GHAuthor]?
 
     func toPRDetail() -> PRDetail {
         let rollup = statusCheckRollup ?? []
@@ -769,7 +783,8 @@ private struct GHPRDetailResponse: Decodable {
             changedFiles: changedFiles ?? 0,
             mergeable: MergeableState(rawValue: mergeable ?? ""),
             mergeStateStatus: MergeStateStatus(rawValue: mergeStateStatus ?? ""),
-            autoMergeEnabled: autoMergeRequest != nil
+            autoMergeEnabled: autoMergeRequest != nil,
+            assignees: (assignees ?? []).map(\.login)
         )
     }
 
@@ -858,6 +873,7 @@ private struct GHEnrichResponse: Decodable {
     let autoMergeRequest: GHAutoMergeRequest?
     let comments: [GHComment]?
     let commits: [GHCommit]?
+    let assignees: [GHAuthor]?
 
     func toEnrichResult(excludeAuthor: String? = nil) -> PREnrichResult {
         let checks = parseChecks(statusCheckRollup ?? [])
@@ -873,6 +889,7 @@ private struct GHEnrichResponse: Decodable {
         let commentsSinceLastCommit = Self.countCommentsSinceCommit(
             comments: comments, lastCommitDate: lastCommitDate, excludeAuthor: excludeAuthor
         )
+        let assigneeLogins = (assignees ?? []).map(\.login)
 
         return PREnrichResult(
             checks: checks, reviewDecision: review,
@@ -882,7 +899,8 @@ private struct GHEnrichResponse: Decodable {
             mergeStateStatus: MergeStateStatus(rawValue: mergeStateStatus ?? ""),
             autoMergeEnabled: autoMergeRequest != nil,
             commentsSinceLastCommit: commentsSinceLastCommit,
-            lastCommitDate: lastCommitDate
+            lastCommitDate: lastCommitDate,
+            assignees: assigneeLogins
         )
     }
 

@@ -223,6 +223,7 @@ public struct PRDetail: Codable, Sendable {
     public var mergeable: MergeableState?
     public var mergeStateStatus: MergeStateStatus?
     public var autoMergeEnabled: Bool
+    public var assignees: [String]
 
     public init(
         body: String = "",
@@ -239,7 +240,8 @@ public struct PRDetail: Codable, Sendable {
         changedFiles: Int = 0,
         mergeable: MergeableState? = nil,
         mergeStateStatus: MergeStateStatus? = nil,
-        autoMergeEnabled: Bool = false
+        autoMergeEnabled: Bool = false,
+        assignees: [String] = []
     ) {
         self.body = body
         self.reviews = reviews
@@ -256,6 +258,7 @@ public struct PRDetail: Codable, Sendable {
         self.mergeable = mergeable
         self.mergeStateStatus = mergeStateStatus
         self.autoMergeEnabled = autoMergeEnabled
+        self.assignees = assignees
     }
 }
 

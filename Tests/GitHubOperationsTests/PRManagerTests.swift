@@ -213,3 +213,29 @@ import Testing
     let cached = await manager.cachedCollaborators(for: "owner/repo")
     #expect(cached?.map(\.login) == ["alice"])
 }
+
+// MARK: - Assignee decoding
+
+@Test func enrichResultHasAssignees() {
+    let result = PREnrichResult()
+    #expect(result.assignees.isEmpty)
+}
+
+@Test func enrichResponseDecodesAssignees() throws {
+    let json = """
+        {
+          "statusCheckRollup": [],
+          "assignees": [{"login":"alice","name":"Alice"}, {"login":"bob","name":null}]
+        }
+        """
+    let data = Data(json.utf8)
+    let result = try PRManager.parseEnrichResponseForTest(data: data, excludeAuthor: nil)
+    #expect(result.assignees == ["alice", "bob"])
+}
+
+@Test func enrichResponseWithNoAssignees() throws {
+    let json = #"{"statusCheckRollup":[]}"#
+    let data = Data(json.utf8)
+    let result = try PRManager.parseEnrichResponseForTest(data: data, excludeAuthor: nil)
+    #expect(result.assignees.isEmpty)
+}
