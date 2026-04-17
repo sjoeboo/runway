@@ -183,3 +183,33 @@ import Testing
     #expect(await manager.cachedWhoami(host: "github.com") == "alice")
     #expect(await manager.cachedWhoami(host: "ghe.spotify.net") == "alice-s")
 }
+
+// MARK: - collaborators parsing
+
+@Test func parseCollaboratorsPages() throws {
+    // --paginate --slurp returns [[...], [...]]
+    let json = """
+        [
+          [{"login":"alice","name":"Alice Bailey"}, {"login":"bob","name":null}],
+          [{"login":"carol","name":"Carol"}, {"login":"alice","name":"Alice Bailey"}]
+        ]
+        """
+    let collabs = try PRManager.parseCollaborators(json)
+    // Dedup by login; preserve first-occurrence order
+    #expect(collabs.map(\.login) == ["alice", "bob", "carol"])
+    #expect(collabs[0].name == "Alice Bailey")
+    #expect(collabs[1].name == nil)
+}
+
+@Test func parseCollaboratorsEmpty() throws {
+    let collabs = try PRManager.parseCollaborators("[]")
+    #expect(collabs.isEmpty)
+}
+
+@Test func collaboratorsCacheSeeded() async {
+    let manager = PRManager()
+    let seed = [Collaborator(login: "alice", name: "Alice")]
+    await manager.seedCollaboratorsForTest(repo: "owner/repo", collabs: seed)
+    let cached = await manager.cachedCollaborators(for: "owner/repo")
+    #expect(cached?.map(\.login) == ["alice"])
+}

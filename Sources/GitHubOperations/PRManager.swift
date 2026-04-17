@@ -46,6 +46,8 @@ public actor PRManager {
     private var cachedHosts: [String]?
     private var hostsCacheTime: Date?
     private var cachedWhoamiByHost: [String: String] = [:]
+    private var cachedCollaboratorsByRepo: [String: (data: [Collaborator], fetchedAt: Date)] = [:]
+    private let collaboratorsTTL: TimeInterval = 600
 
     public init() {}
 
@@ -378,6 +380,50 @@ public actor PRManager {
             cachedWhoamiByHost[host ?? ""] = login
         }
     #endif
+
+    /// Fetch the collaborator list for a repo. Cached per-repo with a 10-min TTL.
+    public func collaborators(repo: String, host: String? = nil) async throws -> [Collaborator] {
+        if let entry = cachedCollaboratorsByRepo[repo],
+            Date().timeIntervalSince(entry.fetchedAt) < collaboratorsTTL
+        {
+            return entry.data
+        }
+        let output = try await runGH(
+            args: ["api", "repos/\(repo)/collaborators", "--paginate", "--slurp"],
+            host: host
+        )
+        let collabs = try Self.parseCollaborators(output)
+        cachedCollaboratorsByRepo[repo] = (collabs, Date())
+        return collabs
+    }
+
+    /// Synchronous read of the cached collaborator list (nil if not loaded or stale).
+    public func cachedCollaborators(for repo: String) -> [Collaborator]? {
+        guard let entry = cachedCollaboratorsByRepo[repo],
+            Date().timeIntervalSince(entry.fetchedAt) < collaboratorsTTL
+        else { return nil }
+        return entry.data
+    }
+
+    #if DEBUG
+        /// Test-only seeder for the collaborators cache.
+        public func seedCollaboratorsForTest(repo: String, collabs: [Collaborator]) {
+            cachedCollaboratorsByRepo[repo] = (collabs, Date())
+        }
+    #endif
+
+    /// Parse `gh api repos/.../collaborators --paginate --slurp` output (array of pages).
+    /// Dedup by login, preserve first-occurrence order.
+    nonisolated static func parseCollaborators(_ json: String) throws -> [Collaborator] {
+        guard let data = json.data(using: .utf8) else { return [] }
+        let pages = try JSONDecoder().decode([[GHCollaboratorUser]].self, from: data)
+        var seen = Set<String>()
+        var result: [Collaborator] = []
+        for user in pages.flatMap({ $0 }) where seen.insert(user.login).inserted {
+            result.append(Collaborator(login: user.login, name: user.name))
+        }
+        return result
+    }
 
     // MARK: - Private
 
@@ -942,6 +988,11 @@ public struct PRFingerprint: Equatable, Sendable {
 
 private struct GHFingerprintItem: Decodable {
     let updatedAt: String?
+}
+
+private struct GHCollaboratorUser: Decodable {
+    let login: String
+    let name: String?
 }
 
 // MARK: - JSONDecoder for gh output
