@@ -256,6 +256,7 @@ public final class PRCoordinator {
         pr.autoMergeEnabled = result.autoMergeEnabled
         pr.commentsSinceLastCommit = result.commentsSinceLastCommit
         pr.lastCommitDate = result.lastCommitDate
+        pr.assignees = result.assignees
         pr.enrichedAt = Date()
     }
 
