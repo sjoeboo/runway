@@ -575,31 +575,57 @@ struct ContentView: View {
             }
         }
 
-        // Status counts — always visible when there are active sessions
-        ToolbarItem(placement: .automatic) {
+        // Status counts — centered in the toolbar's principal slot. The window
+        // title renders in its native leading slot via .navigationTitle, so we
+        // don't duplicate it here.
+        ToolbarItem(placement: .principal) {
             toolbarSessionCounts
         }
     }
 
     @ViewBuilder
     private var toolbarSessionCounts: some View {
-        let running = store.sessions.filter { $0.status == .running }.count
-        let waiting = store.sessions.filter { $0.status == .waiting }.count
-        if running > 0 || waiting > 0 {
-            HStack(spacing: 6) {
-                if running > 0 {
-                    Label("\(running)", systemImage: "bolt.fill")
-                        .font(.caption)
-                        .foregroundStyle(.green)
+        let counts = store.sessions.statusCounts
+        if counts.hasAny {
+            HStack(spacing: 14) {
+                if counts.running > 0 {
+                    statusChip(status: .running, count: counts.running, label: "running")
                 }
-                if waiting > 0 {
-                    Label("\(waiting)", systemImage: "hand.raised.fill")
-                        .font(.caption)
-                        .foregroundStyle(.orange)
+                if counts.waiting > 0 {
+                    statusChip(status: .waiting, count: counts.waiting, label: "waiting")
+                }
+                if counts.idle > 0 {
+                    statusChip(status: .idle, count: counts.idle, label: "idle")
+                }
+                if counts.error > 0 {
+                    statusChip(status: .error, count: counts.error, label: "error")
                 }
             }
-            .help("\(running) running, \(waiting) waiting")
+            .padding(.horizontal, 4)
+            .help(toolbarCountsHelpText(counts))
         }
+    }
+
+    private func statusChip(status: SessionStatus, count: Int, label: String) -> some View {
+        HStack(spacing: 5) {
+            SessionStatusIndicator(status: status, size: 9)
+            Text("\(count)")
+                .font(.subheadline)
+                .fontWeight(.medium)
+                .monospacedDigit()
+                .foregroundStyle(theme.chrome.text)
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(count) \(label) \(count == 1 ? "session" : "sessions")")
+    }
+
+    private func toolbarCountsHelpText(_ counts: SessionStatusCounts) -> String {
+        var parts: [String] = []
+        if counts.running > 0 { parts.append("\(counts.running) running") }
+        if counts.waiting > 0 { parts.append("\(counts.waiting) waiting") }
+        if counts.idle > 0 { parts.append("\(counts.idle) idle") }
+        if counts.error > 0 { parts.append("\(counts.error) error") }
+        return parts.joined(separator: ", ")
     }
 }
 
