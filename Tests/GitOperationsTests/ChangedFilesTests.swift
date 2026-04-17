@@ -154,3 +154,66 @@ private func sh(_ cmd: String, in dir: String) throws {
         #expect(!diffText.isEmpty)
     }
 }
+
+// MARK: - Regression: stale local default branch
+
+/// When a local tracking branch (e.g. `master`) is behind `origin/master`, computing
+/// `merge-base master HEAD` returns an old commit and the diff inflates to include
+/// unrelated upstream commits. The fix is to prefer `origin/<branch>` for merge-base.
+///
+/// Scenario:
+///   - origin/master has commits M1..M4
+///   - local master is stale at M1 (never pulled)
+///   - feature branch was created off origin/master (M4) + adds F1, F2
+///   - changedFiles(.branch) should report only F1/F2's files, not M2..M4's.
+@Test func changedFilesUsesOriginBranchNotStaleLocal() async throws {
+    let tmpURL = FileManager.default.temporaryDirectory
+        .appendingPathComponent("runway-stale-master-\(UUID().uuidString)")
+        .resolvingSymlinksInPath()
+    let tmpDir = tmpURL.path
+    defer { try? FileManager.default.removeItem(atPath: tmpDir) }
+    try FileManager.default.createDirectory(atPath: tmpDir, withIntermediateDirectories: true)
+
+    let remoteDir = "\(tmpDir)/origin.git"
+    let localDir = "\(tmpDir)/local"
+
+    // 1. Create a bare "remote" repo with an initial commit on master.
+    try FileManager.default.createDirectory(atPath: remoteDir, withIntermediateDirectories: true)
+    try sh("git init --bare -b master", in: remoteDir)
+
+    // 2. Seed origin/master with commit M1 (containing initial.txt), then clone.
+    let seedDir = "\(tmpDir)/seed"
+    try FileManager.default.createDirectory(atPath: seedDir, withIntermediateDirectories: true)
+    try sh("git init -b master", in: seedDir)
+    try sh("git config user.email 'test@test.com' && git config user.name 'Test'", in: seedDir)
+    try sh("echo initial > initial.txt && git add . && git commit -m M1", in: seedDir)
+    try sh("git remote add origin \(remoteDir) && git push origin master", in: seedDir)
+
+    // 3. Clone the remote — now local master == origin/master == M1.
+    try sh("git clone \(remoteDir) \(localDir)", in: tmpDir)
+    try sh("git config user.email 'test@test.com' && git config user.name 'Test'", in: localDir)
+
+    // 4. Push M2..M4 to origin directly (these are "upstream" commits the user
+    //    hasn't pulled into their local master).
+    for (i, file) in ["upstream-a.txt", "upstream-b.txt", "upstream-c.txt"].enumerated() {
+        try sh("echo up > \(file) && git add . && git commit -m M\(i + 2)", in: seedDir)
+    }
+    try sh("git push origin master", in: seedDir)
+
+    // 5. In the local clone, fetch (so origin/master updates) but DO NOT pull
+    //    (so local master stays stale at M1).
+    try sh("git fetch origin", in: localDir)
+
+    // 6. Create a feature branch from origin/master (fresh), add two files.
+    try sh("git checkout -b feature origin/master", in: localDir)
+    try sh("echo feat1 > feat1.txt && git add . && git commit -m F1", in: localDir)
+    try sh("echo feat2 > feat2.txt && git add . && git commit -m F2", in: localDir)
+
+    // 7. The fix: changedFiles(.branch) should compare against origin/master (M4),
+    //    not stale local master (M1), so only feat1.txt + feat2.txt show up.
+    let manager = WorktreeManager()
+    let changes = await manager.changedFiles(path: localDir, mode: .branch)
+    let paths = Set(changes.map(\.path))
+
+    #expect(paths == ["feat1.txt", "feat2.txt"], "Expected only the feature branch's files, got \(paths)")
+}
