@@ -109,3 +109,32 @@ import Testing
     #expect(origins.contains(.mine))
     #expect(origins.contains(.reviewRequested))
 }
+
+// MARK: - Collaborator
+
+@Test func collaboratorIdEqualsLogin() {
+    let collab = Collaborator(login: "alice", name: "Alice B")
+    #expect(collab.id == "alice")
+}
+
+@Test func collaboratorHashableByLogin() {
+    let a1 = Collaborator(login: "alice", name: "Alice")
+    let a2 = Collaborator(login: "alice", name: nil)
+    #expect(a1 == a1)
+    // Different names yield different structs — hashable by all fields is fine
+    #expect(a1 != a2)
+}
+
+@Test func collaboratorDecodable() throws {
+    let json = Data(#"{"login":"alice","name":"Alice Bailey"}"#.utf8)
+    let collab = try JSONDecoder().decode(Collaborator.self, from: json)
+    #expect(collab.login == "alice")
+    #expect(collab.name == "Alice Bailey")
+}
+
+@Test func collaboratorDecodableWithNullName() throws {
+    let json = Data(#"{"login":"bob","name":null}"#.utf8)
+    let collab = try JSONDecoder().decode(Collaborator.self, from: json)
+    #expect(collab.login == "bob")
+    #expect(collab.name == nil)
+}

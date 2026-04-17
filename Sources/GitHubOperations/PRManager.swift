@@ -457,6 +457,20 @@ public actor PRManager {
     }
 }
 
+// MARK: - Collaborator
+
+public struct Collaborator: Identifiable, Sendable, Hashable, Codable {
+    public let login: String
+    public let name: String?
+
+    public init(login: String, name: String? = nil) {
+        self.login = login
+        self.name = name
+    }
+
+    public var id: String { login }
+}
+
 // MARK: - Types
 
 public enum PRFilter: Sendable {
