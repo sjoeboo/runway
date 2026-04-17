@@ -244,29 +244,43 @@ Fixed-frame popover content (`360 × 420`). Structure:
 
 Collaborator fetch triggers in `.task { await prCoordinator.loadCollaborators(for: pr.repo) }`. The cache ensures reopening the picker is instant within the 10-minute window.
 
-**4. Card footer avatars (`PRDashboardView`)**
+**4. "Assignees" column in `PRDashboardView` Table**
 
-In the existing PR card footer row, add a small `HStack` of `AssigneeAvatar(size: 14)` between the branch name and the checks pill. Shown only when `!pr.assignees.isEmpty`. Max 3 visible; remaining count rendered as `"+N"` in a dim circle of the same size.
+The dashboard uses SwiftUI `Table` with columns (not cards). Add a new `TableColumn("Assignees")` between the existing "Author" and "Age" columns, sortable by assignee count.
 
 ```swift
-if !pr.assignees.isEmpty {
-    let myLogin = prCoordinator.myLogin(forHost: prManager.hostFromURL(pr.url))
-    HStack(spacing: -4) {
-        ForEach(pr.assignees.prefix(3), id: \.self) { login in
-            AssigneeAvatar(login: login, isMe: login == myLogin, size: 14)
-        }
-        if pr.assignees.count > 3 {
-            Text("+\(pr.assignees.count - 3)")
-                .font(.caption2)
-                .frame(width: 14, height: 14)
-                .background(Circle().fill(theme.chrome.surface))
-                .foregroundColor(theme.chrome.textDim)
+TableColumn("Assignees", value: \.assigneeSortKey) { pr in
+    if !pr.assignees.isEmpty {
+        let myLogin = prCoordinator.myLogin(forHost: prManager.hostFromURL(pr.url))
+        HStack(spacing: -4) {
+            ForEach(pr.assignees.prefix(3), id: \.self) { login in
+                AssigneeAvatar(login: login, isMe: login == myLogin, size: 14)
+            }
+            if pr.assignees.count > 3 {
+                Text("+\(pr.assignees.count - 3)")
+                    .font(.caption2)
+                    .frame(width: 14, height: 14)
+                    .background(Circle().fill(theme.chrome.surface))
+                    .foregroundColor(theme.chrome.textDim)
+            }
         }
     }
+}
+.width(min: 40, ideal: 80, max: 140)
+```
+
+`assigneeSortKey` is a new computed property on `PullRequest` (via the existing `PullRequest+ViewHelpers.swift` extension pattern that already hosts `reviewSortRank` / `mergeSortRank` / `checksPassRatio`):
+
+```swift
+public extension PullRequest {
+    /// Sort key for the "Assignees" column — count ascending (PRs without assignees first).
+    var assigneeSortKey: Int { assignees.count }
 }
 ```
 
 `PRCoordinator` exposes `myLogin(forHost:)` returning the cached whoami for that host (or `nil` if not yet resolved, in which case the "me" highlight is skipped gracefully). The slight negative spacing (`-4`) creates an overlapping-avatar stack familiar from GitHub/Linear.
+
+The cell renders nothing (empty view) when `pr.assignees.isEmpty`, keeping the Table visually tidy for PRs with no assignees.
 
 **5. "Assigned" dashboard tab**
 
