@@ -35,6 +35,9 @@ public final class PRCoordinator {
     /// Populated lazily on first `warmWhoami(host:)` call per host.
     var whoamiByHost: [String: String] = [:]
 
+    /// Observable mirror of PRManager collaborators cache. Keyed by repo (e.g. "owner/repo").
+    var collaboratorsByRepo: [String: [Collaborator]] = [:]
+
     // MARK: - Private State
 
     private var prPollTask: Task<Void, Never>?
@@ -45,6 +48,9 @@ public final class PRCoordinator {
     private let sessionPRTTL: TimeInterval = 60
     private var detailCache: [String: (detail: PRDetail, fetchedAt: Date)] = [:]
     private let detailTTL: TimeInterval = 300
+
+    /// Tracks which repos have a load in-flight to avoid duplicate fetches.
+    private var loadingCollaboratorsRepos: Set<String> = []
 
     // MARK: - Dependencies
 
@@ -143,6 +149,26 @@ public final class PRCoordinator {
             if let login = try? await prManager.whoami(host: host) {
                 whoamiByHost[key] = login
             }
+        }
+    }
+
+    // MARK: - Collaborators
+
+    /// Load collaborators for a repo, caching the result. Deduplicates concurrent calls.
+    /// Hits the PRManager cache for instant re-reads within the 10-min TTL.
+    func loadCollaborators(for repo: String, host: String? = nil) async {
+        if let cached = await prManager.cachedCollaborators(for: repo) {
+            collaboratorsByRepo[repo] = cached
+            return
+        }
+        guard !loadingCollaboratorsRepos.contains(repo) else { return }
+        loadingCollaboratorsRepos.insert(repo)
+        defer { loadingCollaboratorsRepos.remove(repo) }
+        do {
+            let collabs = try await prManager.collaborators(repo: repo, host: host)
+            collaboratorsByRepo[repo] = collabs
+        } catch {
+            store?.statusMessage = .error("Couldn't load collaborators: \(error.localizedDescription)")
         }
     }
 
