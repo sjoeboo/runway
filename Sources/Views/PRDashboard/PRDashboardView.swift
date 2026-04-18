@@ -1,3 +1,4 @@
+import GitHubOperations
 import Models
 import SwiftUI
 import Theme
@@ -23,6 +24,12 @@ public struct PRDashboardView: View {
     var onEnableAutoMerge: ((PullRequest, MergeStrategy) -> Void)?
     var onDisableAutoMerge: ((PullRequest) -> Void)?
     var onClosePR: ((PullRequest) -> Void)?
+    var onAssignToMe: ((PullRequest) -> Void)?
+    var onUnassignMe: ((PullRequest) -> Void)?
+    var onToggleAssignee: ((PullRequest, String) -> Void)?
+    var onLoadCollaborators: ((String) -> Void)?
+    var myLoginForHost: ((String?) -> String?)?
+    var collaboratorsForRepo: ((String) -> [Collaborator])?
 
     @AppStorage("prListWidth") private var prListWidth: Double = 380
     @AppStorage("hideDrafts") private var hideDrafts: Bool = false
@@ -78,7 +85,13 @@ public struct PRDashboardView: View {
         onReviewPR: ((PullRequest) -> Void)? = nil,
         onEnableAutoMerge: ((PullRequest, MergeStrategy) -> Void)? = nil,
         onDisableAutoMerge: ((PullRequest) -> Void)? = nil,
-        onClosePR: ((PullRequest) -> Void)? = nil
+        onClosePR: ((PullRequest) -> Void)? = nil,
+        onAssignToMe: ((PullRequest) -> Void)? = nil,
+        onUnassignMe: ((PullRequest) -> Void)? = nil,
+        onToggleAssignee: ((PullRequest, String) -> Void)? = nil,
+        onLoadCollaborators: ((String) -> Void)? = nil,
+        myLoginForHost: ((String?) -> String?)? = nil,
+        collaboratorsForRepo: ((String) -> [Collaborator])? = nil
     ) {
         self.pullRequests = pullRequests
         self.selectedPRID = selectedPRID
@@ -99,6 +112,12 @@ public struct PRDashboardView: View {
         self.onEnableAutoMerge = onEnableAutoMerge
         self.onDisableAutoMerge = onDisableAutoMerge
         self.onClosePR = onClosePR
+        self.onAssignToMe = onAssignToMe
+        self.onUnassignMe = onUnassignMe
+        self.onToggleAssignee = onToggleAssignee
+        self.onLoadCollaborators = onLoadCollaborators
+        self.myLoginForHost = myLoginForHost
+        self.collaboratorsForRepo = collaboratorsForRepo
     }
 
     private var selectedPR: PullRequest? {
@@ -194,7 +213,21 @@ public struct PRDashboardView: View {
                     },
                     onClosePR: onClosePR.map { callback in
                         { callback(pr) }
-                    }
+                    },
+                    onAssignToMe: onAssignToMe.map { callback in
+                        { callback(pr) }
+                    },
+                    onUnassignMe: onUnassignMe.map { callback in
+                        { callback(pr) }
+                    },
+                    onToggleAssignee: onToggleAssignee.map { callback in
+                        { login in callback(pr, login) }
+                    },
+                    onLoadCollaborators: onLoadCollaborators.map { callback in
+                        { callback(pr.repo) }
+                    },
+                    myLogin: myLoginForHost?(hostFromURL(pr.url)),
+                    collaborators: collaboratorsForRepo?(pr.repo) ?? []
                 )
                 .frame(maxWidth: .infinity)
             }
@@ -367,6 +400,11 @@ public struct PRDashboardView: View {
 
     private func prStateBadge(_ pr: PullRequest) -> some View {
         PRStateDot(state: pr.state)
+    }
+
+    private func hostFromURL(_ url: String) -> String? {
+        guard let parsed = URL(string: url), let host = parsed.host else { return nil }
+        return host == "github.com" ? nil : host
     }
 
     private func prRepoShortName(_ pr: PullRequest) -> String {
