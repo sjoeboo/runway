@@ -31,6 +31,13 @@ public final class PRCoordinator {
     var reviewPRCandidate: PullRequest? = nil
     var isResolvingPR: Bool = false
 
+    /// Mirror of PRManager whoami cache, observable to drive UI highlighting.
+    /// Populated lazily on first `warmWhoami(host:)` call per host.
+    var whoamiByHost: [String: String] = [:]
+
+    /// Observable mirror of PRManager collaborators cache. Keyed by repo (e.g. "owner/repo").
+    var collaboratorsByRepo: [String: [Collaborator]] = [:]
+
     // MARK: - Private State
 
     private var prPollTask: Task<Void, Never>?
@@ -41,6 +48,9 @@ public final class PRCoordinator {
     private let sessionPRTTL: TimeInterval = 60
     private var detailCache: [String: (detail: PRDetail, fetchedAt: Date)] = [:]
     private let detailTTL: TimeInterval = 300
+
+    /// Tracks which repos have a load in-flight to avoid duplicate fetches.
+    private var loadingCollaboratorsRepos: Set<String> = []
 
     // MARK: - Dependencies
 
@@ -121,6 +131,51 @@ public final class PRCoordinator {
         let staleness: TimeInterval = 60
         if let last = prLastFetched, Date().timeIntervalSince(last) < staleness { return }
         await fetchPRs()
+    }
+
+    // MARK: - Whoami
+
+    /// Synchronous accessor for the current user's login on a given host.
+    /// Returns nil until the first `warmWhoami(host:)` call resolves.
+    func myLogin(forHost host: String?) -> String? {
+        whoamiByHost[host ?? ""]
+    }
+
+    /// Populate the whoami mirror for a host if not already present. Safe to call repeatedly.
+    func warmWhoami(host: String?) {
+        let key = host ?? ""
+        guard whoamiByHost[key] == nil else { return }
+        Task { @MainActor in
+            if let login = try? await prManager.whoami(host: host) {
+                whoamiByHost[key] = login
+            }
+        }
+    }
+
+    // MARK: - Collaborators
+
+    /// Whether a collaborator fetch is currently in flight for this repo.
+    /// Used by the picker to show a ProgressView while the first load runs.
+    func isLoadingCollaborators(for repo: String) -> Bool {
+        loadingCollaboratorsRepos.contains(repo)
+    }
+
+    /// Load collaborators for a repo, caching the result. Deduplicates concurrent calls.
+    /// Hits the PRManager cache for instant re-reads within the 10-min TTL.
+    func loadCollaborators(for repo: String, host: String? = nil) async {
+        if let cached = await prManager.cachedCollaborators(for: repo) {
+            collaboratorsByRepo[repo] = cached
+            return
+        }
+        guard !loadingCollaboratorsRepos.contains(repo) else { return }
+        loadingCollaboratorsRepos.insert(repo)
+        defer { loadingCollaboratorsRepos.remove(repo) }
+        do {
+            let collabs = try await prManager.collaborators(repo: repo, host: host)
+            collaboratorsByRepo[repo] = collabs
+        } catch {
+            store?.statusMessage = .error("Couldn't load collaborators: \(error.localizedDescription)")
+        }
     }
 
     // MARK: - PR Enrichment
@@ -207,6 +262,7 @@ public final class PRCoordinator {
         pr.autoMergeEnabled = result.autoMergeEnabled
         pr.commentsSinceLastCommit = result.commentsSinceLastCommit
         pr.lastCommitDate = result.lastCommitDate
+        pr.assignees = result.assignees
         pr.enrichedAt = Date()
     }
 
@@ -477,6 +533,81 @@ public final class PRCoordinator {
     func openPRInBrowser(_ pr: PullRequest) {
         if let url = URL(string: pr.url) {
             NSWorkspace.shared.open(url)
+        }
+    }
+
+    // MARK: - Assignee Actions
+
+    /// Assign the current user to the PR. Optimistic UI: mutates pr.assignees before refresh.
+    func assignPRToMe(_ pr: PullRequest) async {
+        let host = prManager.hostFromURL(pr.url)
+        guard let login = try? await prManager.whoami(host: host) else {
+            store?.statusMessage = .error("Couldn't resolve your GitHub login")
+            return
+        }
+        whoamiByHost[host ?? ""] = login
+        await updateAssignees(pr, adding: [login], removing: [])
+        // Mirror the self-assignment into the PR's origin set so the Assigned tab
+        // reflects the change immediately (rather than waiting for the next poll).
+        if let idx = pullRequests.firstIndex(where: { $0.id == pr.id }) {
+            pullRequests[idx].origin.insert(.assigned)
+        }
+    }
+
+    /// Unassign the current user from the PR.
+    func unassignMeFromPR(_ pr: PullRequest) async {
+        let host = prManager.hostFromURL(pr.url)
+        guard let login = try? await prManager.whoami(host: host) else {
+            store?.statusMessage = .error("Couldn't resolve your GitHub login")
+            return
+        }
+        whoamiByHost[host ?? ""] = login
+        await updateAssignees(pr, adding: [], removing: [login])
+        // Remove .assigned locally so the PR disappears from the Assigned tab immediately.
+        if let idx = pullRequests.firstIndex(where: { $0.id == pr.id }) {
+            pullRequests[idx].origin.remove(.assigned)
+        }
+    }
+
+    /// Apply a set of assignee changes to a PR. Optimistic on success, reverts via re-enrichment
+    /// on failure. Skips the gh subprocess when both lists are empty.
+    func updateAssignees(_ pr: PullRequest, adding: [String], removing: [String]) async {
+        guard !adding.isEmpty || !removing.isEmpty else { return }
+
+        // Optimistic update
+        let originalAssignees: [String]?
+        if let idx = pullRequests.firstIndex(where: { $0.id == pr.id }) {
+            originalAssignees = pullRequests[idx].assignees
+            var current = pullRequests[idx].assignees
+            for login in adding where !current.contains(login) { current.append(login) }
+            current.removeAll { removing.contains($0) }
+            pullRequests[idx].assignees = current
+        } else {
+            originalAssignees = nil
+        }
+
+        let host = prManager.hostFromURL(pr.url)
+        do {
+            if !adding.isEmpty {
+                try await prManager.assign(repo: pr.repo, number: pr.number, logins: adding, host: host)
+            }
+            if !removing.isEmpty {
+                try await prManager.unassign(repo: pr.repo, number: pr.number, logins: removing, host: host)
+            }
+            let parts: [String] = [
+                adding.isEmpty ? nil : "+\(adding.joined(separator: ","))",
+                removing.isEmpty ? nil : "-\(removing.joined(separator: ","))",
+            ].compactMap { $0 }
+            store?.statusMessage = .success("Updated assignees on #\(pr.number): \(parts.joined(separator: " "))")
+            await refreshPRAfterAction(pr)
+        } catch {
+            // Revert optimistic update
+            if let original = originalAssignees,
+                let idx = pullRequests.firstIndex(where: { $0.id == pr.id })
+            {
+                pullRequests[idx].assignees = original
+            }
+            store?.statusMessage = .error("Assign failed: \(error.localizedDescription)")
         }
     }
 

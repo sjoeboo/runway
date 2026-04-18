@@ -526,7 +526,31 @@ struct ContentView: View {
                 onReviewPR: { pr in store.reviewPR(pr) },
                 onEnableAutoMerge: { pr, strategy in Task { await store.prCoordinator.enableAutoMerge(pr, strategy: strategy) } },
                 onDisableAutoMerge: { pr in Task { await store.prCoordinator.disableAutoMerge(pr) } },
-                onClosePR: { pr in Task { await store.prCoordinator.closePR(pr) } }
+                onClosePR: { pr in Task { await store.prCoordinator.closePR(pr) } },
+                onAssignToMe: { pr in Task { await store.prCoordinator.assignPRToMe(pr) } },
+                onUnassignMe: { pr in Task { await store.prCoordinator.unassignMeFromPR(pr) } },
+                onToggleAssignee: { pr, login in
+                    Task {
+                        if pr.assignees.contains(login) {
+                            await store.prCoordinator.updateAssignees(pr, adding: [], removing: [login])
+                        } else {
+                            await store.prCoordinator.updateAssignees(pr, adding: [login], removing: [])
+                        }
+                    }
+                },
+                onLoadCollaborators: { repo in
+                    Task { await store.prCoordinator.loadCollaborators(for: repo) }
+                },
+                myLoginForHost: { host in
+                    store.prCoordinator.warmWhoami(host: host)
+                    return store.prCoordinator.myLogin(forHost: host)
+                },
+                collaboratorsForRepo: { repo in
+                    store.prCoordinator.collaboratorsByRepo[repo] ?? []
+                },
+                isLoadingCollaboratorsForRepo: { repo in
+                    store.prCoordinator.isLoadingCollaborators(for: repo)
+                }
             )
         }
     }

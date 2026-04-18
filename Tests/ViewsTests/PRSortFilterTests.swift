@@ -310,3 +310,22 @@ import Testing
     #expect(sorted[1].number == 3)  // pending
     #expect(sorted[2].number == 2)  // changes
 }
+
+// MARK: - assigneeSortKey
+
+@Test func assigneeSortKeyEmpty() {
+    let pr = PullRequest(
+        number: 1, title: "t", state: .open,
+        headBranch: "h", baseBranch: "m", author: "a", repo: "r"
+    )
+    #expect(pr.assigneeSortKey == 0)
+}
+
+@Test func assigneeSortKeyCount() {
+    var pr = PullRequest(
+        number: 1, title: "t", state: .open,
+        headBranch: "h", baseBranch: "m", author: "a", repo: "r"
+    )
+    pr.assignees = ["alice", "bob", "carol"]
+    #expect(pr.assigneeSortKey == 3)
+}

@@ -1,3 +1,4 @@
+import GitHubOperations
 import Models
 import SwiftUI
 import Theme
@@ -23,6 +24,13 @@ public struct PRDashboardView: View {
     var onEnableAutoMerge: ((PullRequest, MergeStrategy) -> Void)?
     var onDisableAutoMerge: ((PullRequest) -> Void)?
     var onClosePR: ((PullRequest) -> Void)?
+    var onAssignToMe: ((PullRequest) -> Void)?
+    var onUnassignMe: ((PullRequest) -> Void)?
+    var onToggleAssignee: ((PullRequest, String) -> Void)?
+    var onLoadCollaborators: ((String) -> Void)?
+    var myLoginForHost: ((String?) -> String?)?
+    var collaboratorsForRepo: ((String) -> [Collaborator])?
+    var isLoadingCollaboratorsForRepo: ((String) -> Bool)?
 
     @AppStorage("prListWidth") private var prListWidth: Double = 380
     @AppStorage("hideDrafts") private var hideDrafts: Bool = false
@@ -78,7 +86,14 @@ public struct PRDashboardView: View {
         onReviewPR: ((PullRequest) -> Void)? = nil,
         onEnableAutoMerge: ((PullRequest, MergeStrategy) -> Void)? = nil,
         onDisableAutoMerge: ((PullRequest) -> Void)? = nil,
-        onClosePR: ((PullRequest) -> Void)? = nil
+        onClosePR: ((PullRequest) -> Void)? = nil,
+        onAssignToMe: ((PullRequest) -> Void)? = nil,
+        onUnassignMe: ((PullRequest) -> Void)? = nil,
+        onToggleAssignee: ((PullRequest, String) -> Void)? = nil,
+        onLoadCollaborators: ((String) -> Void)? = nil,
+        myLoginForHost: ((String?) -> String?)? = nil,
+        collaboratorsForRepo: ((String) -> [Collaborator])? = nil,
+        isLoadingCollaboratorsForRepo: ((String) -> Bool)? = nil
     ) {
         self.pullRequests = pullRequests
         self.selectedPRID = selectedPRID
@@ -99,6 +114,13 @@ public struct PRDashboardView: View {
         self.onEnableAutoMerge = onEnableAutoMerge
         self.onDisableAutoMerge = onDisableAutoMerge
         self.onClosePR = onClosePR
+        self.onAssignToMe = onAssignToMe
+        self.onUnassignMe = onUnassignMe
+        self.onToggleAssignee = onToggleAssignee
+        self.onLoadCollaborators = onLoadCollaborators
+        self.myLoginForHost = myLoginForHost
+        self.collaboratorsForRepo = collaboratorsForRepo
+        self.isLoadingCollaboratorsForRepo = isLoadingCollaboratorsForRepo
     }
 
     private var selectedPR: PullRequest? {
@@ -117,6 +139,8 @@ public struct PRDashboardView: View {
             result = result.filter { $0.origin.contains(.mine) }
         case .reviewRequested:
             result = result.filter { $0.origin.contains(.reviewRequested) }
+        case .assigned:
+            result = result.filter { $0.origin.contains(.assigned) }
         }
 
         if showSessionPRsOnly {
@@ -194,7 +218,22 @@ public struct PRDashboardView: View {
                     },
                     onClosePR: onClosePR.map { callback in
                         { callback(pr) }
-                    }
+                    },
+                    onAssignToMe: onAssignToMe.map { callback in
+                        { callback(pr) }
+                    },
+                    onUnassignMe: onUnassignMe.map { callback in
+                        { callback(pr) }
+                    },
+                    onToggleAssignee: onToggleAssignee.map { callback in
+                        { login in callback(pr, login) }
+                    },
+                    onLoadCollaborators: onLoadCollaborators.map { callback in
+                        { callback(pr.repo) }
+                    },
+                    myLogin: myLoginForHost?(hostFromURL(pr.url)),
+                    collaborators: collaboratorsForRepo?(pr.repo) ?? [],
+                    isLoadingCollaborators: isLoadingCollaboratorsForRepo?(pr.repo) ?? false
                 )
                 .frame(maxWidth: .infinity)
             }
@@ -244,6 +283,25 @@ public struct PRDashboardView: View {
                     .lineLimit(1)
             }
             .width(min: 60, ideal: 90, max: 200)
+
+            TableColumn("Assignees", value: \.assigneeSortKey) { pr in
+                if !pr.assignees.isEmpty {
+                    let me = myLoginForHost?(hostFromURL(pr.url))
+                    HStack(spacing: -4) {
+                        ForEach(pr.assignees.prefix(3), id: \.self) { login in
+                            AssigneeAvatar(login: login, isMe: login == me, size: 14)
+                        }
+                        if pr.assignees.count > 3 {
+                            Text("+\(pr.assignees.count - 3)")
+                                .font(.caption2)
+                                .frame(width: 14, height: 14)
+                                .background(Circle().fill(theme.chrome.surface))
+                                .foregroundColor(theme.chrome.textDim)
+                        }
+                    }
+                }
+            }
+            .width(min: 40, ideal: 80, max: 140)
 
             TableColumn("Age", value: \.createdAt) { pr in
                 Text(pr.ageText)
@@ -369,6 +427,11 @@ public struct PRDashboardView: View {
         PRStateDot(state: pr.state)
     }
 
+    private func hostFromURL(_ url: String) -> String? {
+        guard let parsed = URL(string: url), let host = parsed.host else { return nil }
+        return host == "github.com" ? nil : host
+    }
+
     private func prRepoShortName(_ pr: PullRequest) -> String {
         if let idx = pr.repo.lastIndex(of: "/") {
             return String(pr.repo[pr.repo.index(after: idx)...])
@@ -479,4 +542,5 @@ public enum PRTab: String, CaseIterable, Sendable {
     case all = "All"
     case mine = "Mine"
     case reviewRequested = "Review Requests"
+    case assigned = "Assigned"
 }

@@ -151,6 +151,12 @@ extension PullRequest {
         default: return 6
         }
     }
+
+    /// Sort key for the "Assignees" table column — count of assignees.
+    /// PRs with no assignees sort first when ascending.
+    public var assigneeSortKey: Int {
+        assignees.count
+    }
 }
 
 // MARK: - Column Widths

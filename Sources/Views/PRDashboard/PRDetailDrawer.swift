@@ -1,3 +1,4 @@
+import GitHubOperations
 import MarkdownRendering
 import Models
 import SwiftUI
@@ -18,6 +19,13 @@ public struct PRDetailDrawer: View {
     var onEnableAutoMerge: ((MergeStrategy) -> Void)?
     var onDisableAutoMerge: (() -> Void)?
     var onClosePR: (() -> Void)?
+    var onAssignToMe: (() -> Void)?
+    var onUnassignMe: (() -> Void)?
+    var onToggleAssignee: ((String) -> Void)?
+    var onLoadCollaborators: (() -> Void)?
+    var myLogin: String?
+    var collaborators: [Collaborator] = []
+    var isLoadingCollaborators: Bool = false
 
     @State private var selectedTab: PRDetailTab = .overview
     @State private var sheetCommentText: String = ""
@@ -27,6 +35,7 @@ public struct PRDetailDrawer: View {
     @State private var selectedMergeStrategy: MergeStrategy = .squash
     @State private var requestChangesText: String = ""
     @State private var activeSheet: ActiveSheet?
+    @State private var showAssigneePicker: Bool = false
 
     enum ActiveSheet: Identifiable {
         case comment
@@ -49,7 +58,14 @@ public struct PRDetailDrawer: View {
         onSendToSession: ((String) -> Void)? = nil,
         onEnableAutoMerge: ((MergeStrategy) -> Void)? = nil,
         onDisableAutoMerge: (() -> Void)? = nil,
-        onClosePR: (() -> Void)? = nil
+        onClosePR: (() -> Void)? = nil,
+        onAssignToMe: (() -> Void)? = nil,
+        onUnassignMe: (() -> Void)? = nil,
+        onToggleAssignee: ((String) -> Void)? = nil,
+        onLoadCollaborators: (() -> Void)? = nil,
+        myLogin: String? = nil,
+        collaborators: [Collaborator] = [],
+        isLoadingCollaborators: Bool = false
     ) {
         self.pr = pr
         self.detail = detail
@@ -64,6 +80,13 @@ public struct PRDetailDrawer: View {
         self.onEnableAutoMerge = onEnableAutoMerge
         self.onDisableAutoMerge = onDisableAutoMerge
         self.onClosePR = onClosePR
+        self.onAssignToMe = onAssignToMe
+        self.onUnassignMe = onUnassignMe
+        self.onToggleAssignee = onToggleAssignee
+        self.onLoadCollaborators = onLoadCollaborators
+        self.myLogin = myLogin
+        self.collaborators = collaborators
+        self.isLoadingCollaborators = isLoadingCollaborators
     }
 
     public var body: some View {
@@ -133,6 +156,9 @@ public struct PRDetailDrawer: View {
             if reviewStatus != .none {
                 detailReviewBadge(reviewStatus)
             }
+
+            // Assignees
+            assigneesRow
 
             // Merge status
             let mergeable = detail?.mergeable ?? pr.mergeable
@@ -389,6 +415,48 @@ public struct PRDetailDrawer: View {
             case .none:
                 EmptyView()
             }
+        }
+        .font(.callout)
+    }
+
+    @ViewBuilder
+    private var assigneesRow: some View {
+        HStack(spacing: 8) {
+            Text("Assignees")
+                .font(.callout)
+                .foregroundColor(theme.chrome.textDim)
+            ForEach(pr.assignees, id: \.self) { login in
+                AssigneeAvatar(login: login, isMe: login == myLogin, size: 18)
+                    .help(login)
+            }
+            Button {
+                onLoadCollaborators?()
+                showAssigneePicker = true
+            } label: {
+                Image(systemName: "plus.circle")
+                    .font(.callout)
+                    .foregroundColor(theme.chrome.textDim)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Edit assignees")
+            .popover(isPresented: $showAssigneePicker, arrowEdge: .bottom) {
+                AssigneePickerView(
+                    pr: pr,
+                    myLogin: myLogin,
+                    collaborators: collaborators,
+                    isLoading: isLoadingCollaborators,
+                    onAssignToMe: {
+                        onAssignToMe?()
+                        showAssigneePicker = false
+                    },
+                    onUnassignMe: {
+                        onUnassignMe?()
+                        showAssigneePicker = false
+                    },
+                    onToggle: { login in onToggleAssignee?(login) }
+                )
+            }
+            Spacer()
         }
         .font(.callout)
     }

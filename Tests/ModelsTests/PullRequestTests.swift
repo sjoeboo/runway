@@ -141,3 +141,38 @@ import Testing
     #expect(pr.commentsSinceLastCommit == 0)
     #expect(pr.lastCommitDate == nil)
 }
+
+// MARK: - PROrigin.assigned
+
+@Test func prOriginAssignedCase() {
+    let origin: PROrigin = .assigned
+    #expect(origin.rawValue == "assigned")
+}
+
+@Test func prOriginAssignedEncodable() throws {
+    let origins: Set<PROrigin> = [.mine, .assigned]
+    let data = try JSONEncoder().encode(origins)
+    let decoded = try JSONDecoder().decode(Set<PROrigin>.self, from: data)
+    #expect(decoded == origins)
+}
+
+// MARK: - PullRequest.assignees
+
+@Test func pullRequestAssigneesDefault() {
+    let pr = PullRequest(
+        number: 1, title: "t", state: .open,
+        headBranch: "h", baseBranch: "m", author: "a", repo: "r"
+    )
+    #expect(pr.assignees.isEmpty)
+}
+
+@Test func pullRequestAssigneesCodableRoundtrip() throws {
+    var pr = PullRequest(
+        number: 1, title: "t", state: .open,
+        headBranch: "h", baseBranch: "m", author: "a", repo: "r"
+    )
+    pr.assignees = ["alice", "bob-chen"]
+    let data = try JSONEncoder().encode(pr)
+    let decoded = try JSONDecoder().decode(PullRequest.self, from: data)
+    #expect(decoded.assignees == ["alice", "bob-chen"])
+}

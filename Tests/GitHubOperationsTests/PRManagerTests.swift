@@ -13,12 +13,31 @@ import Testing
     #expect(error.errorDescription?.contains("not logged in") == true)
 }
 
-// MARK: - PRFilter
+// MARK: - PRFilter.assigned
 
-@Test func prFilterCases() {
-    // Verify all filter cases exist and are distinct
-    let filters: [PRFilter] = [.mine, .reviewRequested, .all]
-    #expect(filters.count == 3)
+@Test func prFilterAssignedCase() {
+    let filters: [PRFilter] = [.mine, .reviewRequested, .assigned, .all]
+    #expect(filters.count == 4)
+}
+
+@Test func buildSearchArgsForAssigned() {
+    let args = PRManager.buildSearchArgs(filter: .assigned)
+    #expect(args.contains("--assignee"))
+    #expect(args.contains("@me"))
+}
+
+@Test func buildSearchArgsForMine() {
+    let args = PRManager.buildSearchArgs(filter: .mine)
+    #expect(args.contains("--author"))
+    #expect(args.contains("@me"))
+    #expect(!args.contains("--assignee"))
+}
+
+@Test func buildListArgsForAssigned() {
+    let args = PRManager.buildListArgs(repo: "owner/repo", filter: .assigned)
+    #expect(args.contains("owner/repo"))
+    #expect(args.contains("--assignee"))
+    #expect(args.contains("@me"))
 }
 
 // MARK: - PRDetail
@@ -108,4 +127,184 @@ import Testing
     #expect(origins.count == 2)
     #expect(origins.contains(.mine))
     #expect(origins.contains(.reviewRequested))
+}
+
+// MARK: - Collaborator
+
+@Test func collaboratorIdEqualsLogin() {
+    let collab = Collaborator(login: "alice", name: "Alice B")
+    #expect(collab.id == "alice")
+}
+
+@Test func collaboratorEqualityUsesAllFields() {
+    // Same login + same name — equal and same hash
+    let a1 = Collaborator(login: "alice", name: "Alice")
+    let a2 = Collaborator(login: "alice", name: "Alice")
+    #expect(a1 == a2)
+    #expect(a1.hashValue == a2.hashValue)
+    // Same login, different name — not equal (synthesized Hashable uses all fields)
+    let a3 = Collaborator(login: "alice", name: nil)
+    #expect(a1 != a3)
+}
+
+@Test func collaboratorDecodable() throws {
+    let json = Data(#"{"login":"alice","name":"Alice Bailey"}"#.utf8)
+    let collab = try JSONDecoder().decode(Collaborator.self, from: json)
+    #expect(collab.login == "alice")
+    #expect(collab.name == "Alice Bailey")
+}
+
+@Test func collaboratorDecodableWithNullName() throws {
+    let json = Data(#"{"login":"bob","name":null}"#.utf8)
+    let collab = try JSONDecoder().decode(Collaborator.self, from: json)
+    #expect(collab.login == "bob")
+    #expect(collab.name == nil)
+}
+
+// MARK: - whoami
+
+@Test func whoamiReturnsSeededValue() async {
+    let manager = PRManager()
+    await manager.seedWhoamiForTest(host: "github.com", login: "alice")
+    let result = await manager.cachedWhoami(host: "github.com")
+    #expect(result == "alice")
+}
+
+@Test func whoamiReturnsNilForUnseededHost() async {
+    let manager = PRManager()
+    let result = await manager.cachedWhoami(host: "github.com")
+    #expect(result == nil)
+}
+
+@Test func whoamiDistinctAcrossHosts() async {
+    let manager = PRManager()
+    await manager.seedWhoamiForTest(host: "github.com", login: "alice")
+    await manager.seedWhoamiForTest(host: "ghe.spotify.net", login: "alice-s")
+    #expect(await manager.cachedWhoami(host: "github.com") == "alice")
+    #expect(await manager.cachedWhoami(host: "ghe.spotify.net") == "alice-s")
+}
+
+// MARK: - collaborators parsing
+
+@Test func parseCollaboratorsPages() throws {
+    // --paginate --slurp returns [[...], [...]]
+    let json = """
+        [
+          [{"login":"alice","name":"Alice Bailey"}, {"login":"bob","name":null}],
+          [{"login":"carol","name":"Carol"}, {"login":"alice","name":"Alice Bailey"}]
+        ]
+        """
+    let collabs = try PRManager.parseCollaborators(json)
+    // Dedup by login; preserve first-occurrence order
+    #expect(collabs.map(\.login) == ["alice", "bob", "carol"])
+    #expect(collabs[0].name == "Alice Bailey")
+    #expect(collabs[1].name == nil)
+}
+
+@Test func parseCollaboratorsEmpty() throws {
+    let collabs = try PRManager.parseCollaborators("[]")
+    #expect(collabs.isEmpty)
+}
+
+@Test func collaboratorsCacheSeeded() async {
+    let manager = PRManager()
+    let seed = [Collaborator(login: "alice", name: "Alice")]
+    await manager.seedCollaboratorsForTest(repo: "owner/repo", collabs: seed)
+    let cached = await manager.cachedCollaborators(for: "owner/repo")
+    #expect(cached?.map(\.login) == ["alice"])
+}
+
+// MARK: - Assignee decoding
+
+@Test func enrichResultHasAssignees() {
+    let result = PREnrichResult()
+    #expect(result.assignees.isEmpty)
+}
+
+@Test func enrichResponseDecodesAssignees() throws {
+    let json = """
+        {
+          "statusCheckRollup": [],
+          "assignees": [{"login":"alice","name":"Alice"}, {"login":"bob","name":null}]
+        }
+        """
+    let data = Data(json.utf8)
+    let result = try PRManager.parseEnrichResponseForTest(data: data, excludeAuthor: nil)
+    #expect(result.assignees == ["alice", "bob"])
+}
+
+@Test func enrichResponseWithNoAssignees() throws {
+    let json = #"{"statusCheckRollup":[]}"#
+    let data = Data(json.utf8)
+    let result = try PRManager.parseEnrichResponseForTest(data: data, excludeAuthor: nil)
+    #expect(result.assignees.isEmpty)
+}
+
+// MARK: - assign / unassign args
+
+@Test func buildAssignArgsAdd() {
+    let args = PRManager.buildAssignArgs(
+        repo: "owner/repo", number: 42, logins: ["alice", "bob"], add: true
+    )
+    #expect(args == ["pr", "edit", "42", "--repo", "owner/repo", "--add-assignee", "alice,bob"])
+}
+
+@Test func buildAssignArgsRemove() {
+    let args = PRManager.buildAssignArgs(
+        repo: "owner/repo", number: 42, logins: ["alice"], add: false
+    )
+    #expect(args == ["pr", "edit", "42", "--repo", "owner/repo", "--remove-assignee", "alice"])
+}
+
+@Test func buildAssignArgsSingle() {
+    let args = PRManager.buildAssignArgs(
+        repo: "o/r", number: 1, logins: ["me"], add: true
+    )
+    #expect(args.last == "me")
+    #expect(args.contains("--add-assignee"))
+}
+
+// MARK: - fetchAllPRs merge
+
+@Test func mergeOriginsSingleList() throws {
+    let pr = PullRequest(
+        number: 1, title: "t", state: .open,
+        headBranch: "h", baseBranch: "m", author: "a", repo: "r"
+    )
+    let merged = PRManager.mergePRsByOrigin(
+        mine: [pr],
+        reviewRequested: [],
+        assigned: []
+    )
+    let out = try #require(merged.first)
+    #expect(out.origin == [.mine])
+}
+
+@Test func mergeOriginsAcrossAllThree() throws {
+    let pr = PullRequest(
+        number: 1, title: "t", state: .open,
+        headBranch: "h", baseBranch: "m", author: "a", repo: "r"
+    )
+    let merged = PRManager.mergePRsByOrigin(
+        mine: [pr],
+        reviewRequested: [pr],
+        assigned: [pr]
+    )
+    #expect(merged.count == 1)
+    let out = try #require(merged.first)
+    #expect(out.origin == [.mine, .reviewRequested, .assigned])
+}
+
+@Test func mergeOriginsAssignedOnly() throws {
+    let pr = PullRequest(
+        number: 2, title: "t", state: .open,
+        headBranch: "h", baseBranch: "m", author: "a", repo: "r"
+    )
+    let merged = PRManager.mergePRsByOrigin(
+        mine: [],
+        reviewRequested: [],
+        assigned: [pr]
+    )
+    let out = try #require(merged.first)
+    #expect(out.origin == [.assigned])
 }

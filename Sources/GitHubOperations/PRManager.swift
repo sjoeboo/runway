@@ -15,6 +15,7 @@ public struct PREnrichResult: Sendable {
     public var autoMergeEnabled: Bool
     public var commentsSinceLastCommit: Int
     public var lastCommitDate: Date?
+    public var assignees: [String]
 
     public init(
         checks: CheckSummary = CheckSummary(), reviewDecision: ReviewDecision = .none,
@@ -23,7 +24,8 @@ public struct PREnrichResult: Sendable {
         mergeable: MergeableState? = nil, mergeStateStatus: MergeStateStatus? = nil,
         autoMergeEnabled: Bool = false,
         commentsSinceLastCommit: Int = 0,
-        lastCommitDate: Date? = nil
+        lastCommitDate: Date? = nil,
+        assignees: [String] = []
     ) {
         self.checks = checks
         self.reviewDecision = reviewDecision
@@ -37,6 +39,7 @@ public struct PREnrichResult: Sendable {
         self.autoMergeEnabled = autoMergeEnabled
         self.commentsSinceLastCommit = commentsSinceLastCommit
         self.lastCommitDate = lastCommitDate
+        self.assignees = assignees
     }
 }
 
@@ -45,6 +48,9 @@ public actor PRManager {
     /// Cached hosts from `gh auth status` — rarely changes at runtime
     private var cachedHosts: [String]?
     private var hostsCacheTime: Date?
+    private var cachedWhoamiByHost: [String: String] = [:]
+    private var cachedCollaboratorsByRepo: [String: (data: [Collaborator], fetchedAt: Date)] = [:]
+    private let collaboratorsTTL: TimeInterval = 600
 
     public init() {}
 
@@ -54,7 +60,7 @@ public actor PRManager {
     /// When `repo` is provided, uses `gh pr list` scoped to that repo.
     public func fetchPRs(repo: String? = nil, filter: PRFilter = .mine) async throws -> [PullRequest] {
         if let repo {
-            let args = buildListArgs(repo: repo, filter: filter)
+            let args = Self.buildListArgs(repo: repo, filter: filter)
             let output = try await runGH(args: args)
             return try parsePRList(output)
         } else {
@@ -63,7 +69,7 @@ public actor PRManager {
             var allPRs: [PullRequest] = []
 
             for host in hosts {
-                let args = buildSearchArgs(filter: filter)
+                let args = Self.buildSearchArgs(filter: filter)
                 if let output = try? await runGH(args: args, host: host) {
                     let prs = (try? parseSearchResults(output)) ?? []
                     allPRs.append(contentsOf: prs)
@@ -74,9 +80,9 @@ public actor PRManager {
         }
     }
 
-    /// Fetch both "mine" and "review-requested" PRs in parallel, merge and deduplicate.
+    /// Fetch "mine", "review-requested", and "assigned" PRs in parallel, merge and deduplicate.
     /// Each PR gets an `origin` set indicating which queries returned it.
-    /// A failure in one filter does not discard results from the other.
+    /// A failure in one filter does not discard results from the others.
     public func fetchAllPRs() async throws -> [PullRequest] {
         // Pre-resolve hosts on the actor so the parallel fetches don't re-enter.
         // Without this, async let + actor-isolated fetchPRs serializes instead of parallelizing.
@@ -84,16 +90,25 @@ public actor PRManager {
 
         async let minePRs: [PullRequest] = Self.fetchPRsNonisolated(hosts: hosts, filter: .mine)
         async let reviewPRs: [PullRequest] = Self.fetchPRsNonisolated(hosts: hosts, filter: .reviewRequested)
+        async let assignedPRs: [PullRequest] = Self.fetchPRsNonisolated(hosts: hosts, filter: .assigned)
 
-        let (mine, review) = await (minePRs, reviewPRs)
+        let (mine, review, assigned) = await (minePRs, reviewPRs, assignedPRs)
+        return Self.mergePRsByOrigin(mine: mine, reviewRequested: review, assigned: assigned)
+    }
 
-        // Merge: deduplicate by ID, combine origins
+    /// Merge three origin-tagged PR lists by id, combining origins into a single Set per PR.
+    /// Nonisolated + static so it is trivially testable without spinning up the actor.
+    nonisolated static func mergePRsByOrigin(
+        mine: [PullRequest],
+        reviewRequested: [PullRequest],
+        assigned: [PullRequest]
+    ) -> [PullRequest] {
         var merged: [String: PullRequest] = [:]
         for var pr in mine {
             pr.origin = [.mine]
             merged[pr.id] = pr
         }
-        for var pr in review {
+        for var pr in reviewRequested {
             pr.origin = [.reviewRequested]
             if var existing = merged[pr.id] {
                 existing.origin.insert(.reviewRequested)
@@ -102,7 +117,15 @@ public actor PRManager {
                 merged[pr.id] = pr
             }
         }
-
+        for var pr in assigned {
+            pr.origin = [.assigned]
+            if var existing = merged[pr.id] {
+                existing.origin.insert(.assigned)
+                merged[pr.id] = existing
+            } else {
+                merged[pr.id] = pr
+            }
+        }
         return Array(merged.values)
     }
 
@@ -131,7 +154,7 @@ public actor PRManager {
                 "pr", "view", "\(number)",
                 "--repo", repo,
                 "--json",
-                "statusCheckRollup,reviewDecision,headRefName,baseRefName,additions,deletions,changedFiles,mergeable,mergeStateStatus,autoMergeRequest,comments,commits",
+                "statusCheckRollup,reviewDecision,headRefName,baseRefName,additions,deletions,changedFiles,mergeable,mergeStateStatus,autoMergeRequest,comments,commits,assignees",
             ], host: host)
         guard let data = output.data(using: .utf8) else {
             return PREnrichResult()
@@ -147,7 +170,7 @@ public actor PRManager {
                 "pr", "view", "\(number)",
                 "--repo", repo,
                 "--json",
-                "body,reviews,comments,files,statusCheckRollup,reviewDecision,headRefName,baseRefName,additions,deletions,changedFiles,mergeable,mergeStateStatus,autoMergeRequest",
+                "body,reviews,comments,files,statusCheckRollup,reviewDecision,headRefName,baseRefName,additions,deletions,changedFiles,mergeable,mergeStateStatus,autoMergeRequest,assignees",
             ], host: host)
         var detail = try parsePRDetail(output)
 
@@ -272,6 +295,25 @@ public actor PRManager {
         )
     }
 
+    /// Assign the given logins to a PR. Single subprocess (gh accepts comma-joined list).
+    public func assign(repo: String, number: Int, logins: [String], host: String? = nil) async throws {
+        guard !logins.isEmpty else { return }
+        let args = Self.buildAssignArgs(repo: repo, number: number, logins: logins, add: true)
+        try await runGH(args: args, host: host)
+    }
+
+    /// Remove assignees from a PR. No-op if logins is empty.
+    public func unassign(repo: String, number: Int, logins: [String], host: String? = nil) async throws {
+        guard !logins.isEmpty else { return }
+        let args = Self.buildAssignArgs(repo: repo, number: number, logins: logins, add: false)
+        try await runGH(args: args, host: host)
+    }
+
+    nonisolated static func buildAssignArgs(repo: String, number: Int, logins: [String], add: Bool) -> [String] {
+        let flag = add ? "--add-assignee" : "--remove-assignee"
+        return ["pr", "edit", "\(number)", "--repo", repo, flag, logins.joined(separator: ",")]
+    }
+
     /// Update a PR branch with the latest base branch (merge or rebase).
     public func updateBranch(repo: String, number: Int, rebase: Bool = false, host: String? = nil) async throws {
         var args = ["pr", "update-branch", "\(number)", "--repo", repo]
@@ -327,6 +369,7 @@ public actor PRManager {
         switch filter {
         case .mine: args += ["--author", "@me"]
         case .reviewRequested: args += ["--review-requested", "@me"]
+        case .assigned: args += ["--assignee", "@me"]
         case .all: break
         }
         // gh search --json returns an array; also print total via --jq is fragile,
@@ -341,18 +384,7 @@ public actor PRManager {
     /// Nonisolated helper for parallel PR fetching — avoids actor re-entrance serialization.
     /// Hosts are pre-resolved on the actor; shell calls and parsing run off-actor.
     nonisolated private static func fetchPRsNonisolated(hosts: [String], filter: PRFilter) async -> [PullRequest] {
-        var args = [
-            "search", "prs",
-            "--state", "open",
-            "--archived=false",
-            "--json", "number,title,state,repository,url,isDraft,createdAt,updatedAt,author",
-            "--limit", "50",
-        ]
-        switch filter {
-        case .mine: args += ["--author", "@me"]
-        case .reviewRequested: args += ["--review-requested", "@me"]
-        case .all: break
-        }
+        let args = Self.buildSearchArgs(filter: filter)
 
         var allPRs: [PullRequest] = []
         for host in hosts {
@@ -362,6 +394,84 @@ public actor PRManager {
             }
         }
         return allPRs
+    }
+
+    /// Returns the current user's login for the given host, fetching and caching on first call.
+    /// Per-host because the same user may have different logins on different GHE instances.
+    public func whoami(host: String? = nil) async throws -> String {
+        let key = host ?? ""
+        if let cached = cachedWhoamiByHost[key] { return cached }
+        let output = try await runGH(args: ["api", "user", "-q", ".login"], host: host)
+        let login = output.trimmingCharacters(in: .whitespacesAndNewlines)
+        cachedWhoamiByHost[key] = login
+        return login
+    }
+
+    /// Returns the cached whoami for a host without triggering a fetch. Used by UI
+    /// that needs synchronous access and can tolerate `nil` until the cache warms.
+    public func cachedWhoami(host: String?) -> String? {
+        cachedWhoamiByHost[host ?? ""]
+    }
+
+    #if DEBUG
+        /// Test-only: seed the whoami cache to bypass the gh shellout.
+        public func seedWhoamiForTest(host: String?, login: String) {
+            cachedWhoamiByHost[host ?? ""] = login
+        }
+    #endif
+
+    /// Fetch the collaborator list for a repo. Cached per-repo with a 10-min TTL.
+    public func collaborators(repo: String, host: String? = nil) async throws -> [Collaborator] {
+        if let entry = cachedCollaboratorsByRepo[repo],
+            Date().timeIntervalSince(entry.fetchedAt) < collaboratorsTTL
+        {
+            return entry.data
+        }
+        let output = try await runGH(
+            args: ["api", "repos/\(repo)/collaborators", "--paginate", "--slurp"],
+            host: host
+        )
+        let collabs = try Self.parseCollaborators(output)
+        cachedCollaboratorsByRepo[repo] = (collabs, Date())
+        return collabs
+    }
+
+    /// Synchronous read of the cached collaborator list (nil if not loaded or stale).
+    public func cachedCollaborators(for repo: String) -> [Collaborator]? {
+        guard let entry = cachedCollaboratorsByRepo[repo],
+            Date().timeIntervalSince(entry.fetchedAt) < collaboratorsTTL
+        else { return nil }
+        return entry.data
+    }
+
+    #if DEBUG
+        /// Test-only seeder for the collaborators cache.
+        public func seedCollaboratorsForTest(repo: String, collabs: [Collaborator]) {
+            cachedCollaboratorsByRepo[repo] = (collabs, Date())
+        }
+    #endif
+
+    #if DEBUG
+        /// Test-only: parse an enrich response from raw JSON data.
+        nonisolated static func parseEnrichResponseForTest(data: Data, excludeAuthor: String?) throws -> PREnrichResult {
+            let decoder = JSONDecoder()
+            decoder.dateDecodingStrategy = .iso8601
+            let resp = try decoder.decode(GHEnrichResponse.self, from: data)
+            return resp.toEnrichResult(excludeAuthor: excludeAuthor)
+        }
+    #endif
+
+    /// Parse `gh api repos/.../collaborators --paginate --slurp` output (array of pages).
+    /// Dedup by login, preserve first-occurrence order.
+    nonisolated static func parseCollaborators(_ json: String) throws -> [Collaborator] {
+        guard let data = json.data(using: .utf8) else { return [] }
+        let pages = try JSONDecoder().decode([[GHCollaboratorUser]].self, from: data)
+        var seen = Set<String>()
+        var result: [Collaborator] = []
+        for user in pages.flatMap({ $0 }) where seen.insert(user.login).inserted {
+            result.append(Collaborator(login: user.login, name: user.name))
+        }
+        return result
     }
 
     // MARK: - Private
@@ -385,7 +495,7 @@ public actor PRManager {
         return hosts.isEmpty ? ["github.com"] : hosts
     }
 
-    private func buildSearchArgs(filter: PRFilter) -> [String] {
+    nonisolated static func buildSearchArgs(filter: PRFilter) -> [String] {
         var args = [
             "search", "prs",
             "--state", "open",
@@ -399,14 +509,16 @@ public actor PRManager {
             args += ["--author", "@me"]
         case .reviewRequested:
             args += ["--review-requested", "@me"]
+        case .assigned:
+            args += ["--assignee", "@me"]
         case .all:
-            break  // No author filter — show all open PRs
+            break
         }
 
         return args
     }
 
-    private func buildListArgs(repo: String, filter: PRFilter) -> [String] {
+    nonisolated static func buildListArgs(repo: String, filter: PRFilter) -> [String] {
         var args = [
             "pr", "list", "--json",
             "number,title,state,headRefName,baseRefName,author,url,isDraft,additions,deletions,changedFiles,createdAt,updatedAt,reviewDecision",
@@ -418,6 +530,8 @@ public actor PRManager {
             args += ["--author", "@me"]
         case .reviewRequested:
             args += ["--search", "review-requested:@me"]
+        case .assigned:
+            args += ["--assignee", "@me"]
         case .all:
             break
         }
@@ -457,11 +571,26 @@ public actor PRManager {
     }
 }
 
+// MARK: - Collaborator
+
+public struct Collaborator: Identifiable, Sendable, Hashable, Codable {
+    public let login: String
+    public let name: String?
+
+    public init(login: String, name: String? = nil) {
+        self.login = login
+        self.name = name
+    }
+
+    public var id: String { login }
+}
+
 // MARK: - Types
 
 public enum PRFilter: Sendable {
     case mine
     case reviewRequested
+    case assigned
     case all
 }
 
@@ -645,6 +774,7 @@ private struct GHPRDetailResponse: Decodable {
     let mergeable: String?
     let mergeStateStatus: String?
     let autoMergeRequest: GHAutoMergeRequest?
+    let assignees: [GHAuthor]?
 
     func toPRDetail() -> PRDetail {
         let rollup = statusCheckRollup ?? []
@@ -689,7 +819,8 @@ private struct GHPRDetailResponse: Decodable {
             changedFiles: changedFiles ?? 0,
             mergeable: MergeableState(rawValue: mergeable ?? ""),
             mergeStateStatus: MergeStateStatus(rawValue: mergeStateStatus ?? ""),
-            autoMergeEnabled: autoMergeRequest != nil
+            autoMergeEnabled: autoMergeRequest != nil,
+            assignees: (assignees ?? []).map(\.login)
         )
     }
 
@@ -778,6 +909,7 @@ private struct GHEnrichResponse: Decodable {
     let autoMergeRequest: GHAutoMergeRequest?
     let comments: [GHComment]?
     let commits: [GHCommit]?
+    let assignees: [GHAuthor]?
 
     func toEnrichResult(excludeAuthor: String? = nil) -> PREnrichResult {
         let checks = parseChecks(statusCheckRollup ?? [])
@@ -793,6 +925,7 @@ private struct GHEnrichResponse: Decodable {
         let commentsSinceLastCommit = Self.countCommentsSinceCommit(
             comments: comments, lastCommitDate: lastCommitDate, excludeAuthor: excludeAuthor
         )
+        let assigneeLogins = (assignees ?? []).map(\.login)
 
         return PREnrichResult(
             checks: checks, reviewDecision: review,
@@ -802,7 +935,8 @@ private struct GHEnrichResponse: Decodable {
             mergeStateStatus: MergeStateStatus(rawValue: mergeStateStatus ?? ""),
             autoMergeEnabled: autoMergeRequest != nil,
             commentsSinceLastCommit: commentsSinceLastCommit,
-            lastCommitDate: lastCommitDate
+            lastCommitDate: lastCommitDate,
+            assignees: assigneeLogins
         )
     }
 
@@ -908,6 +1042,11 @@ public struct PRFingerprint: Equatable, Sendable {
 
 private struct GHFingerprintItem: Decodable {
     let updatedAt: String?
+}
+
+private struct GHCollaboratorUser: Decodable {
+    let login: String
+    let name: String?
 }
 
 // MARK: - JSONDecoder for gh output
