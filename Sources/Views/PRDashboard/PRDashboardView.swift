@@ -30,6 +30,7 @@ public struct PRDashboardView: View {
     var onLoadCollaborators: ((String) -> Void)?
     var myLoginForHost: ((String?) -> String?)?
     var collaboratorsForRepo: ((String) -> [Collaborator])?
+    var isLoadingCollaboratorsForRepo: ((String) -> Bool)?
 
     @AppStorage("prListWidth") private var prListWidth: Double = 380
     @AppStorage("hideDrafts") private var hideDrafts: Bool = false
@@ -91,7 +92,8 @@ public struct PRDashboardView: View {
         onToggleAssignee: ((PullRequest, String) -> Void)? = nil,
         onLoadCollaborators: ((String) -> Void)? = nil,
         myLoginForHost: ((String?) -> String?)? = nil,
-        collaboratorsForRepo: ((String) -> [Collaborator])? = nil
+        collaboratorsForRepo: ((String) -> [Collaborator])? = nil,
+        isLoadingCollaboratorsForRepo: ((String) -> Bool)? = nil
     ) {
         self.pullRequests = pullRequests
         self.selectedPRID = selectedPRID
@@ -118,6 +120,7 @@ public struct PRDashboardView: View {
         self.onLoadCollaborators = onLoadCollaborators
         self.myLoginForHost = myLoginForHost
         self.collaboratorsForRepo = collaboratorsForRepo
+        self.isLoadingCollaboratorsForRepo = isLoadingCollaboratorsForRepo
     }
 
     private var selectedPR: PullRequest? {
@@ -229,7 +232,8 @@ public struct PRDashboardView: View {
                         { callback(pr.repo) }
                     },
                     myLogin: myLoginForHost?(hostFromURL(pr.url)),
-                    collaborators: collaboratorsForRepo?(pr.repo) ?? []
+                    collaborators: collaboratorsForRepo?(pr.repo) ?? [],
+                    isLoadingCollaborators: isLoadingCollaboratorsForRepo?(pr.repo) ?? false
                 )
                 .frame(maxWidth: .infinity)
             }

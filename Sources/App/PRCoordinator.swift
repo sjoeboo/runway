@@ -154,6 +154,12 @@ public final class PRCoordinator {
 
     // MARK: - Collaborators
 
+    /// Whether a collaborator fetch is currently in flight for this repo.
+    /// Used by the picker to show a ProgressView while the first load runs.
+    func isLoadingCollaborators(for repo: String) -> Bool {
+        loadingCollaboratorsRepos.contains(repo)
+    }
+
     /// Load collaborators for a repo, caching the result. Deduplicates concurrent calls.
     /// Hits the PRManager cache for instant re-reads within the 10-min TTL.
     func loadCollaborators(for repo: String, host: String? = nil) async {
@@ -541,6 +547,11 @@ public final class PRCoordinator {
         }
         whoamiByHost[host ?? ""] = login
         await updateAssignees(pr, adding: [login], removing: [])
+        // Mirror the self-assignment into the PR's origin set so the Assigned tab
+        // reflects the change immediately (rather than waiting for the next poll).
+        if let idx = pullRequests.firstIndex(where: { $0.id == pr.id }) {
+            pullRequests[idx].origin.insert(.assigned)
+        }
     }
 
     /// Unassign the current user from the PR.
@@ -552,6 +563,10 @@ public final class PRCoordinator {
         }
         whoamiByHost[host ?? ""] = login
         await updateAssignees(pr, adding: [], removing: [login])
+        // Remove .assigned locally so the PR disappears from the Assigned tab immediately.
+        if let idx = pullRequests.firstIndex(where: { $0.id == pr.id }) {
+            pullRequests[idx].origin.remove(.assigned)
+        }
     }
 
     /// Apply a set of assignee changes to a PR. Optimistic on success, reverts via re-enrichment

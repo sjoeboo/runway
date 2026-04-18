@@ -547,6 +547,9 @@ struct ContentView: View {
                 },
                 collaboratorsForRepo: { repo in
                     store.prCoordinator.collaboratorsByRepo[repo] ?? []
+                },
+                isLoadingCollaboratorsForRepo: { repo in
+                    store.prCoordinator.isLoadingCollaborators(for: repo)
                 }
             )
         }
