@@ -280,6 +280,25 @@ public struct PRDashboardView: View {
             }
             .width(min: 60, ideal: 90, max: 200)
 
+            TableColumn("Assignees", value: \.assigneeSortKey) { pr in
+                if !pr.assignees.isEmpty {
+                    let me = myLoginForHost?(hostFromURL(pr.url))
+                    HStack(spacing: -4) {
+                        ForEach(pr.assignees.prefix(3), id: \.self) { login in
+                            AssigneeAvatar(login: login, isMe: login == me, size: 14)
+                        }
+                        if pr.assignees.count > 3 {
+                            Text("+\(pr.assignees.count - 3)")
+                                .font(.caption2)
+                                .frame(width: 14, height: 14)
+                                .background(Circle().fill(theme.chrome.surface))
+                                .foregroundColor(theme.chrome.textDim)
+                        }
+                    }
+                }
+            }
+            .width(min: 40, ideal: 80, max: 140)
+
             TableColumn("Age", value: \.createdAt) { pr in
                 Text(pr.ageText)
                     .font(.caption)
