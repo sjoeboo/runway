@@ -130,3 +130,15 @@ import Testing
     )
     #expect(prGroup(for: pr) == .ready)
 }
+
+// MARK: - PRTab.assigned
+
+@Test func prTabAssignedCaseExists() {
+    let tabs = PRTab.allCases
+    #expect(tabs.contains(.assigned))
+    #expect(tabs.count == 4)
+}
+
+@Test func prTabAssignedRawValue() {
+    #expect(PRTab.assigned.rawValue == "Assigned")
+}

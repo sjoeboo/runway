@@ -136,6 +136,8 @@ public struct PRDashboardView: View {
             result = result.filter { $0.origin.contains(.mine) }
         case .reviewRequested:
             result = result.filter { $0.origin.contains(.reviewRequested) }
+        case .assigned:
+            result = result.filter { $0.origin.contains(.assigned) }
         }
 
         if showSessionPRsOnly {
@@ -517,4 +519,5 @@ public enum PRTab: String, CaseIterable, Sendable {
     case all = "All"
     case mine = "Mine"
     case reviewRequested = "Review Requests"
+    case assigned = "Assigned"
 }
